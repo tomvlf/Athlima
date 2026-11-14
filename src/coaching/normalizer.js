@@ -84,6 +84,18 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
     if(power == null && sport === 'cycling') warnings.push('Normalized power unavailable; average power is not used as normalized power.');
     if(!ftp && (sport === 'cycling' || power != null)) warnings.push('FTP unavailable; power load unavailable.');
     const tss = intensity == null ? null : raw.duration / 3600 * intensity ** 2 * 100;
+    const distance = optional(raw.distance, 'distance', warnings);
+    // Running load: average speed relative to threshold speed; no grade adjustment is available.
+    const thresholdPace = sport === 'running'
+        ? optional(raw.thresholdPace ?? profile.thresholdPace ?? null, 'threshold pace', warnings, 120, 900) : null;
+    let speed = sport === 'running' && distance > 0 ? distance / raw.duration : null;
+    if(speed != null && (speed < 0.5 || speed > 7)) {
+        warnings.push('Implausible running speed; pace load unavailable.');
+        speed = null;
+    }
+    if(sport === 'running' && speed != null && !thresholdPace) warnings.push('Threshold pace unavailable; pace load unavailable.');
+    const paceIntensity = speed != null && thresholdPace ? speed / (1000 / thresholdPace) : null;
+    const paceLoad = paceIntensity == null ? null : raw.duration / 3600 * paceIntensity ** 2 * 100;
     const hrReserve = hr && profile.maxHeartRate > profile.restingHeartRate &&
         positive(profile.restingHeartRate) ? (hr - profile.restingHeartRate) /
             (profile.maxHeartRate - profile.restingHeartRate) : null;
@@ -94,11 +106,13 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
         feedback[key] = optional(raw.feedback?.[key], key, warnings, 1, 5);
     }
     const level = streams.power && streams.heartRate && rpe != null ? 'A'
-        : (power != null || avgPower != null) && hr && rpe != null ? 'B'
+        : (power != null || avgPower != null || paceIntensity != null) && hr && rpe != null ? 'B'
             : hr && rpe != null ? 'C' : rpe != null ? 'D' : 'E';
     const loadMetrics = {
         power: metric(tss, 'medium', 'Duration hours x (normalized power / FTP)^2 x 100.',
             {duration: raw.duration, normalizedPower: power, ftp}),
+        pace: metric(paceLoad, 'low', 'Duration hours x (average speed / threshold speed)^2 x 100; rTSS-like, not grade-adjusted.',
+            {duration: raw.duration, distance, thresholdPace}),
         heartRate: metric(hrLoad, 'low', 'HR-reserve squared minutes; not TSS or clinical TRIMP.',
             {duration: raw.duration, averageHeartRate: hr,
                 restingHeartRate: profile.restingHeartRate ?? null, maxHeartRate: profile.maxHeartRate ?? null}),
@@ -128,7 +142,7 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
         indoor: raw.indoor ?? null,
         duration: raw.duration, movingTime: optional(raw.movingTime, 'moving time', warnings),
         elapsedTime: optional(raw.elapsedTime, 'elapsed time', warnings),
-        distance: optional(raw.distance, 'distance', warnings),
+        distance,
         elevation: optional(raw.elevation, 'elevation', warnings),
         averagePower: avgPower, normalizedPower: power,
         averagePowerCalculation: {source: averagePowerSource, version: VERSION},
@@ -146,7 +160,8 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
         workKj: sourceWork ?? derivedWork,
         workCalculation: sourceWork != null ? {value: sourceWork, source: 'source', version: VERSION} :
             metric(derivedWork, 'low', 'Integrated available one-second power, otherwise average power x elapsed seconds / 1000.'),
-        ftp, intensityFactor: intensity,
+        ftp, intensityFactor: intensity ?? paceIntensity,
+        ...(sport === 'running' ? {averageSpeed: speed, thresholdPace} : {}),
         rpe, feedback, streams,
         bestEfforts, details,
         powerProfile: profileSamples(raw.powerProfile, 'power', 3000),

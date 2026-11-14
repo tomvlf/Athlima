@@ -11,7 +11,7 @@
 import { workouts as builtIn } from '../workouts/workouts.js';
 import { FAMILIES, buildWorkout, progressWorkout, stepLoad } from './workouts.js';
 import { explainWorkout } from './explanations.js';
-import { DEFAULTS, addDays, validateCoachingConfig } from './domain.js';
+import { DEFAULTS, addDays, sportOf, validateCoachingConfig } from './domain.js';
 
 const CATEGORY_FAMILIES = {
     'VO2 Max': ['aerobic'], HIIT: ['aerobic'], Threshold: ['threshold'], 'Sweet Spot': ['threshold'],
@@ -295,12 +295,14 @@ export function prescribeWorkout(args, {history = [], prefer = null, catalogue, 
     const config = validateCoachingConfig(rules);
     const level = args.level ?? 1;
     const family = FAMILIES[args.family]?.hard && args.minutes < 25 ? 'endurance' : args.family;
-    const choice = library && Number.isInteger(args.minutes) && args.minutes >= 10 &&
+    // The built-in ZWO library holds cycling power templates only.
+    const useLibrary = library && sportOf(args.profile) === 'cycling';
+    const choice = useLibrary && Number.isInteger(args.minutes) && args.minutes >= 10 &&
         chooseLibraryWorkout({seconds: args.minutes * 60, family, level, phaseType: args.phaseType, date: args.date}, {
             history, prefer, maxLoad, allowTechnique, catalogue: catalogue ?? defaultCatalogue(config), rules: config});
     if(!choice) {
         const generated = progressWorkout(args);
-        if(library) {
+        if(useLibrary) {
             generated.libraryRationale = `No safe, fitting library template was available for this ${generated.family} slot; the Coach generated a conservative session instead.`;
             generated.description = `${generated.description} ${generated.libraryRationale}`;
         }

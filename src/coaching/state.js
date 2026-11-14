@@ -16,7 +16,7 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { DEFAULTS, VERSION, addDays, sum, mean, metric, positive, round,
+import { DEFAULTS, VERSION, addDays, sum, mean, metric, positive, round, sportOf,
     validateProfile, validateCoachingConfig } from './domain.js';
 
 export const POWER_DURATIONS = [5, 15, 30, 60, 180, 300, 720, 1200, 1800, 2400, 3600];
@@ -127,14 +127,15 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
     if(config.longDays > 730 || config.readinessWindowDays > config.longDays) {
         throw new Error('Coaching history windows must not exceed 730 days or the configured long window.');
     }
-    const history = activities.filter(a => a.sport === 'cycling' && a.day <= asOf &&
+    const sport = sportOf(profile);
+    const history = activities.filter(a => a.sport === sport && a.day <= asOf &&
         a.day > addDays(asOf, -config.longDays));
     const recent = history.filter(a => a.day > addDays(asOf, -config.mediumDays));
     // One scale for the entire snapshot, never add TSS to RPE or HR units.
-    const loadSource = recent.length && recent.every(a => a.loadMetrics.power.value != null) ? 'power'
-        : recent.length && recent.every(a => a.loadMetrics.sessionRpe.value != null) ? 'sessionRpe'
-            : recent.length && recent.every(a => a.loadMetrics.heartRate.value != null) ? 'heartRate' : 'duration';
-    const loadOf = a => loadSource === 'duration' ? a.duration / 60 : a.loadMetrics[loadSource].value;
+    const loadSource = [sport === 'running' ? 'pace' : 'power', 'sessionRpe', 'heartRate']
+        .find(key => recent.length && recent.every(a => a.loadMetrics[key]?.value != null)) ?? 'duration';
+    const loadOf = a => loadSource === 'duration' ? a.duration / 60 : a.loadMetrics[loadSource]?.value;
+    const longestWindow = history.filter(a => a.day > addDays(asOf, -config.runLongestSessionReferenceDays));
     const daily = [];
     let chronic = 0, acute = 0, previousChronic = 0;
     for(let i = config.longDays - 1; i >= 0; i--) {
@@ -200,10 +201,12 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
     const rpes = recent.filter(a => a.rpe != null).sort((a, b) => a.start.localeCompare(b.start));
     const half = Math.floor(rpes.length / 2);
     return {
-        id: `${profile.id}:${asOf}:${VERSION}`, athleteId: profile.id, date: asOf, version: VERSION, config,
+        id: `${profile.id}:${asOf}:${VERSION}`, athleteId: profile.id, date: asOf, version: VERSION, config, sport,
         profileInputs: JSON.parse(JSON.stringify(profile)),
         ftp: {...metric(profile.ftp ?? null, 'medium', 'Athlete-declared FTP, not inferred CP.'), source: 'athlete-profile'},
         wKg: metric(profile.ftp ? profile.ftp / profile.weight : null, 'medium', 'Declared FTP / body mass.'),
+        thresholdPace: metric(profile.thresholdPace ?? null, 'medium', 'Athlete-declared running threshold pace, seconds per km.'),
+        longestRecentSessionMinutes: longestWindow.length ? Math.max(...longestWindow.map(a => a.duration / 60)) : 0,
         criticalPower: cp, maximumAerobicPower: metric(null, 'unavailable', 'No validated MAP protocol supplied.'),
         powerDuration: powerCurve, baselinePowerDuration: baseline,
         performanceComparison: 'Missing maximal efforts are not evidence of performance decline.',

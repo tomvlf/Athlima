@@ -381,6 +381,9 @@ xf.reg('ui:coaching:select', (workout, db) => {
            current.date !== localDay(new Date().toISOString(), profile.timeZone)) {
             throw new Error('Only unresolved workouts scheduled for today in the active coaching plan can be started.');
         }
+        if(current.sport === 'running') {
+            throw new Error('Runs are not played on the trainer. Follow the pace guide in the calendar or export the ZWO to your watch.');
+        }
         if(profile.ftp == null) {
             throw new Error('FTP is unavailable. Use duration/RPE guidance, or set FTP and regenerate for power-based execution.');
         }

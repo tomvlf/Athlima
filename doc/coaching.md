@@ -1,4 +1,4 @@
-# Adaptive cycling coaching
+# Adaptive cycling and running coaching
 
 The **Coach** view is a deterministic training support system, not a medical
 professional. It does not diagnose illness or injury, and it does not infer a
@@ -26,21 +26,25 @@ used as an isolated verdict about whether to train.
 
 **Coach** guides you through four numbered steps:
 
-1. **Check your rider profile.** FTP and body weight come from **Settings**;
-   body weight is required, and without FTP sessions use effort (RPE) guidance.
-2. **What are you training for?** Goal name, type, priority and a time frame
+1. **What are you training for?** Goal name, type (grouped into *Cycling* and
+   *Running*; the goal type selects the sport), priority and a time frame
    (about 6 weeks, 3 months, 6 months or a year). Event details such as an exact
    event date, distance, climbing and targets are optional; an event date
-   replaces the time frame.
-3. **When can you ride?** The longest ride per weekday in minutes (0 for rest
-   days), an indoor/outdoor preference per day, a long-ride day, weekly hours
-   and experience.
+   replaces the time frame. Power targets are only shown for cycling goals.
+2. **Check your athlete profile.** Body weight comes from **Settings** and is
+   required. Cycling uses FTP from **Settings**; without FTP, sessions use effort
+   (RPE) guidance. Running asks for a threshold pace (min:sec per km or mile), or
+   a recent race distance and finish time from which threshold pace is
+   estimated; without either, runs use effort guidance.
+3. **When can you train?** The longest session per weekday in minutes (0 for
+   rest days), an indoor/outdoor preference per day, a long ride / long run day,
+   weekly hours and experience in this sport.
 4. **Create your plan.** Recorded Athlima rides are included automatically; for
-   better targets connect **Settings > Intervals.icu** first, or import rides
-   later under **Ride history and backup**. The existing Athlima activity
-   summaries contain only duration, and the FIT cache retains only seven rides.
-   **More options** holds the start date, time zone, heart-rate values and
-   equipment.
+   runs and better targets connect **Settings > Intervals.icu** first, or import
+   activities later under **Training history and backup**. The existing Athlima
+   activity summaries contain only duration, and the FIT cache retains only
+   seven rides. **More options** holds the start date, time zone, heart-rate
+   values and equipment.
 
 Once a plan is active, Coach shows the goal countdown, current phase, next
 session and upcoming sessions, plus post-ride feedback, plan adjustments and a
@@ -99,6 +103,89 @@ Other profile changes likewise require reconfiguration for future plans.
 Do not stack the coach's prescription with separate library or Intervals.icu
 sessions; choose a substitution and let the completed ride update the coach.
 
+## Running coach
+
+Choosing a running goal type (general running fitness, first 5 km, 5 km,
+10 km, half marathon, marathon, ultra / trail) plans runs with the same engine,
+phases, readiness rules and adaptation as cycling. Only the session content,
+the load scale and a set of running-specific safety rules differ. The rules and
+their evidence are summarised in [Scientific review](#scientific-review).
+
+**Intensity and load.** Running intensities are fractions of *threshold speed*
+(the speed you could hold for about an hour), so the shared step format and
+validators still apply. Easy runs are at 80%, threshold repetitions 98%,
+VO2max intervals 107% and short repetitions and strides 115% of threshold
+speed. A recorded run's load is `hours x (average speed / threshold speed)^2 x
+100`, a low-confidence, rTSS-like proxy using average rather than grade-adjusted
+pace. Planned load reuses the interval-weighted power-load calculation on
+threshold-speed fractions. These are engineering estimates, not validated rTSS;
+planned and recorded interval loads can differ even with exact execution.
+Equal running and cycling scores do not imply equal physiological or injury
+stress, and their histories are modelled separately.
+
+**Threshold pace.** Enter it directly, or enter a recent all-out race. The race
+time is converted to a one-hour equivalent with Riegel's formula
+(`T2 = T1 x (D2 / D1)^1.06`); for example 5 km in 25:00 gives about 5:15/km.
+Without a threshold pace the plan still works, but sessions are described by
+effort (RPE) and recorded runs have no pace load.
+
+**What the plan contains.**
+
+- *Run-walk for novices.* Beginners whose longest recent run is under 30
+  minutes start with run-walk intervals: 1 min run / 90 s walk without recent
+  runs, 2 min / 1 min after runs of 10-20 minutes, and 5 min / 1 min after
+  runs of 20-30 minutes. The stage advances every two weeks (up to 8 min run /
+  1 min walk) before continuous running, so a complete novice run-walks for
+  about 12 weeks. Run-walk sessions are never hard, and beginners are limited
+  to four running days per week. These stages and the frequency cap are coaching
+  heuristics, not a trial-validated beginner or injury-rehabilitation programme.
+- *Single-run spike cap.* No planned run may be more than 10% longer than the
+  duration reference for the previous 30 days. This is a **duration-based
+  heuristic** inspired by Frandsen et al. 2025, whose observational study measured
+  **distance**, not duration. It does not establish a safe threshold or prove
+  injury prevention. The initial historical maximum lacks its original date,
+  making that part of the window approximate. The cap is checked in
+  `validatePlan` and re-applied after every adaptation.
+- *Weekly volume.* For runs the weekly minutes ramp (5%, 2.5% with weak data)
+  and the weekly target load limit progression. The extra cycling-style
+  scheduled-load ramp is not applied, to avoid shrinking training time as
+  low-load walking phases out. This is an engineering choice, not a consequence
+  proven by injury research: a null week-to-week distance association does not
+  establish that weekly load is irrelevant. When the easy-run load of the available minutes
+  exceeds the weekly budget, all sessions are shortened proportionally, so the
+  number of running days is kept.
+- *Quality caps.* Threshold running is limited to about 10%, interval running to
+  8% and repetitions to 5% of originally scheduled weekly running time, summed
+  across all sessions of that family. These are Daniels-inspired coaching caps,
+  with time used as a proxy for distance, not validated physiological limits.
+  Adaptations retain the original weekly reference, so completed quality work
+  is not invalidated by a later reduction. In the taper the reference is the
+  largest of the preceding four weeks, so a short quality touch remains.
+- *Strides.* Runners who no longer use run-walk get 4 strides (6 in build,
+  specific and peak phases) of 20 s at the end of one easy run per week. Strides
+  are never added to hard sessions or the long run.
+- *Long run.* About 30% of the weekly time goes to the long run on the chosen
+  day, bounded by the spike cap.
+- *Strength.* The plan rationale recommends considering progressive strength
+  work for running economy, with a conservative introduction and qualified
+  guidance for unfamiliar heavy or plyometric exercises. It adds fatigue;
+  strength is advice, not scheduled or tracked training.
+- *Race readiness.* When the longest planned run stays below 50% of the
+  expected race time (declared duration, target finish time, or a Riegel
+  prediction from threshold pace and the race distance), the plan flags
+  potentially insufficient endurance preparation. This 50% share is a coaching
+  heuristic, not trial evidence or a readiness assessment. No warning does not
+  certify that the runner is prepared.
+
+**Day to day.** Runs are not played on the trainer: there is no **Start** button
+for runs, and the player rejects them. The calendar and session page show a
+pace guide per step (for example "threshold 5:06/km, easy 6:15/km") with a
+reminder to run by effort on hills, in heat or on trails. **Export ZWO** writes
+a running ZWO (`<sportType>run</sportType>`) for watches and apps that accept it.
+Runs synchronised from Intervals.icu (`Run`, `TrailRun`, `VirtualRun`) or
+imported as JSON (`"sport": "running"`, `distance` in metres) are matched only
+to running sessions and then adapt the plan as for cycling.
+
 ## Architecture and API
 
 All calculations use seconds, watts, kilograms, kilometres for goal distances,
@@ -110,6 +197,7 @@ declared IANA time zone. Pure calculations take explicit dates and timestamps.
 | Responsibility | Module / public function |
 |---|---|
 | Activity Normalizer | `normalizer.js`: `normalizeActivity`, `fromRecordedRide` |
+| Running rules | `running.js`: run families, `runSteps`, `runWalkStage`, Riegel helpers, `describeRunPaces` |
 | Rider State Estimator | `state.js`: `estimateState`, `powerDuration`, `estimateCriticalPower`, `intensityDistribution`, `estimateDurability` |
 | Goal Demand Model | `demands.js`: `modelGoalDemand` |
 | Gap Analyzer | `demands.js`: `analyzeGaps` |
@@ -127,7 +215,9 @@ declared IANA time zone. Pure calculations take explicit dates and timestamps.
 planning modules. Goal weights are in the extensible `GOALS` registry; callers
 can supply a registry with additional five-element capability weight vectors.
 The initial types are general fitness, FTP improvement, gran fondo, climbing,
-time trial, road race, criterium, sprint and long-distance completion.
+time trial, road race, criterium, sprint and long-distance completion. Running
+goals use the `RUN_GOALS` registry; `profile.sport` (`'cycling'` by default or
+`'running'`) selects the registry, session families and safety rules.
 
 `CoachingService(storage, clock, rules)` composes history, snapshots, matching
 and revision persistence. `rules` is optional and defaults to `DEFAULTS`;
@@ -310,9 +400,9 @@ caution.
 | No history / recent inactivity | At most 90 initial minutes, further bounded by history and availability |
 | Insufficient (low-confidence) history | Never starts below the no-history 90 minutes; a single short test ride cannot shrink the plan |
 | Initial power-load envelope | Also bounded by observed recent and medium-window average power load, when on a power scale and the data level is sufficient |
-| Recovery | Every fourth training week, 70% of the preceding envelope |
-| Taper | 55% of the envelope; starts 7 / 4 / 2 days before an A / B / C goal |
-| Hard sessions | At most 2/week (1 for beginners), none with weak data or recovery concerns |
+| Recovery | Every fourth training week, 70% of the preceding envelope; skipped when it would fall directly before the taper |
+| Taper | 55% of the envelope; 14 / 7 / 3 days before an A / B / C goal, at most 25% of the plan; keeps one short quality session per taper week when the plan lasts at least 21 days and the session is at least 3 days before the event |
+| Hard sessions | At most 2/week (1 for beginners), none with weak data or recovery concerns; the focus rotates between the goal's two highest-priority capabilities |
 | Hard-session separation | At least one easy/rest day |
 | Demanding interval time | Library template <=18% of its slot; full plan <=20% of weekly time |
 | Minimum useful session | 10 minutes; shorter or overloaded sessions are omitted with warnings |
@@ -343,6 +433,58 @@ template-designated warm-up/recovery/cool-down steps are preserved. The
 scheduler respects availability, long-ride preference, per-day duration and
 hard-session spacing. Unschedulable targets are reduced and explained, never
 forced into another day.
+
+## Scientific review
+
+The planning methods were checked against the training-science literature. The
+table lists each method, the evidence, the verdict and what changed. "Aligned"
+means a broad principle is consistent with evidence, not that this planner or
+its exact thresholds have been validated. No single intensity distribution or
+periodisation is optimal for every athlete. Many studies involve trained
+athletes, so transfer to beginners and very long races is uncertain.
+Defaults remain engineering heuristics.
+
+| Method | Evidence | Verdict | Change |
+|---|---|---|---|
+| Phases and mostly easy volume | [Seiler 2010](https://pubmed.ncbi.nlm.nih.gov/20861519/); [Stöggl & Sperlich 2014](https://pubmed.ncbi.nlm.nih.gov/24550842/); [Rosenblat 2019](https://pubmed.ncbi.nlm.nih.gov/29863593/); [Casado 2022](https://pubmed.ncbi.nlm.nih.gov/35418513/); [Filipas 2022](https://pubmed.ncbi.nlm.nih.gov/34792817/): support for substantial easy training; pyramidal and polarized approaches can both work | Broadly aligned; exact phase lengths and distribution are not established | Retained |
+| Hard sessions capped and separated; hard-time share <=20% | [Seiler 2010](https://pubmed.ncbi.nlm.nih.gov/20861519/); [Burnley et al. 2022](https://pubmed.ncbi.nlm.nih.gov/35135998/) challenge universal polarized superiority | Reasonable guardrails, not proof of an optimal dose. Time-in-zone, session counts and threshold definitions are not interchangeable | Retained; do not label the engine a validated "80/20" programme |
+| One fixed hard focus per goal | [Rønnestad 2014](https://pubmed.ncbi.nlm.nih.gov/22646668/), [another cycling trial](https://pubmed.ncbi.nlm.nih.gov/23134196/) and [Mølmen 2019](https://pubmed.ncbi.nlm.nih.gov/31802956/) examine block training; [Milanović 2015](https://pubmed.ncbi.nlm.nih.gov/26243014/) finds VO2max improvements with both continuous training and HIIT | Broader stimuli are reasonable; these studies do not validate this rotation algorithm or make HIIT necessary for every athlete | Rotate between the goal's two highest-priority hard capabilities |
+| Taper: 55% volume, formerly 7 / 4 / 2 days with recovery only | [Bosquet 2007](https://pubmed.ncbi.nlm.nih.gov/17762369/): 27-study meta-analysis favours about 2 weeks, progressive 41-60% volume reduction, intensity/frequency maintained; [Mujika & Padilla 2003](https://pubmed.ncbi.nlm.nih.gov/12840640/); [Spilsbury 2015](https://pubmed.ncbi.nlm.nih.gov/25189116/); [Smyth & Lawlor 2021](https://pubmed.ncbi.nlm.nih.gov/34651125/) | Volume broadly aligned; taper length and loss of intensity needed attention | 14 / 7 / 3 days for A / B / C goals, capped at 25% of plan length; allow one quality session per taper week when readiness, history and availability permit. B/C lengths remain heuristics |
+| Recovery week every fourth week | [Sandbakk et al. 2025](https://pubmed.ncbi.nlm.nih.gov/40278987/) describe world-class coaches' practice, not a trial establishing a universal deload interval | Coaching heuristic | Avoid stacking a routine deload immediately before taper; this is not a claim that stacked reductions necessarily cause detraining |
+| CTL/ATL-like exponential averages and session RPE | [Morton, Fitz-Clarke & Banister 1990](https://pubmed.ncbi.nlm.nih.gov/2246166/); [Foster 1998](https://pubmed.ncbi.nlm.nih.gov/9662690/), [2001](https://pubmed.ncbi.nlm.nih.gov/11708692/) | Consistent with load modelling; fixed 42/7-day constants do not measure biological fitness/fatigue or predict individual injury | Retained as labelled indicators, not calibrated performance predictions |
+| Weekly ramp 5% (2.5% with weak data) | [Impellizzeri 2020](https://pubmed.ncbi.nlm.nih.gov/32502973/) critiques causal ACWR claims; [Buist 2008](https://pubmed.ncbi.nlm.nih.gov/17940147/) found no injury reduction from a graded programme based on the weekly 10% rule | Conservative heuristic, not a proven safe threshold | Running retains minutes ramp and target load, without a second scheduled-load ramp |
+| Readiness from subjective feedback | [Saw 2016](https://pubmed.ncbi.nlm.nih.gov/26423706/): subjective measures often respond more consistently to training load than common objective markers | Monitoring principle supported; this scoring algorithm is unvalidated | Retained; no isolated sleep verdict or diagnosis |
+| Running injury risk | [Nielsen 2014](https://pubmed.ncbi.nlm.nih.gov/25155475/); [Damsted 2018](https://pubmed.ncbi.nlm.nih.gov/30534459/); [Frandsen 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC12421110/): 5,205-runner cohort; single-session **distance** spikes >10-30%, >30-100% and >100% associated with HRRs 1.64, 1.52 and 2.28; no week-to-week distance-ratio association | Observational association, not proof of causation or a safe limit; duration is an unvalidated proxy | Duration-based spike guardrail in planning, validation and adaptation, with limitations disclosed |
+| Run-walk and novice progression | [Hottenrott 2016](https://pubmed.ncbi.nlm.nih.gov/25467199/): 42 non-elite marathon runners, similar finish times and less reported muscle pain/fatigue with run-walk, but no reduced cardiovascular load; [Videbæk 2015](https://pubmed.ncbi.nlm.nih.gov/25951917/) examines injury incidence | Does not establish reduced muscle damage/injury or validate these novice stages | Heuristic staged run-walk and a four-day beginner cap |
+| Quality-session limits | Daniels' coaching framework uses threshold/interval/repetition work and volume-based dose limits; this implementation substitutes time for mileage | Coaching convention, not independently trial-validated percentages | Aggregate weekly family caps of 10% / 8% / 5%; rechecked after adaptation |
+| Race prediction / threshold pace | Riegel's endurance model; [Vickers & Vertosick 2016](https://pubmed.ncbi.nlm.nih.gov/27570626/) find optimistic marathon estimates in recreational runners | Approximate one-hour race pace is not a measured lactate threshold or critical speed | Exponent 1.06, direct pace input or race estimate, and a heuristic preparation warning |
+| Strength training | [Balsalobre-Fernández 2016](https://pubmed.ncbi.nlm.nih.gov/26694507/); [Blagrove 2018](https://pubmed.ncbi.nlm.nih.gov/29249083/); [Rønnestad & Mujika 2014](https://pubmed.ncbi.nlm.nih.gov/23914932/) | Evidence supports running-economy benefits; individual dose, experience and recovery still matter | Optional progressive-strength advice, not scheduled sessions |
+| Power/HR/pace zones | [Burnley et al. 2022](https://pubmed.ncbi.nlm.nih.gov/35135998/) discuss problems with classifying intensity and claims of polarized superiority | Fixed percentages are not measured physiological thresholds; FTP, critical power and lactate/ventilatory thresholds are not interchangeable | Keep zone estimates labelled; suggest individual calibration |
+
+### Suggested further adaptations (not implemented)
+
+These are lower-confidence changes or need more data or user interface work:
+
+- **Intensity in base for time-crunched athletes.** Evaluate an optional modest
+  quality session for experienced, recovered athletes with limited weekly time,
+  rather than assuming an easy-only base is always optimal. Do not apply it
+  automatically to beginners or weak-history profiles.
+- **Threshold-based heart-rate zones.** Use lactate threshold heart rate (LTHR)
+  instead of percentages of maximum heart rate, and use heart rate as the load
+  source (Banister TRIMP) when power and pace are missing.
+- **Monotony and strain** (Foster 1998) as an extra readiness signal.
+- **Data level for power-only or pace-only users.** These users cannot reach data
+  level A/B without heart rate and RPE, which keeps their plans conservative.
+- **Progressive intensity distribution.** Evaluate pyramidal-to-polarized
+  progression rather than treating the fixed `targetIntensityDistribution` as
+  optimal. Filipas supports this in well-trained male runners, not all athletes.
+- **Progressive taper.** A progressive (non-linear) taper performed slightly
+  better than a step taper in Bosquet 2007.
+- **Running-specific improvements.** Use distance (not duration) for the spike
+  cap, grade-adjusted pace for load, and dated longest-run history so the
+  30-day window is exact. Avoid long runs directly after interval days for
+  intermediate runners.
+- **Validate the race-readiness heuristic** against real training outcomes.
 
 ## Estimation limitations
 
@@ -545,7 +687,7 @@ stop for pain. Coaching support does not diagnose illness or injury.
 ## Verification
 
 ```sh
-npm test -- --runInBand test/coaching test/views/training-calendar.test.js
+npm test -- --runInBand test/coaching test/views/training-calendar.test.js test/platform/plan-view.test.js
 npm test -- --runInBand   # full suite, including IndexedDB, service-worker and backup tests
 npm run build
 ```
@@ -557,6 +699,9 @@ availability/date matrices, initial and progressive load bounds, periodisation
 and recovery re-entry, structured player/ZWO compatibility, matching,
 future-only adaptation, immutable revision history, duplicate events, failed
 persistence, IndexedDB restoration/conflicts, and the calendar form workflow.
+`test/coaching/running.test.js` covers every running goal, the spike cap,
+run-walk, strides, the race-readiness warning, pace load, Riegel estimates, run
+ZWO export and run-only matching.
 
 ### Threshold validation with representative data
 
@@ -588,7 +733,17 @@ plausibility; they are **not** physiological validation of the thresholds.
   low-data ramp. Archive and regenerate the plan once enough rides are recorded.
 * The per-session hard-time cap (18%) means threshold days use sweet-spot style
   sessions; true threshold/VO2 blocks would need a weekly hard-time budget.
-* Planned recovery and taper weeks contain recovery-family rides only.
+* Planned recovery weeks contain recovery-family sessions only; taper weeks
+  keep one short quality session when the plan is long enough.
+* Running load uses average pace, not grade-adjusted pace, so hills, trails,
+  stops and interval structure can distort the score; planned running load uses
+  a different interval-weighted proxy. Neither is a validated injury measure.
+  The spike cap uses duration rather than distance; the
+  ZWO `pace="2"` mapping (10 km pace) only approximates threshold pace; and
+  Riegel predictions are optimistic for the marathon.
+* Beginner running plans grow slowly (about 2 minutes per week from 90
+  minutes) and may not be enough for a long race; the readiness warning flags
+  this.
 * Small leftover budget can produce 10-20 minute filler sessions.
 * A very short recorded ride matched to today's session counts as a
   low-quality completion and triggers the 15% short-term reduction.

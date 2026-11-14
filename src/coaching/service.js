@@ -16,7 +16,7 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { VERSION, DEFAULTS, localDay, validateProfile, validateCoachingConfig, date } from './domain.js';
+import { VERSION, DEFAULTS, localDay, sportOf, validateProfile, validateCoachingConfig, date } from './domain.js';
 import { normalizeActivity } from './normalizer.js';
 import { estimateState } from './state.js';
 import { generatePlan } from './planner.js';
@@ -166,7 +166,8 @@ export class CoachingService {
                         feedback: Object.fromEntries(Object.keys(previous.feedback).map(key =>
                             [key, previous.feedback[key] ?? activity.feedback[key]]))},
                     next.profile || undefined);
-                    if((previous.sport === 'cycling' || updated.sport === 'cycling') &&
+                    const coached = sportOf(next.profile);
+                    if((previous.sport === coached || updated.sport === coached) &&
                        evidence(previous) !== evidence(updated)) refreshed = true;
                     next.activities[index] = updated;
                 }
@@ -181,7 +182,7 @@ export class CoachingService {
                 for(const activity of added.filter(a => a.day <= today && a.day >= next.plan.startDate)) {
                     this.applyActivity(next, activity, today);
                 }
-                if(refreshed || added.some(a => a.sport === 'cycling' && a.day < next.plan.startDate)) {
+                if(refreshed || added.some(a => a.sport === sportOf(next.profile) && a.day < next.plan.startDate)) {
                     const state = this.snapshot(next, today);
                     next.plan = adaptPlan({plan: next.plan, profile: next.profile, state,
                         trigger: 'feedback', date: today, timestamp: this.clock()});
@@ -200,7 +201,7 @@ export class CoachingService {
      * @param {string|null} [explicitId=null] - Optional workout ID when the rider explicitly matches a workout.
      */
     applyActivity(next, activity, asOf, explicitId = null) {
-        if(activity.sport !== 'cycling' || activity.day > asOf || activity.day < next.plan.startDate) return;
+        if(activity.sport !== sportOf(next.profile) || activity.day > asOf || activity.day < next.plan.startDate) return;
         const match = matchWorkout(activity, next.plan.workouts, explicitId, this.rules);
         const matched = next.plan.workouts.find(w => w.id === match.workoutId);
         const state = this.snapshot(next, asOf, matched

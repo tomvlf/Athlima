@@ -16,12 +16,65 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { VERSION, GOALS, addDays, daysBetween, weekday, sum, round,
+import { VERSION, addDays, daysBetween, weekday, sum, round, sportOf, goalRegistry,
     validateProfile, validateGoal, validateCoachingConfig } from './domain.js';
 import { modelGoalDemand, analyzeGaps } from './demands.js';
-import { progressWorkout, FAMILIES, stepLoad } from './workouts.js';
+import { progressWorkout, FAMILIES, familySpec, stepLoad } from './workouts.js';
 import { prescribeWorkout } from './library.js';
 import { explainPhase, explainWeek } from './explanations.js';
+import { runWalkStage, runSteps, runQualityExcess, predictedRaceSeconds } from './running.js';
+
+/**
+ * Taper length: the configured length for the goal priority (Bosquet et al. 2007: about two weeks
+ * for an A event), never more than a quarter of a short plan so build work is not displaced.
+ *
+ * @param {object} goal - Goal with `priority`.
+ * @param {number} total - Plan length in days.
+ * @param {object} config - Validated coaching configuration.
+ * @returns {number} Taper length in days.
+ */
+export function taperDays(goal, total, config) {
+    const configured = goal.priority === 'A' ? config.taperDaysPriorityA
+        : goal.priority === 'B' ? config.taperDaysPriorityB : config.taperDaysPriorityC;
+    return Math.max(1, Math.min(configured, Math.round(total * config.taperMaximumPlanShare)));
+}
+
+/**
+ * Duration proxy for Frandsen et al. (2025)'s distance-based reference; not an injury prediction.
+ * Adaptation passes `counted` to ignore missed sessions, a stricter reference than validation.
+ *
+ * @returns {number} Reference duration in minutes.
+ */
+export function longestReference(day, workouts, initial, startDate, config, counted = () => true) {
+    const window = config.runLongestSessionReferenceDays;
+    const planned = workouts.filter(w => w.date < day && counted(w) && daysBetween(w.date, day) <= window)
+        .map(w => w.duration / 60);
+    const history = daysBetween(startDate, day) <= window ? [initial] : [];
+    return Math.max(0, ...planned, ...history) || config.runInitialLongestSessionMinutes;
+}
+
+/**
+ * Quality caps use the original scheduled minutes once known, preserving the reference during
+ * adaptation. Tapers use preceding normal volume so a short touch of intensity remains possible.
+ */
+export function qualityReferenceMinutes(weeks, index) {
+    const week = weeks[index];
+    const previous = weeks.slice(Math.max(0, index - 4), index).map(w => w.plannedMinutes ?? w.scheduledMinutes);
+    return week.phaseType === 'taper' && previous.length ? Math.max(...previous)
+        : week.plannedMinutes ?? week.targetMinutes;
+}
+
+/** Keeps the long-run day and prefers non-consecutive days when a beginner has more days than allowed. */
+function limitRunDays(days, longDay, maximum) {
+    if(days.length <= maximum) return days;
+    const chosen = days.filter(d => weekday(d) === longDay).slice(0, 1);
+    for(const day of days) {
+        if(chosen.length < maximum && !chosen.includes(day) &&
+           chosen.every(c => Math.abs(daysBetween(c, day)) > 1)) chosen.push(day);
+    }
+    for(const day of days) if(chosen.length < maximum && !chosen.includes(day)) chosen.push(day);
+    return chosen.sort();
+}
 
 /**
  * Splits the goal timeline into training phases with a clear purpose and focus.
@@ -36,22 +89,26 @@ import { explainPhase, explainWeek } from './explanations.js';
  * @returns {Array<object>} Period blocks that define the time-based plan structure.
  */
 export function periodise(startDate, goal, state, gaps) {
+    const config = validateCoachingConfig(state.config);
     const total = daysBetween(startDate, goal.date);
+    const taper = taperDays(goal, total, config);
     const focus = gaps.priorities.slice(0, 2).map(p => p.capability);
     const days = [];
     for(let i = 0; i <= total; i++) {
         const remaining = total - i;
         const fraction = i / total;
+        const week = Math.floor(i / 7);
         let type;
         if(remaining === 0) type = 'event';
-        else if(remaining <= (goal.priority === 'A' ? state.config.taperDaysPriorityA
-            : goal.priority === 'B' ? state.config.taperDaysPriorityB : state.config.taperDaysPriorityC)) type = 'taper';
+        else if(remaining <= taper) type = 'taper';
         else if(total < 21) type = 'preparation';
         else if(i < 7 && state.sufficiency !== 'supported') type = 'assessment';
-        else if(Math.floor(i / 7) % state.config.recoveryWeekInterval === state.config.recoveryWeekOffset) type = 'recovery';
-        else if(fraction < state.config.basePhaseEndFraction) type = 'base';
-        else if(fraction < state.config.buildPhaseEndFraction) type = 'build';
-        else if(remaining > state.config.specificPhaseMinimumDays) type = 'specific';
+        // Avoid an unnecessarily long reduction by not stacking a routine deload immediately before taper.
+        else if(week % config.recoveryWeekInterval === config.recoveryWeekOffset &&
+            total - week * 7 - 13 > taper) type = 'recovery';
+        else if(fraction < config.basePhaseEndFraction) type = 'base';
+        else if(fraction < config.buildPhaseEndFraction) type = 'build';
+        else if(remaining > config.specificPhaseMinimumDays) type = 'specific';
         else type = 'peak';
         const day = addDays(startDate, i);
         const previous = days.at(-1);
@@ -60,7 +117,7 @@ export function periodise(startDate, goal, state, gaps) {
             primaryCapabilities: focus, secondaryCapabilities: gaps.priorities.slice(2).map(p => p.capability),
             targetVolumeRange: [0, 0], targetLoadRange: [0, 0],
             targetIntensityDistribution: {easy: 0.8, moderate: 0.15, hard: 0.05},
-            rationale: explainPhase(type, focus)});
+            rationale: explainPhase(type, focus, state.sport)});
     }
     return days;
 }
@@ -81,6 +138,10 @@ export function periodise(startDate, goal, state, gaps) {
  */
 export function weeklyTargets(startDate, goal, state, profile, phases) {
     const config = validateCoachingConfig(state.config);
+    const running = sportOf(profile) === 'running';
+    const initialPower = running ? config.runInitialLoadPower : config.initialLoadPower;
+    const planningPower = running ? config.runWeeklyPlanningLoadPower : config.weeklyPlanningLoadPower;
+    const taperLength = taperDays(goal, daysBetween(startDate, goal.date), config);
     const capacity = Math.min(profile.maxWeeklyHours * 60, profile.typicalWeeklyHours * 60,
         sum(profile.availableDays.map(d => profile.maxSessionMinutes[d])));
     const ramp = state.confidence === 'medium' && state.readiness.status !== 'caution'
@@ -92,8 +153,8 @@ export function weeklyTargets(startDate, goal, state, profile, phases) {
     // Insufficient history (e.g. one short test ride) must not start below the no-history default.
     let previous = Math.min(capacity, sufficient ? historical : Math.max(historical, config.initialMinutes));
     if(state.readiness.status === 'caution') previous *= config.readinessVolumeFactor;
-    let previousLoad = previous / 60 * config.initialLoadPower ** 2 * 100;
-    if(sufficient && state.loadSource === 'power' && state.activityCount) {
+    let previousLoad = previous / 60 * initialPower ** 2 * 100;
+    if(sufficient && state.loadSource === (running ? 'pace' : 'power') && state.activityCount) {
         const baseline = sum(state.dailyLoad.slice(-state.config.mediumDays).map(d => d.load)) / (state.config.mediumDays / 7);
         previousLoad = Math.min(previousLoad, baseline, state.weeklyLoad);
     }
@@ -102,18 +163,18 @@ export function weeklyTargets(startDate, goal, state, profile, phases) {
         const start = addDays(startDate, offset);
         const end = addDays(start, Math.min(6, daysBetween(start, goal.date) - 1));
         const phase = phases.find(p => p.startDate <= start && p.endDate >= start);
-        const available = Array.from({length: daysBetween(start, end) + 1}, (_, i) => addDays(start, i))
-            .filter(d => profile.availableDays.includes(weekday(d)));
+        const days = Array.from({length: daysBetween(start, end) + 1}, (_, i) => addDays(start, i));
+        const available = days.filter(d => profile.availableDays.includes(weekday(d)));
         const minutesCap = Math.min(capacity, sum(available.map(d => profile.maxSessionMinutes[weekday(d)])));
-        const taper = daysBetween(end, goal.date) <= (goal.priority === 'A' ? config.taperDaysPriorityA
-            : goal.priority === 'B' ? config.taperDaysPriorityB : config.taperDaysPriorityC);
+        // A week tapers when most of its days are inside the taper, so the taper is not stretched by a week.
+        const taper = days.filter(d => daysBetween(d, goal.date) <= taperLength).length * 2 >= days.length;
         const recovery = phase.type === 'recovery';
         const factor = taper ? config.taperFactor : recovery ? config.recoveryFactor : weeks.length ? 1 + ramp : 1;
         // A planned deload can return to the last four weeks' envelope, not exceed it abruptly.
         const referenceMinutes = Math.max(previous, ...weeks.slice(-4).map(w => w.targetMinutes));
         const referenceLoad = Math.max(previousLoad, ...weeks.slice(-4).map(w => w.targetLoad));
         const targetMinutes = Math.floor(Math.min(minutesCap, referenceMinutes * factor));
-        const targetLoad = round(Math.min(targetMinutes / 60 * config.weeklyPlanningLoadPower ** 2 * 100,
+        const targetLoad = round(Math.min(targetMinutes / 60 * planningPower ** 2 * 100,
             referenceLoad * factor));
         const week = {id: `week-${weeks.length + 1}`, startDate: start, endDate: end,
             phaseId: phase.id, phaseType: taper ? 'taper' : phase.type,
@@ -145,76 +206,152 @@ export function weeklyTargets(startDate, goal, state, profile, phases) {
  */
 export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
     const config = validateCoachingConfig(state.config);
+    const sport = sportOf(profile);
+    const running = sport === 'running';
     const workouts = [];
     let lastHard = null;
     const scheduledHistory = [];
-    for(const week of weeks) {
-        const available = Array.from({length: daysBetween(week.startDate, week.endDate) + 1}, (_, i) =>
+    const startDate = phases[0].startDate;
+    const eventDate = phases.at(-1).startDate;
+    const planDays = daysBetween(startDate, eventDate);
+    const maxHard = state.sufficiency === 'supported' && state.readiness.status !== 'caution'
+        ? profile.experience === 'beginner' ? config.beginnerHardSessionsPerWeek
+            : config.experiencedHardSessionsPerWeek : 0;
+    // Rotate hard sessions across the top goal-relevant capabilities in proportion to their priority,
+    // instead of repeating only the first one (a mixed, mostly pyramidal distribution; Casado et al. 2022).
+    const candidates = gaps.priorities.filter(p => FAMILIES[p.capability]?.hard).slice(0, config.hardFocusCandidates);
+    const focusCounts = Object.fromEntries(candidates.map(p => [p.capability, 0]));
+    const totalScore = sum(candidates.map(p => p.score)) || 1;
+    const nextFocus = () => {
+        const n = sum(Object.values(focusCounts));
+        return candidates.reduce((best, p) => {
+            const deficit = p.score / totalScore * (n + 1) - focusCounts[p.capability];
+            return deficit > best.deficit + 1e-9 ? {capability: p.capability, deficit} : best;
+        }, {capability: 'threshold', deficit: -Infinity}).capability;
+    };
+    const initialLongest = state.longestRecentSessionMinutes > 0
+        ? state.longestRecentSessionMinutes : config.runInitialLongestSessionMinutes;
+    const spikeCap = day => running
+        ? Math.floor(config.runSessionSpikeLimit * longestReference(day, workouts, initialLongest, startDate, config))
+        : Infinity;
+    const walkReference = state.activityCount ? state.longestRecentSessionMinutes || 0 : 0;
+    for(const [weekIndex, week] of weeks.entries()) {
+        let available = Array.from({length: daysBetween(week.startDate, week.endDate) + 1}, (_, i) =>
             addDays(week.startDate, i)).filter(d => profile.availableDays.includes(weekday(d)));
+        if(running && profile.experience === 'beginner') {
+            available = limitRunDays(available, profile.longRideDay, config.runBeginnerMaximumDays);
+        }
+        // These novice run-walk stages are coaching heuristics, not a trial-validated progression.
+        const runWalk = running && profile.experience === 'beginner' ? runWalkStage(walkReference, weekIndex, config) : null;
         // Allocate long-ride capacity first, then spread remaining minutes across other days.
         const ordered = [...available].sort((a, b) =>
             Number(weekday(b) === profile.longRideDay) - Number(weekday(a) === profile.longRideDay) || a.localeCompare(b));
         let budget = Math.min(week.targetMinutes,
             !scheduledHistory.length ? Infinity : Math.floor(Math.max(...scheduledHistory.slice(-4).map(w => w.minutes)) * (1 + week.rampLimit)));
-        const loadBudget = Math.min(week.targetLoad,
-            !scheduledHistory.length ? Infinity : Math.max(...scheduledHistory.slice(-4).map(w => w.load)) * (1 + week.rampLimit));
+        // Retain target load, the minutes ramp and session cap, but avoid a second load ramp that
+        // forces minutes down as walk breaks phase out. This is not a validated injury-prevention rule.
+        const loadBudget = Math.min(week.targetLoad, running || !scheduledHistory.length ? Infinity
+            : Math.max(...scheduledHistory.slice(-4).map(w => w.load)) * (1 + week.rampLimit));
+        const longShare = running ? Math.max(config.runLongRunShare, 1 / ordered.length) : config.longRideAllocationShare;
         const allocations = new Map();
         ordered.forEach((day, i) => {
             const long = weekday(day) === profile.longRideDay;
             const share = long && ordered.length > 1
-                ? Math.ceil(budget * config.longRideAllocationShare) : Math.floor(budget / (ordered.length - i));
-            const minutes = Math.min(profile.maxSessionMinutes[weekday(day)], share);
+                ? Math.ceil(budget * longShare) : Math.floor(budget / (ordered.length - i));
+            const minutes = Math.min(profile.maxSessionMinutes[weekday(day)], share, spikeCap(day));
             allocations.set(day, minutes >= config.minimumSessionMinutes ? minutes : 0);
             budget -= minutes >= config.minimumSessionMinutes ? minutes : 0;
         });
-        let hardCount = 0, weekLoad = 0;
-        const maxHard = state.sufficiency === 'supported' && state.readiness.status !== 'caution'
-            ? profile.experience === 'beginner' ? config.beginnerHardSessionsPerWeek
-                : config.experiencedHardSessionsPerWeek : 0;
+        if(running && Number.isFinite(loadBudget)) {
+            // Keep run frequency: when even easy running would exceed the ramp-limited load, shorten
+            // every run proportionally instead of dropping the week's last sessions.
+            const easyLoad = sum([...allocations.values()].filter(Boolean).map(m =>
+                stepLoad(runSteps({family: 'endurance', minutes: m, runFormat: {runWalk}}, config))));
+            const scale = easyLoad > 0 ? loadBudget / easyLoad : 1;
+            if(scale < 1) {
+                for(const [day, m] of allocations) {
+                    const scaled = Math.floor(m * scale);
+                    allocations.set(day, scaled >= config.minimumSessionMinutes ? scaled : 0);
+                }
+            }
+        }
+        const weeklyMinutes = qualityReferenceMinutes(weeks, weekIndex);
+        let hardCount = 0, weekLoad = 0, stridesPlanned = false;
         for(const day of available) {
-            const minutes = allocations.get(day);
-            if(!minutes) continue;
+            // Re-check against every earlier session, including this week's, exactly as validatePlan does.
+            const minutes = Math.min(allocations.get(day) || 0, spikeCap(day));
+            if(minutes < config.minimumSessionMinutes) continue;
             const phase = phases.find(p => p.startDate <= day && p.endDate >= day);
-            const canHard = ['build', 'specific', 'peak'].includes(phase.type) &&
-                hardCount < maxHard && minutes >= config.minimumHardSessionMinutes &&
-                (lastHard == null || daysBetween(lastHard, day) >= config.minimumHardSeparationDays) &&
-                weekday(day) !== profile.longRideDay;
-            const focus = gaps.priorities.find(p => FAMILIES[p.capability]?.hard)?.capability || 'threshold';
-            const family = phase.type === 'recovery' || phase.type === 'taper' || state.readiness.status === 'caution'
-                ? 'recovery' : canHard ? focus : weekday(day) === profile.longRideDay ? 'durability' : 'endurance';
+            const long = weekday(day) === profile.longRideDay;
+            // Taper: keep frequency and a short touch of intensity while volume falls (Bosquet et al. 2007).
+            const taperQuality = phase.type === 'taper' && planDays >= config.taperQualityMinimumPlanDays &&
+                daysBetween(day, eventDate) >= config.taperQualityMinimumDaysBeforeEvent && hardCount < 1;
+            const canHard = (['build', 'specific', 'peak'].includes(phase.type) || taperQuality) &&
+                hardCount < maxHard && minutes >= config.minimumHardSessionMinutes && !runWalk &&
+                (lastHard == null || daysBetween(lastHard, day) >= config.minimumHardSeparationDays) && !long;
+            const focus = phase.type === 'taper' ? candidates[0]?.capability ?? 'threshold' : nextFocus();
+            const family = phase.type === 'recovery' || state.readiness.status === 'caution' ? 'recovery'
+                : canHard ? focus : long && phase.type !== 'taper' ? 'durability' : 'endurance';
             const successful = state.successfulSessionsByFamily?.[family] || 0;
             const level = Math.min(config.progressionMaximumLevel,
                 1 + Math.floor(successful / config.progressionSuccessfulSessionsPerLevel));
+            const strides = running && !runWalk && !stridesPlanned && family === 'endurance' && !long
+                ? ['build', 'specific', 'peak'].includes(phase.type) ? 6 : 4 : 0;
             const slot = {id: `${planId}:${day}`, date: day, minutes, family, level,
-                phaseId: phase.id, weekId: week.id, phaseType: phase.type, profile, rules: config};
-            let workout = prescribeWorkout(slot, {history: workouts, rules: config, allowTechnique: true});
+                phaseId: phase.id, weekId: week.id, phaseType: phase.type, profile, rules: config,
+                ...(running ? {runFormat: {runWalk, strides}, weeklyMinutes} : {})};
+            const options = {history: workouts, rules: config, allowTechnique: true, library: !running};
+            let workout = prescribeWorkout(slot, options);
             // First use a lighter version of the same session, then reduce intensity, then duration;
             // never force the target into an unavailable day.
             if(weekLoad + workout.targetLoad > loadBudget && workout.libraryWorkoutId) {
                 workout = progressWorkout(slot);
             }
             if(weekLoad + workout.targetLoad > loadBudget) {
-                workout = prescribeWorkout({...slot, family: 'recovery', level: 1}, {history: workouts, rules: config});
+                workout = prescribeWorkout({...slot, family: 'recovery', level: 1}, {...options, allowTechnique: false});
             }
             if(weekLoad + workout.targetLoad > loadBudget && workout.libraryWorkoutId) {
                 workout = progressWorkout({...slot, family: 'recovery', level: 1});
             }
             if(weekLoad + workout.targetLoad > loadBudget) {
                 const fitMinutes = Math.floor((loadBudget - weekLoad) /
-                    (FAMILIES.recovery.power ** 2 * 100) * 60);
+                    (familySpec('recovery', sport).power ** 2 * 100) * 60);
                 if(fitMinutes < config.minimumSessionMinutes) continue;
-                workout = progressWorkout({id: workout.id, date: day, minutes: Math.min(minutes, fitMinutes),
-                    family: 'recovery', phaseId: phase.id, weekId: week.id, phaseType: phase.type, profile,
-                    rules: config});
+                workout = progressWorkout({...slot, id: workout.id, minutes: Math.min(minutes, fitMinutes),
+                    family: 'recovery', level: 1});
             }
             if(FAMILIES[workout.family].hard) {
                 hardCount++;
                 lastHard = day;
+                if(workout.family in focusCounts && phase.type !== 'taper') focusCounts[workout.family]++;
             }
+            if(workout.runFormat?.strides) stridesPlanned = true;
             workouts.push(workout);
             weekLoad += workout.targetLoad;
         }
-        const scheduled = workouts.filter(w => w.weekId === week.id);
+        // Run sessions concentrate quality time, so cap demanding time against the week actually scheduled.
+        let scheduled = workouts.filter(w => w.weekId === week.id);
+        const hardSeconds = () => sum(scheduled.flatMap(w => w.steps.filter(s => s.power > config.hardPowerThreshold))
+            .map(s => s.duration));
+        while(true) {
+            const minutes = sum(scheduled.map(w => w.duration / 60));
+            const totalExceeded = hardSeconds() > minutes * 60 * config.weeklyHardTimeShare;
+            const excess = running ? runQualityExcess(scheduled,
+                week.phaseType === 'taper' ? weeklyMinutes : minutes, config) : [];
+            if(!totalExceeded && !excess.length) break;
+            const index = workouts.findLastIndex(w => w.weekId === week.id && FAMILIES[w.family].hard &&
+                (totalExceeded || excess.includes(w.family)));
+            if(index < 0) break;
+            const hard = workouts[index];
+            if(hard.family in focusCounts && hard.phaseId && phases.find(p => p.id === hard.phaseId)?.type !== 'taper') {
+                focusCounts[hard.family]--;
+            }
+            workouts[index] = progressWorkout({id: hard.id, date: hard.date, minutes: hard.duration / 60,
+                family: 'endurance', level: 1, phaseId: hard.phaseId, weekId: hard.weekId,
+                phaseType: phases.find(p => p.id === hard.phaseId).type, profile, rules: config,
+                ...(running ? {runFormat: {runWalk, strides: 0}, weeklyMinutes} : {})});
+            scheduled = workouts.filter(w => w.weekId === week.id);
+        }
         week.scheduledMinutes = sum(scheduled.map(w => w.duration / 60));
         week.scheduledLoad = round(sum(scheduled.map(w => w.targetLoad)));
         scheduledHistory.push({minutes: week.scheduledMinutes, load: week.scheduledLoad});
@@ -239,6 +376,10 @@ export function rampReference(week, minutes, load) {
         load: Math.max(load, planned(week.plannedLoad, week.targetLoad)),
     };
 }
+
+const RUN_STRENGTH_ADVICE = 'Consider progressive strength training for running economy ' +
+    '(Balsalobre-Fernández et al. 2016; Blagrove et al. 2018). Start conservatively, seek qualified guidance ' +
+    'for unfamiliar heavy or plyometric exercises, and account for the extra fatigue; strength is not scheduled or tracked here.';
 
 export function validatePlan(plan, profile, rules = plan.coachingConfig) {
     const config = validateCoachingConfig(rules);
@@ -275,8 +416,16 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig) {
     }
     hard.sort((a, b) => a.date.localeCompare(b.date));
     if(hard.some((w, i) => i && daysBetween(hard[i - 1].date, w.date) < config.minimumHardSeparationDays)) errors.push('Hard workouts need an easy/rest day between.');
+    if(sportOf(profile) === 'running') {
+        const initial = plan.initialLimits.longestSessionMinutes ?? config.runInitialLongestSessionMinutes;
+        const runs = [...plan.workouts].sort((a, b) => a.date.localeCompare(b.date));
+        if(runs.some(w => w.duration / 60 > config.runSessionSpikeLimit *
+            longestReference(w.date, runs, initial, plan.startDate, config) + 0.01)) {
+            errors.push('A run exceeds the longest run of the previous 30 days by more than the spike limit.');
+        }
+    }
     const history = [];
-    for(const week of plan.weeks) {
+    for(const [index, week] of plan.weeks.entries()) {
         const workouts = plan.workouts.filter(w => w.weekId === week.id);
         const minutes = sum(workouts.map(w => w.duration / 60));
         const load = sum(workouts.map(w => w.targetLoad));
@@ -289,12 +438,16 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig) {
            (profile.experience === 'beginner' ? config.beginnerHardSessionsPerWeek : config.experiencedHardSessionsPerWeek)) errors.push('Too many hard workouts.');
         const hardSeconds = sum(workouts.flatMap(w => w.steps.filter(s => s.power > config.hardPowerThreshold)).map(s => s.duration));
         if(hardSeconds > minutes * 60 * config.weeklyHardTimeShare) errors.push('Weekly demanding interval time exceeded.');
+        if(sportOf(profile) === 'running' &&
+           runQualityExcess(workouts, qualityReferenceMinutes(plan.weeks, index), config).length) {
+            errors.push('Aggregate weekly running quality cap exceeded.');
+        }
         if(history.length) {
             // The pre-plan envelope stays a reference, so a short early reduction cannot cap the whole plan.
             const reference = [plan.initialLimits, ...history].slice(-4);
             const minuteCeiling = Math.max(...reference.map(w => w.minutes)) * (1 + week.rampLimit) + 0.01;
             const loadCeiling = Math.max(...reference.map(w => w.load)) * (1 + week.rampLimit) + 0.05;
-            if(minutes > minuteCeiling || load > loadCeiling) {
+            if(minutes > minuteCeiling || (sportOf(profile) !== 'running' && load > loadCeiling)) {
                 errors.push(`${week.id}: abrupt weekly progression exceeded (minutes ${round(minutes)}/${round(minuteCeiling)}, load ${round(load)}/${round(loadCeiling)}).`);
             }
         }
@@ -304,13 +457,26 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig) {
         history.push(rampReference(week, minutes, load));
     }
     if(!plan.workouts.length) warnings.push('No safe session fits the supplied dates and availability.');
+    if(sportOf(profile) === 'running' && plan.workouts.length) {
+        const goal = plan.goalDefinition ?? {};
+        const predicted = goal.distanceKm && profile.thresholdPace
+            ? predictedRaceSeconds(profile.thresholdPace, goal.distanceKm, config.riegelExponent) / 60 : null;
+        const race = goal.expectedDurationMinutes ?? goal.finishTimeMinutes ?? predicted;
+        const longest = Math.max(...plan.workouts.map(w => w.duration / 60));
+        if(race && longest < race * config.runRaceReadinessShare) {
+            warnings.push(`Longest planned run (${Math.round(longest)} min) stays below ${Math.round(config.runRaceReadinessShare * 100)}% of the expected race time ` +
+                `(about ${Math.round(race)} min): this plan may not provide enough endurance preparation. ` +
+                'This is a heuristic, not a readiness assessment. Consider a shorter race, a later date, or qualified coaching advice.');
+        }
+    }
     if(daysBetween(plan.startDate, plan.endDate) < 21) warnings.push('Short lead time: preparation and taper only, no accelerated build.');
     if(errors.length) throw new Error(`Unsafe plan: ${[...new Set(errors)].join(' ')}`);
     return [...new Set(warnings)];
 }
 
-export function generatePlan({profile, goal, state, startDate, generatedAt, registry = GOALS}) {
+export function generatePlan({profile, goal, state, startDate, generatedAt, registry = goalRegistry(sportOf(profile))}) {
     validateProfile(profile);
+    const sport = sportOf(profile);
     const config = validateCoachingConfig(state.config);
     validateGoal(goal, startDate, registry, config);
     if(state.date !== startDate || state.athleteId !== profile.id || !Number.isFinite(Date.parse(generatedAt))) {
@@ -331,14 +497,16 @@ export function generatePlan({profile, goal, state, startDate, generatedAt, regi
         phase.targetLoadRange = [0, round(sum(members.map(w => w.targetLoad)))];
     }
     const plan = {
-        id, athleteId: profile.id, goalId: goal.id, startDate, endDate: goal.date, status: 'active',
+        id, athleteId: profile.id, goalId: goal.id, sport, startDate, endDate: goal.date, status: 'active',
         goalDefinition: JSON.parse(JSON.stringify(goal)),
         plannerVersion: VERSION, generatedAt, sourceSnapshot: state.id, revision: 1,
         coachingConfig: JSON.parse(JSON.stringify(config)),
         progressionBaseline: JSON.parse(JSON.stringify(state.successfulSessionsByFamily || {})),
-        rationale: `${demand.rationale} ${gaps.rationale} Training decision support, not medical advice.`,
+        rationale: `${demand.rationale} ${gaps.rationale}${sport === 'running' ? ` ${RUN_STRENGTH_ADVICE}` : ''} Training decision support, not medical advice.`,
         demand, gaps, phases, weeks, workouts, adaptations: [], validationWarnings: [],
-        initialLimits: {minutes: weeks[0].targetMinutes, load: weeks[0].targetLoad},
+        initialLimits: {minutes: weeks[0].targetMinutes, load: weeks[0].targetLoad,
+            ...(sport === 'running' ? {longestSessionMinutes: state.longestRecentSessionMinutes > 0
+                ? state.longestRecentSessionMinutes : config.runInitialLongestSessionMinutes} : {})},
     };
     plan.validationWarnings = validatePlan(plan, profile, config);
     return plan;

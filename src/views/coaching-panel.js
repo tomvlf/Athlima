@@ -19,7 +19,8 @@
 import { xf } from '../functions.js';
 import { db } from '../db.js';
 import { coachingService, coachingData } from '../coaching/service.js';
-import { GOALS, localDay, addDays } from '../coaching/domain.js';
+import { GOALS, RUN_GOALS, DEFAULTS, localDay, addDays, sportOf, sportForGoalType } from '../coaching/domain.js';
+import { parsePace, thresholdPaceFromRace, formatPace } from '../coaching/running.js';
 import { fileHandler } from '../file.js';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c =>
@@ -37,9 +38,9 @@ const PHASES = {
 };
 const STATUS = {scheduled: 'Planned', completed: 'Done', substituted: 'Done (substitute)', missed: 'Missed', failed: 'Not completed'};
 const DATA_QUALITY = {
-    supported: 'Enough recent ride history for personalised targets.',
-    limited: 'Limited ride history, so targets are kept conservative.',
-    insufficient: 'No ride history yet, so the plan starts with easy baseline rides.',
+    supported: 'Enough recent training history for personalised targets.',
+    limited: 'Limited training history, so targets are kept conservative.',
+    insufficient: 'No training history yet, so the plan starts with easy baseline sessions.',
 };
 const FEELINGS = [
     ['legFreshness', 'How fresh did your legs feel?', ['Very heavy', 'Heavy', 'Normal', 'Fresh', 'Very fresh']],
@@ -52,9 +53,19 @@ const RPE = ['Rest', 'Very, very easy', 'Very easy', 'Easy', 'Moderate', 'Somewh
 const HEART_RATE = [['maxHeartRate', 'Maximum heart rate'], ['thresholdHeartRate', 'Threshold heart rate'],
     ['restingHeartRate', 'Resting heart rate']];
 const EQUIPMENT = [['powerMeter', 'Power meter'], ['heartRateMonitor', 'Heart-rate monitor'], ['smartTrainer', 'Smart trainer']];
+// The fourth entry restricts a field to one sport; running goals have no power targets.
 const GOAL_NUMBERS = [['distanceKm', 'Distance', 'km', '0.1'], ['elevationM', 'Climbing', 'm', '1'],
     ['expectedDurationMinutes', 'Expected duration', 'min', '1'], ['finishTimeMinutes', 'Target finish time', 'min', '1'],
-    ['targetPower', 'Target power', 'W', '1'], ['targetFTP', 'Target FTP', 'W', '1'], ['targetWKg', 'Target W/kg', 'W/kg', '0.1']];
+    ['targetPower', 'Target power', 'W', '1', 'cycling'], ['targetFTP', 'Target FTP', 'W', '1', 'cycling'],
+    ['targetWKg', 'Target W/kg', 'W/kg', '0.1', 'cycling']];
+const SPORT_GOALS = [['Cycling', GOALS], ['Running', RUN_GOALS]];
+const GOAL_LABELS = {first_5k: 'First 5 km', run_5k: '5 km race', run_10k: '10 km race', ultra_trail: 'Ultra / trail'};
+const goalLabel = type => GOAL_LABELS[type] || label(type);
+// "h:mm:ss" or "mm:ss" to seconds.
+const parseClock = text => {
+    const match = /^\s*(?:(\d{1,2}):)?(\d{1,3}):([0-5]\d)\s*$/.exec(String(text ?? ''));
+    return match ? Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) : null;
+};
 const TERRAIN = ['', 'flat', 'rolling', 'hilly', 'mountainous'];
 const HORIZONS = [[42, 'In about 6 weeks'], [91, 'Within 3 months'], [182, 'Within 6 months'], [365, 'Within a year']];
 
@@ -70,6 +81,7 @@ class CoachingPanel extends HTMLElement {
         const options = {signal: this.controller.signal};
         this.addEventListener('submit', event => this.submit(event), options);
         this.addEventListener('click', event => this.click(event), options);
+        this.addEventListener('change', event => { if(event.target.name === 'type') this.syncSport(); }, options);
         xf.sub('coaching:changed', () => this.render(), options);
         xf.sub('db:ftp', () => this.render(), options);
         xf.sub('db:weight', () => this.render(), options);
@@ -102,15 +114,25 @@ class CoachingPanel extends HTMLElement {
             for(const summary of this.querySelectorAll('details > summary')) {
                 if(open.has(summary.textContent)) summary.parentElement.open = true;
             }
+            this.syncSport();
         } catch(error) {
             console.error('Unable to render coaching:', error);
             this.innerHTML = `<p role="alert">Coaching unavailable: ${escape(error.message)}</p>`;
         }
     }
+    /** Shows only the setup fields of the sport of the selected goal type. */
+    syncSport() {
+        const type = this.querySelector('[data-coach-form=setup] [name=type]')?.value;
+        if(!type) return;
+        const sport = sportForGoalType(type);
+        for(const el of this.querySelectorAll('[data-coach-form=setup] [data-sport]')) el.hidden = el.dataset.sport !== sport;
+    }
     planView(data, plan) {
         const profile = data.profile, state = data.snapshots.at(-1), goal = plan.goalDefinition || data.goal || {};
         const today = localDay(new Date().toISOString(), profile.timeZone);
-        const ftpChanged = profile.ftp !== (db.ftp || null);
+        const running = sportOf(profile) === 'running';
+        // Runs are done outdoors and never started in the indoor player, so FTP changes do not matter.
+        const ftpChanged = !running && profile.ftp !== (db.ftp || null);
         const workouts = [...plan.workouts].sort((a, b) => a.date.localeCompare(b.date));
         const upcoming = workouts.filter(w => w.status === 'scheduled' && w.date >= today);
         const overdue = workouts.filter(w => w.status === 'scheduled' && w.date < today).length;
@@ -125,7 +147,7 @@ class CoachingPanel extends HTMLElement {
                 <div>
                     <p class="eyebrow">Your goal</p>
                     <h2>${escape(goal.name || 'Training plan')}</h2>
-                    <p class="muted">${escape(label(goal.type))} · ${escape(dayLabel(goal.date || plan.endDate,
+                    <p class="muted">${escape(goalLabel(goal.type))} · ${escape(dayLabel(goal.date || plan.endDate,
                         {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}))}</p>
                 </div>
                 <div class="coach-stats">
@@ -143,7 +165,7 @@ class CoachingPanel extends HTMLElement {
             ${!plan.workouts.length ? '<p class="coach-alert" role="status">No sessions fit the current training-load and availability limits. Review the warnings below and check your history and profile before archiving and regenerating.</p>' : ''}
             ${overdue ? `<div class="coach-callout">
                 <p><strong>${overdue} past session${overdue === 1 ? '' : 's'} not yet resolved.</strong>
-                    Rides you recorded are matched automatically. Review the rest so the coach can adapt; missed training is never made up.</p>
+                    ${running ? 'Runs and activities' : 'Rides'} you recorded are matched automatically. Review the rest so the coach can adapt; missed training is never made up.</p>
                 <button type="button" data-coach="review">Review missed sessions</button></div>` : ''}
             <div class="coach-grid">
                 <section class="coach-card">
@@ -153,7 +175,7 @@ class CoachingPanel extends HTMLElement {
                         <p class="coach-next-title">${escape(next.title)}</p>
                         <p class="muted">${minutes(next.duration)} · Effort ${escape(next.expectedRpe)}/10 (${escape(RPE[next.expectedRpe] || '')})</p>
                         <p>${escape(String(next.description ?? "").replace(/^./, c => c.toUpperCase()))}</p>
-                        <a class="button" href="#/calendar">${next.date === today ? 'Start from calendar' : 'Open calendar'}</a>`
+                        <a class="button" href="#/calendar">${next.date === today && !running ? 'Start from calendar' : 'Open calendar'}</a>`
                         : '<p class="muted">No more sessions are planned. Archive this plan and set a new goal to continue.</p>'}
                 </section>
                 <section class="coach-card">
@@ -176,14 +198,17 @@ class CoachingPanel extends HTMLElement {
                     <div>${this.confirmArchive ? `<button type="button" class="danger" data-coach="archive">Yes, archive this plan</button>
                         <button type="button" class="secondary" data-coach="cancel-archive">Cancel</button>`
                         : '<button type="button" class="secondary" data-coach="confirm-archive">Archive plan and start over</button>'}
-                        <p class="muted">Needed after changing FTP, availability or your goal. History is kept.</p></div>
+                        <p class="muted">Needed after changing ${running ? 'threshold pace' : 'FTP'}, availability or your goal. History is kept.</p></div>
                 </div>
             </section>
             <details class="coach-card">
                 <summary>Why this plan? <span class="muted">Revision ${plan.revision}</span></summary>
                 <p>${escape(plan.rationale)}</p>
-                <p><strong>Ride data:</strong> ${escape(DATA_QUALITY[state?.sufficiency] || state?.sufficiency)}
+                <p><strong>Training data:</strong> ${escape(DATA_QUALITY[state?.sufficiency] || state?.sufficiency)}
                     Load is measured by ${escape(state?.loadSource)}. ${escape(state?.readiness.reason)}</p>
+                ${running ? `<p><strong>Threshold pace:</strong> ${profile.thresholdPace
+                    ? `${escape(formatPace(profile.thresholdPace, profile.unitSystem))}. Run targets are shown as pace ranges in the calendar.`
+                    : 'not set, so runs are prescribed by effort (RPE) and duration only.'}</p>` : ''}
                 <h4>Phases</h4>
                 <ul>${plan.phases.map(p => `<li>${escape(dayLabel(p.startDate))} - ${escape(dayLabel(p.endDate))}:
                     <strong>${escape(PHASES[p.type] || label(p.type))}</strong>. ${escape(p.rationale)}</li>`).join('')}</ul>
@@ -203,11 +228,11 @@ class CoachingPanel extends HTMLElement {
     feedbackForm(data) {
         const rides = [...data.activities].reverse().slice(0, 20);
         return `<details class="coach-card" ${rides.length ? '' : 'hidden'}>
-            <summary>How did your last ride feel?</summary>
+            <summary>How did your last session feel?</summary>
             <p class="muted">Optional. Your answers help the coach decide whether to ease off. Leave anything blank to skip it.</p>
             <form data-coach-form="feedback">
-                <label>Ride<select name="activity" required>
-                    ${rides.map(a => `<option value="${escape(a.id)}">${escape(dayLabel(a.day))} - ${Math.round(a.duration / 60)} min</option>`).join('')}
+                <label>Session<select name="activity" required>
+                    ${rides.map(a => `<option value="${escape(a.id)}">${escape(dayLabel(a.day))} - ${a.sport === 'running' ? 'Run' : 'Ride'}, ${Math.round(a.duration / 60)} min</option>`).join('')}
                 </select></label>
                 <div class="coach-fields">
                     <label>How hard was it overall?<select name="rpe"><option value="">Skip</option>
@@ -221,13 +246,14 @@ class CoachingPanel extends HTMLElement {
     }
     historyTools() {
         return `<details class="coach-card">
-            <summary>Ride history and backup</summary>
+            <summary>Training history and backup</summary>
             <p class="muted">Rides you record in Athlima are added automatically. For better targets, connect
-                Intervals.icu in <a href="#/settings">Settings</a>, or paste rides in the documented JSON format below
-                (duration in seconds, ISO start time with offset).</p>
-            <form data-coach-form="import"><label>Rides JSON
+                Intervals.icu in <a href="#/settings">Settings</a>, or paste activities in the documented JSON format below
+                (duration in seconds, ISO start time with offset; for runs add <code>"sport": "running"</code> and
+                <code>"distance"</code> in metres).</p>
+            <form data-coach-form="import"><label>Activities JSON
                 <textarea name="rides" required rows="5">[]</textarea></label>
-                <button type="submit" class="secondary">Import rides</button></form>
+                <button type="submit" class="secondary">Import activities</button></form>
             <button type="button" class="secondary" data-coach="export">Download coaching history</button>
         </details>`;
     }
@@ -238,31 +264,25 @@ class CoachingPanel extends HTMLElement {
         const limits = profile?.maxSessionMinutes || DEFAULT_LIMITS;
         const hasHistory = data.plan && data.plan.status !== 'active';
         const ready = db.weight > 0;
+        const sport = sportForGoalType(goal?.type || 'general_fitness');
+        const unit = db.measurement === 'imperial' ? 'imperial' : 'metric';
+        const pace = profile?.thresholdPace ? formatPace(profile.thresholdPace, unit).split('/')[0] : '';
         return `
             <header class="coach-intro">
                 <h2>${hasHistory ? 'Set up your next plan' : 'Create your training plan'}</h2>
-                <p>Answer a few questions and the coach builds a day-by-day plan towards your goal. It fits your
-                    schedule and adapts automatically after every ride. Takes about two minutes.</p>
+                <p>Answer a few questions and the coach builds a day-by-day cycling or running plan towards your goal.
+                    It fits your schedule and adapts automatically after every session. Takes about two minutes.</p>
                 ${hasHistory ? `<p class="muted">Your previous plan ended (${escape(data.plan.status)}). Its history is kept.</p>` : ''}
             </header>
             <form data-coach-form="setup" class="coach-setup">
                 <section class="coach-step">
-                    <h3><span class="coach-step-number">1</span>Check your rider profile</h3>
-                    <ul class="coach-checklist">
-                        <li class="${db.ftp ? 'ok' : 'warn'}">FTP: <strong>${db.ftp ? `${escape(db.ftp)} W` : 'not set'}</strong>
-                            ${db.ftp ? '' : '<span class="muted">- sessions will use effort (RPE) guidance instead of watts</span>'}</li>
-                        <li class="${ready ? 'ok' : 'warn'}">Body weight: <strong>${ready ? `${escape(db.weight)} kg` : 'not set (required)'}</strong></li>
-                    </ul>
-                    <p class="muted">Not right? Update them in <a href="#/settings">Settings</a> first; the plan uses these values.</p>
-                </section>
-
-                <section class="coach-step">
-                    <h3><span class="coach-step-number">2</span>What are you training for?</h3>
+                    <h3><span class="coach-step-number">1</span>What are you training for?</h3>
                     <div class="coach-fields">
-                        <label>Goal name<input name="name" value="${escape(goal?.name || 'My cycling goal')}" required
-                            placeholder="e.g. Marmotte, first 100 km, higher FTP"></label>
-                        <label>Goal type<select name="type">${Object.keys(GOALS).map(v =>
-                            `<option value="${v}" ${selected(v === (goal?.type || 'general_fitness'))}>${escape(label(v))}</option>`).join('')}</select></label>
+                        <label>Goal name<input name="name" value="${escape(goal?.name || 'My training goal')}" required
+                            placeholder="e.g. Marmotte, first 5 km, half marathon, higher FTP"></label>
+                        <label>Goal type<select name="type">${SPORT_GOALS.map(([group, goals]) => `<optgroup label="${group}">${
+                            Object.keys(goals).map(v => `<option value="${v}" ${selected(v === (goal?.type || 'general_fitness'))}>${
+                                escape(goalLabel(v))}</option>`).join('')}</optgroup>`).join('')}</select></label>
                         <label>When do you want to reach it?<select name="horizon">${HORIZONS.map(([days, text]) =>
                             `<option value="${days}" ${selected(days === 91)}>${text}</option>`).join('')}</select>
                             <small>The plan builds up to the end of this period.</small></label>
@@ -274,7 +294,7 @@ class CoachingPanel extends HTMLElement {
                         <div class="coach-fields">
                             <label>Event date<input type="date" name="date" min="${today}">
                                 <small>Have a fixed event day? It replaces the time frame above.</small></label>
-                            ${GOAL_NUMBERS.map(([name, text, unit, step]) => `<label>${text} (${unit})<input type="number" name="${name}"
+                            ${GOAL_NUMBERS.map(([name, text, unit, step, only]) => `<label ${only ? `data-sport="${only}"` : ''}>${text} (${unit})<input type="number" name="${name}"
                                 min="0" step="${step}" value="${escape(goal?.[name] ?? '')}"></label>`).join('')}
                             <label>Terrain<select name="terrain">${TERRAIN.map(v =>
                                 `<option value="${v}" ${selected(v === (goal?.terrain || ''))}>${v ? label(v) : 'Not specified'}</option>`).join('')}</select></label>
@@ -285,8 +305,27 @@ class CoachingPanel extends HTMLElement {
                 </section>
 
                 <section class="coach-step">
-                    <h3><span class="coach-step-number">3</span>When can you ride?</h3>
-                    <p class="muted">Enter the longest ride you can do on each day, in minutes. Use 0 for rest days.</p>
+                    <h3><span class="coach-step-number">2</span>Check your athlete profile</h3>
+                    <ul class="coach-checklist">
+                        <li data-sport="cycling" class="${db.ftp ? 'ok' : 'warn'}">FTP: <strong>${db.ftp ? `${escape(db.ftp)} W` : 'not set'}</strong>
+                            ${db.ftp ? '' : '<span class="muted">- sessions will use effort (RPE) guidance instead of watts</span>'}</li>
+                        <li class="${ready ? 'ok' : 'warn'}">Body weight: <strong>${ready ? `${escape(db.weight)} kg` : 'not set (required)'}</strong></li>
+                    </ul>
+                    <p class="muted">Not right? Update them in <a href="#/settings">Settings</a> first; the plan uses these values.</p>
+                    <div class="coach-fields" data-sport="running" ${sport === 'running' ? '' : 'hidden'}>
+                        <label>Threshold pace (min:sec per ${unit === 'imperial' ? 'mile' : 'km'})<input name="thresholdPace"
+                            value="${escape(pace)}" placeholder="e.g. 5:00" inputmode="numeric">
+                            <small>The pace you could hold for about an hour. Leave blank if you are unsure.</small></label>
+                        <label>Or a recent race distance (km)<input type="number" name="raceDistanceKm" min="1" max="100" step="0.1"
+                            placeholder="e.g. 5"></label>
+                        <label>and its finish time (h:mm:ss or mm:ss)<input name="raceTime" placeholder="e.g. 27:30"
+                            inputmode="numeric"><small>An all-out effort from the last 2 months gives the best estimate.</small></label>
+                    </div>
+                </section>
+
+                <section class="coach-step">
+                    <h3><span class="coach-step-number">3</span>When can you train?</h3>
+                    <p class="muted">Enter the longest session you can do on each day, in minutes. Use 0 for rest days.</p>
                     <div class="coach-days">${DAYS.map((day, index) => `
                         <div class="coach-day">
                             <label>${day.slice(0, 3)}<input name="day${index}" type="number" min="0" max="1440" step="5"
@@ -295,21 +334,22 @@ class CoachingPanel extends HTMLElement {
                                 `<option value="${v}" ${selected(v === (profile?.dayPreferences?.[index] || 'either'))}>${label(v)}</option>`).join('')}</select>
                         </div>`).join('')}</div>
                     <div class="coach-fields">
-                        <label>Long-ride day<select name="longDay"><option value="">No preference</option>${DAYS.map((day, index) =>
+                        <label>Long ride / long run day<select name="longDay"><option value="">No preference</option>${DAYS.map((day, index) =>
                             `<option value="${index}" ${selected(index === (profile ? profile.longRideDay : 6))}>${day}</option>`).join('')}</select></label>
-                        <label>Hours you usually ride per week<input type="number" name="hours" min="0.5" step="0.5"
+                        <label>Hours you usually train per week<input type="number" name="hours" min="0.5" step="0.5"
                             value="${escape(profile?.typicalWeeklyHours || 3)}" required></label>
-                        <label>Most hours you could ride in a week<input type="number" name="maxHours" min="0.5" step="0.5"
+                        <label>Most hours you could train in a week<input type="number" name="maxHours" min="0.5" step="0.5"
                             value="${escape(profile?.maxWeeklyHours || 4)}" required></label>
-                        <label>Cycling experience<select name="experience">${Object.entries(EXPERIENCE).map(([v, text]) =>
-                            `<option value="${v}" ${selected(v === (profile?.experience || 'beginner'))}>${text}</option>`).join('')}</select></label>
+                        <label>Experience in this sport<select name="experience">${Object.entries(EXPERIENCE).map(([v, text]) =>
+                            `<option value="${v}" ${selected(v === (profile?.experience || 'beginner'))}>${text}</option>`).join('')}</select>
+                            <small data-sport="running">New to running? Beginners start with run-walk sessions.</small></label>
                     </div>
                 </section>
 
                 <section class="coach-step">
                     <h3><span class="coach-step-number">4</span>Create your plan</h3>
-                    <p class="muted">Rides recorded in Athlima are included automatically. For better targets, connect
-                        Intervals.icu in <a href="#/settings">Settings</a> before creating the plan; you can also import rides later.</p>
+                    <p class="muted">Rides recorded in Athlima are included automatically. For runs and better targets, connect
+                        Intervals.icu in <a href="#/settings">Settings</a> before creating the plan; you can also import activities later.</p>
                     <details><summary>More options</summary>
                         <div class="coach-fields">
                             <label>Plan start date<input type="date" name="start" value="${today}" required></label>
@@ -330,38 +370,68 @@ class CoachingPanel extends HTMLElement {
             ${profile ? this.historyTools() : ''}`;
     }
     profileFrom(values, service) {
+        const sport = sportForGoalType(values.get('type'));
         const limits = Object.fromEntries(Array.from({length: 7}, (_, day) =>
             [day, Number(values.get(`day${day}`))]).filter(([, limit]) => limit > 0));
-        if(!Object.keys(limits).length) throw new Error('Enter minutes for at least one day you can ride (step 3).');
+        if(!Object.keys(limits).length) throw new Error('Enter minutes for at least one day you can train (step 3).');
         const longDay = values.get('longDay');
         if(longDay !== '' && longDay != null && !limits[longDay]) {
-            throw new Error(`You chose ${DAYS[longDay]} as long-ride day but entered 0 minutes for it (step 3).`);
+            throw new Error(`You chose ${DAYS[longDay]} as long-session day but entered 0 minutes for it (step 3).`);
         }
         const hours = Number(values.get('hours')), maxHours = Number(values.get('maxHours'));
-        if(hours > maxHours) throw new Error('Usual weekly hours cannot be more than the most hours you could ride (step 3).');
+        if(hours > maxHours) throw new Error('Usual weekly hours cannot be more than the most hours you could train (step 3).');
         const dayPreferences = Object.fromEntries(Object.keys(limits)
             .map(day => [day, values.get(`env${day}`) || 'either']).filter(([, v]) => v !== 'either'));
         const profile = {
-            id: service.data.profile?.id || 'local-athlete',
-            ftp: db.ftp || null, weight: db.weight, unitSystem: db.measurement,
+            id: service.data.profile?.id || 'local-athlete', sport,
+            ftp: sport === 'cycling' ? db.ftp || null : null, weight: db.weight, unitSystem: db.measurement,
             experience: values.get('experience'), timeZone: values.get('timeZone'),
             typicalWeeklyHours: hours, maxWeeklyHours: maxHours,
             longRideDay: longDay === '' || longDay == null ? null : Number(longDay),
             maxSessionMinutes: limits, availableDays: Object.keys(limits).map(Number),
         };
+        if(sport === 'running') {
+            const thresholdPace = this.thresholdPaceFrom(values);
+            if(thresholdPace != null) profile.thresholdPace = thresholdPace;
+        }
         if(Object.keys(dayPreferences).length) profile.dayPreferences = dayPreferences;
         for(const [name] of HEART_RATE) if(optional(values.get(name)) != null) profile[name] = optional(values.get(name));
         for(const [name] of EQUIPMENT) if(values.get(name)) profile[name] = values.get(name) === 'yes';
         return profile;
     }
+    /** Threshold pace in seconds per km from the typed pace, or estimated from a recent race (Riegel 1981). */
+    thresholdPaceFrom(values) {
+        const typed = String(values.get('thresholdPace') ?? '').trim();
+        const raceDistance = optional(values.get('raceDistanceKm')), raceText = String(values.get('raceTime') ?? '').trim();
+        let pace = null;
+        if(typed) {
+            const parsed = parsePace(typed);
+            if(parsed == null) throw new Error('Enter threshold pace as minutes:seconds, e.g. 5:00 (step 2).');
+            pace = Math.round(db.measurement === 'imperial' ? parsed / 1.609344 : parsed);
+        } else if(raceDistance != null || raceText) {
+            const seconds = parseClock(raceText);
+            if(!(raceDistance > 0) || seconds == null) {
+                throw new Error('Enter both the race distance and its finish time (h:mm:ss or mm:ss) (step 2).');
+            }
+            pace = thresholdPaceFromRace(raceDistance, seconds);
+        }
+        if(pace != null && (pace < DEFAULTS.runThresholdPaceMinimum || pace > DEFAULTS.runThresholdPaceMaximum)) {
+            throw new Error(`Threshold pace must be between ${formatPace(DEFAULTS.runThresholdPaceMinimum)} and ${
+                formatPace(DEFAULTS.runThresholdPaceMaximum)} (step 2).`);
+        }
+        return pace;
+    }
     goalFrom(values) {
         const start = values.get('start');
         const date = values.get('date') || addDays(start, Number(values.get('horizon')) || 91);
-        if(date <= start) throw new Error('The event date must be after the plan start date (step 2).');
-        if(date > addDays(start, 366)) throw new Error('The event date must be within a year of the plan start (step 2).');
-        const goal = {id: 'cycling-goal', name: values.get('name'), type: values.get('type'),
+        if(date <= start) throw new Error('The event date must be after the plan start date (step 1).');
+        if(date > addDays(start, 366)) throw new Error('The event date must be within a year of the plan start (step 1).');
+        const sport = sportForGoalType(values.get('type'));
+        const goal = {id: `${sport}-goal`, name: values.get('name'), type: values.get('type'),
             priority: values.get('priority'), date, active: true};
-        for(const [name] of GOAL_NUMBERS) if(optional(values.get(name)) != null) goal[name] = optional(values.get(name));
+        for(const [name, , , , only] of GOAL_NUMBERS) {
+            if((!only || only === sport) && optional(values.get(name)) != null) goal[name] = optional(values.get(name));
+        }
         if(values.get('terrain')) goal.terrain = values.get('terrain');
         if(values.get('completionObjective')) goal.completionObjective = values.get('completionObjective');
         return goal;
@@ -396,7 +466,7 @@ class CoachingPanel extends HTMLElement {
             } else if(form.dataset.coachForm === 'import') {
                 const rides = JSON.parse(values.get('rides'));
                 await service.importActivities(rides);
-                this.notice = `Imported ${rides.length} ride${rides.length === 1 ? '' : 's'}.`;
+                this.notice = `Imported ${rides.length} activit${rides.length === 1 ? 'y' : 'ies'}.`;
             } else {
                 const feedback = Object.fromEntries(['rpe', 'legFreshness', 'sleepQuality', 'muscleSoreness', 'stress']
                     .filter(key => values.get(key) !== '').map(key => [key, Number(values.get(key))]));

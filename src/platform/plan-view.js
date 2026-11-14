@@ -7,16 +7,17 @@
  */
 
 import { FAMILIES } from '../coaching/workouts.js';
+import { RUN_TITLES } from '../coaching/running.js';
 import { escape, mobileDetails } from './format.js';
 
 const PHASES = {
-    assessment: ['Baseline', 'Easy rides that show the Coach where your fitness is today.'],
-    preparation: ['Preparation', 'Easing into regular, structured riding.'],
-    base: ['Base', 'Building endurance with mostly easy, steady riding.'],
+    assessment: ['Baseline', 'Easy sessions that show the Coach where your fitness is today.'],
+    preparation: ['Preparation', 'Easing into regular, structured training.'],
+    base: ['Base', 'Building endurance with mostly easy, steady training.'],
     build: ['Build', 'Adding harder sessions aimed at your goal.'],
     specific: ['Event-specific', 'Training that looks like the demands of your goal.'],
     peak: ['Peak', 'Keeping sharpness without adding more volume.'],
-    taper: ['Taper', 'Less riding so you arrive fresh.'],
+    taper: ['Taper', 'Less training so you arrive fresh.'],
     recovery: ['Recovery week', 'A lighter week so your body can absorb the training.'],
     event: ['Goal', 'Your goal day.'],
 };
@@ -32,7 +33,15 @@ const GOAL_TYPES = {
     general_fitness: 'General fitness', ftp_improvement: 'Raise FTP', gran_fondo: 'Gran fondo', climbing: 'Climbing',
     time_trial: 'Time trial', road_race: 'Road race', criterium: 'Criterium', sprint: 'Sprinting',
     long_distance_completion: 'Long-distance ride',
+    general_running: 'General running fitness', first_5k: 'First 5 km', run_5k: '5 km race', run_10k: '10 km race',
+    half_marathon: 'Half marathon', marathon: 'Marathon', ultra_trail: 'Ultra / trail',
 };
+// Run plans reuse the cycling layout; only the words change.
+const WORDS = {
+    cycling: {session: 'ride', sessions: 'rides', act: 'Ride', prepare: 'Prepare to ride', other: 'other ride', families: FAMILY_LABELS},
+    running: {session: 'run', sessions: 'runs', act: 'View', prepare: 'View run', other: 'other run', families: RUN_TITLES},
+};
+const wordsFor = plan => WORDS[plan?.sport === 'running' || plan?.workouts?.[0]?.sport === 'running' ? 'running' : 'cycling'];
 
 const phaseName = type => PHASES[type]?.[0] || String(type ?? '').replaceAll('_', ' ');
 const dateLabel = (day, options = {weekday: 'short', day: 'numeric', month: 'short'}) =>
@@ -45,42 +54,43 @@ const hours = seconds => {
     const h = Math.floor(total / 60), m = total % 60;
     return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
 };
-const sessionName = workout => workout.libraryName || FAMILY_LABELS[workout.family] || workout.title;
-const sessionKind = workout => workout.libraryName && FAMILY_LABELS[workout.family] ? `${FAMILY_LABELS[workout.family]} &middot; ` : '';
+const sessionName = (workout, words = WORDS.cycling) => workout.libraryName || words.families[workout.family] || workout.title;
+const sessionKind = (workout, words = WORDS.cycling) => workout.libraryName && words.families[workout.family]
+    ? `${words.families[workout.family]} &middot; ` : '';
 const badge = (text, kind = '') => `<span class="plan-chip ${kind}">${escape(text)}</span>`;
 
-function sessionRow(workout, day) {
-    const [status, kind] = STATUS[workout.status] || [workout.status, ''];
+function sessionRow(workout, day, words) {
+    const [status, kind] = workout.status === 'substituted' ? [`Done (${words.other})`, 'done'] : STATUS[workout.status] || [workout.status, ''];
     const hard = FAMILIES[workout.family]?.hard;
     const isToday = workout.date === day;
     const overdue = workout.status === 'scheduled' && workout.date < day;
     return `<li class="plan-session ${isToday ? 'today' : ''} ${isDone(workout) ? 'is-done' : ''}">
         <div class="plan-session-day"><strong>${isToday ? 'Today' : escape(dateLabel(workout.date, {weekday: 'short'}))}</strong>
             <span>${escape(dateLabel(workout.date, {day: 'numeric', month: 'short'}))}</span></div>
-        <div class="plan-session-body"><strong>${escape(sessionName(workout))}</strong>
-            <span>${sessionKind(workout)}${hours(workout.duration)} &middot; ${hard ? 'Hard effort' : 'Easy effort'}${workout.expectedRpe ? ` &middot; RPE ${workout.expectedRpe}/10` : ''}</span>
+        <div class="plan-session-body"><strong>${escape(sessionName(workout, words))}</strong>
+            <span>${sessionKind(workout, words)}${hours(workout.duration)} &middot; ${hard ? 'Hard effort' : 'Easy effort'}${workout.expectedRpe ? ` &middot; RPE ${workout.expectedRpe}/10` : ''}</span>
             ${workout.libraryAdjustments?.length ? `<span class="plan-session-note">Adjusted for you: ${escape(workout.libraryAdjustments.join(', '))}</span>` : ''}</div>
         <div class="plan-session-status">${overdue ? badge('Not yet logged', 'missed') : workout.status !== 'scheduled' ? badge(status, kind) : ''}${hard ? badge('Key session', 'hard') : ''}</div>
         <a class="button ${isToday && workout.status === 'scheduled' ? '' : 'secondary'}" href="#/workout/${encodeURIComponent(workout.id)}"
-            aria-label="${isToday ? 'Ride' : 'View'} ${escape(sessionName(workout))} on ${escape(dateLabel(workout.date))}">${isToday && workout.status === 'scheduled' ? 'Ride' : 'View'}</a>
+            aria-label="${isToday ? words.act : 'View'} ${escape(sessionName(workout, words))} on ${escape(dateLabel(workout.date))}">${isToday && workout.status === 'scheduled' ? words.act : 'View'}</a>
     </li>`;
 }
 
-function weekBlock(week, index, workouts, day, open) {
+function weekBlock(week, index, workouts, day, open, words) {
     const planned = workouts.reduce((total, w) => total + w.duration, 0);
     const done = workouts.filter(isDone).length;
     const current = week.startDate <= day && week.endDate >= day;
     const past = week.endDate < day;
     const summary = workouts.length
-        ? `${workouts.length} ${workouts.length === 1 ? 'ride' : 'rides'} &middot; ${hours(planned)}${past || current ? ` &middot; ${done}/${workouts.length} done` : ''}`
+        ? `${workouts.length} ${workouts.length === 1 ? words.session : words.sessions} &middot; ${hours(planned)}${past || current ? ` &middot; ${done}/${workouts.length} done` : ''}`
         : 'Rest week';
     return `<details class="plan-week ${current ? 'current' : ''}" ${open ? 'open' : ''}>
         <summary><span class="plan-week-title"><strong>${current ? 'This week' : `Week ${index + 1}`}</strong>
             <span>${escape(rangeLabel(week.startDate, week.endDate))}</span></span>
             ${badge(phaseName(week.phaseType), `phase-${escape(week.phaseType)}`)}
             <span class="plan-week-summary">${summary}</span></summary>
-        ${workouts.length ? `<ul class="plan-sessions">${workouts.map(w => sessionRow(w, day)).join('')}</ul>`
-            : '<p class="muted">No rides planned this week.</p>'}
+        ${workouts.length ? `<ul class="plan-sessions">${workouts.map(w => sessionRow(w, day, words)).join('')}</ul>`
+            : `<p class="muted">No ${words.sessions} planned this week.</p>`}
         ${PHASES[week.phaseType] ? `<p class="muted plan-week-note">${escape(PHASES[week.phaseType][1])}</p>` : ''}
     </details>`;
 }
@@ -127,10 +137,11 @@ export function renderPlan(data, day) {
     const archived = plan.status === 'archived';
     const goal = data.goal || {};
     const stat = (value, label) => `<div><strong>${value}</strong><span>${label}</span></div>`;
+    const words = wordsFor(plan);
 
     const past = currentIndex < 0 ? weeks.filter(w => w.endDate < day) : weeks.slice(0, currentIndex);
     const upcoming = currentIndex < 0 ? weeks.filter(w => w.startDate > day) : weeks.slice(currentIndex + 1);
-    const block = (week, open = false) => weekBlock(week, weeks.indexOf(week), inWeek(week), day, open);
+    const block = (week, open = false) => weekBlock(week, weeks.indexOf(week), inWeek(week), day, open, words);
 
     return `${archived ? `<div class="coach-notice">This plan has been archived. <a href="#/coach">Create a new plan in Coach</a>.</div>` : ''}
         <section class="panel plan-overview">
@@ -150,9 +161,9 @@ export function renderPlan(data, day) {
             ${phase ? `<p class="plan-phase-now">Now: ${badge(phaseName(phase.type), `phase-${escape(phase.type)}`)} ${escape(PHASES[phase.type]?.[1] || '')}
                 <span class="muted">Until ${escape(dateLabel(phase.endDate))}.</span></p>` : ''}
             ${next && !archived ? `<div class="plan-next"><div><span class="eyebrow">${next.date === day ? 'Today' : 'Next session'}</span>
-                <strong>${escape(sessionName(next))} &middot; ${hours(next.duration)}</strong>
+                <strong>${escape(sessionName(next, words))} &middot; ${hours(next.duration)}</strong>
                 <span class="muted">${escape(dateLabel(next.date, {weekday: 'long', day: 'numeric', month: 'long'}))}</span></div>
-                <a class="button" href="#/workout/${encodeURIComponent(next.id)}">${next.date === day ? 'Prepare to ride' : 'View session'}</a></div>` : ''}
+                <a class="button" href="#/workout/${encodeURIComponent(next.id)}">${next.date === day ? words.prepare : 'View session'}</a></div>` : ''}
         </section>
         <section class="panel">${mobileDetails('plan-timeline', 'Plan at a glance', `<h2 class="desktop-section-title">Plan at a glance</h2>${timeline(plan, day)}`)}</section>
         ${workouts.length ? `<section class="panel plan-weeks"><h2>Week by week</h2>
@@ -161,14 +172,14 @@ export function renderPlan(data, day) {
             ${upcoming.length > 4 ? `<details class="plan-past"><summary>Later weeks (${upcoming.length - 4})</summary>${upcoming.slice(4).map(w => block(w)).join('')}</details>` : ''}
             ${past.length ? `<details class="plan-past"><summary>Earlier weeks (${past.length})</summary>${past.map(w => block(w)).join('')}</details>` : ''}
         </section>` : `<section class="panel"><h2>No sessions scheduled</h2>
-            <p>No rides fit within your current availability and training-load limits. Check your available days and hours in Coach,
+            <p>No ${words.sessions} fit within your current availability and training-load limits. Check your available days and hours in Coach,
             then create a new plan.</p><a class="button secondary" href="#/coach">Review Coach</a></section>`}
         <section class="panel plan-more">
             <details><summary>Recent changes to your plan (${plan.adaptations.length})</summary>
                 ${plan.adaptations.length ? `<ul class="plan-changes">${plan.adaptations.slice(-10).reverse().map(a => `<li>
                     <span class="muted">${escape(new Date(a.timestamp).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}))}</span>
                     ${escape(a.reasoning)}</li>`).join('')}</ul>`
-                    : '<p class="muted">The Coach adjusts your plan after recorded rides, feedback or missed sessions. Changes will be listed here.</p>'}
+                    : '<p class="muted">The Coach adjusts your plan after recorded ${words.sessions}, feedback or missed sessions. Changes will be listed here.</p>'}
             </details>
             <details><summary>How this plan was built</summary><p>${escape(plan.rationale)}</p>
                 ${phase?.rationale ? `<p><strong>Current phase:</strong> ${escape(phase.rationale)}</p>` : ''}

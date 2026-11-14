@@ -2,7 +2,7 @@
  * activity-types.js: maps provider activity types to Athlima sport categories.
  *
  * Intervals.icu (and Strava) use detailed type names such as GravelRide or TrailRun.
- * Coaching only plans cycling, so every type is reduced to a broad sport category
+ * Coaching plans cycling and running, so every type is reduced to a broad sport category
  * while the original type is kept for labels and icons.
  */
 

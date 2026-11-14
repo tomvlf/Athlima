@@ -77,6 +77,7 @@ test('coaching forms create a persistent plan that appears and adapts in the exi
         expect(calendar.entriesForDate(workout.date).some(e => e.id === workout.id)).toBe(true);
         expect(calendar.canStartCoaching(workout)).toBe(true);
         expect(calendar.canStartCoaching(service.data.plan.workouts.at(-1))).toBe(false);
+        expect(calendar.canStartCoaching({...workout, sport: 'running'})).toBe(false);
         xf.dispatch('ui:coaching:select', toAppWorkout(workout));
         expect(db.workout.coachingWorkoutId).toBe(workout.id);
         expect(db.workout.meta.duration).toBe(workout.duration);
@@ -109,4 +110,21 @@ test('goal date follows the chosen time frame unless an event date is entered', 
     expect(panel.goalFrom(values(base)).date).toBe('2026-07-02');
     expect(panel.goalFrom(values({...base, date: '2026-03-01'})).date).toBe('2026-03-01');
     expect(() => panel.goalFrom(values({...base, date: '2025-12-01'}))).toThrow('after the plan start');
+});
+
+test('running setup derives threshold pace from a typed pace or a race and drops cycling-only targets', () => {
+    const values = entries => ({get: key => entries[key] ?? ''});
+    const panel = new CoachingPanel();
+    const service = {data: {profile: null}};
+    const base = {type: 'run_10k', timeZone: 'UTC', experience: 'intermediate', hours: '4', maxHours: '5',
+        day1: '45', day6: '90', longDay: '6'};
+    expect(panel.profileFrom(values({...base, thresholdPace: '4:45'}), service))
+        .toMatchObject({sport: 'running', ftp: null, thresholdPace: 285});
+    expect(panel.profileFrom(values({...base, raceDistanceKm: '5', raceTime: '25:00'}), service).thresholdPace).toBe(315);
+    expect(() => panel.profileFrom(values({...base, raceDistanceKm: '5'}), service)).toThrow('race distance and its finish time');
+    expect(() => panel.profileFrom(values({...base, thresholdPace: '1:00'}), service)).toThrow('Threshold pace must be between');
+    const goal = panel.goalFrom(values({start: '2026-01-01', name: '10 km', type: 'run_10k', priority: 'A',
+        horizon: '91', distanceKm: '10', targetPower: '250'}));
+    expect(goal).toMatchObject({id: 'running-goal', distanceKm: 10});
+    expect(goal.targetPower).toBeUndefined();
 });

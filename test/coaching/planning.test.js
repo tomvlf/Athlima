@@ -47,6 +47,10 @@ describe('goal-specific deterministic planning', () => {
         expect(p.phases.at(-1).type).toBe('event');
         expect(p.phases.at(-2).type).toBe('taper');
         expect(() => validatePlan(p, profile)).not.toThrow();
+        // Taper research (Bosquet 2007): cut volume, keep intensity; arrive from a training week, not a deload.
+        const taper = p.weeks.findIndex(w => w.phaseType === 'taper');
+        expect(p.weeks[taper - 1].phaseType).not.toBe('recovery');
+        expect(p.workouts.some(w => w.weekId === p.weeks[taper].id && FAMILIES[w.family].hard)).toBe(true);
         for(const workout of p.workouts) {
             expect(workout.duration / 60).toBeLessThanOrEqual(profile.maxSessionMinutes[
                 new Date(workout.date).getUTCDay()]);
@@ -64,6 +68,12 @@ describe('goal-specific deterministic planning', () => {
     test('goal registry is extensible', () => {
         const p = plan({goal: {...goal, type: 'custom'}, registry: {...GOALS, custom: [1, 2, 3, 4, 5]}});
         expect(p.demand.capabilities.durability).toBeCloseTo(7 / 19);
+    });
+    test('hard sessions rotate between the goal\'s top demands instead of repeating one stimulus', () => {
+        const p = plan({goal: {...goal, type: 'ftp_improvement'}});
+        const hard = new Set(p.workouts.filter(w => FAMILIES[w.family].hard).map(w => w.family));
+        expect(hard.has('threshold')).toBe(true);
+        expect(hard.has('aerobic')).toBe(true);
     });
     test('short lead time does not compress demanding build work', () => {
         const p = plan({goal: {...goal, date: addDays(start, 10)}});

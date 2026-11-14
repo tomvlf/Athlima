@@ -26,7 +26,9 @@ export const DEFAULTS = Object.freeze({
     buildPhaseEndFraction: 0.7, specificPhaseMinimumDays: 14,
     initialLoadPower: 0.65, weeklyPlanningLoadPower: 0.7,
     recoveryWeekInterval: 4, recoveryWeekOffset: 3,
-    taperDaysPriorityA: 7, taperDaysPriorityB: 4, taperDaysPriorityC: 2,
+    // Bosquet et al. 2007 meta-analysis: ~2-week taper, volume -41-60%, intensity and frequency kept.
+    taperDaysPriorityA: 14, taperDaysPriorityB: 7, taperDaysPriorityC: 3, taperMaximumPlanShare: 0.25,
+    taperQualityMinimumPlanDays: 21, taperQualityMinimumDaysBeforeEvent: 3, hardFocusCandidates: 2,
     longRideAllocationShare: 0.4,
     longEventDurationThreshold: 240, longEventDistanceThreshold: 150,
     longEventDurabilityWeightBonus: 2, climbingElevationThreshold: 2000,
@@ -57,6 +59,19 @@ export const DEFAULTS = Object.freeze({
     heartRateZones: Object.freeze([0.6, 0.7, 0.8, 0.9]),
     powerThreeZoneThresholds: Object.freeze([0.75, 1.05]),
     heartRateThreeZoneThresholds: Object.freeze([0.7, 0.9]),
+    // Running: intensities are fractions of threshold speed (Friel pace zones re-expressed as speed).
+    runPaceZones: Object.freeze([0.78, 0.88, 0.94, 1.01, 1.03, 1.11]),
+    runInitialLoadPower: 0.8, runWeeklyPlanningLoadPower: 0.85, runLongRunShare: 0.3,
+    // Duration proxy for the distance-spike association in Frandsen et al. 2025, not a proven safe limit.
+    runSessionSpikeLimit: 1.1, runLongestSessionReferenceDays: 30, runInitialLongestSessionMinutes: 30,
+    runBeginnerMaximumDays: 4, runWalkThresholdMinutes: 30, runWalkStageWeeks: 2,
+    // Daniels-style quality caps, expressed as shares of weekly running time.
+    runThresholdWeeklyShare: 0.1, runIntervalWeeklyShare: 0.08, runRepetitionWeeklyShare: 0.05,
+    // Coaching heuristic (not trial evidence): flag potentially insufficient long-run preparation.
+    runRaceReadinessShare: 0.5,
+    runLongEventDurationThreshold: 180, runLongEventDistanceThreshold: 30,
+    runClimbingElevationThreshold: 1000, riegelExponent: 1.06,
+    runThresholdPaceMinimum: 120, runThresholdPaceMaximum: 900,
 });
 export const GOALS = Object.freeze({
     general_fitness: [5, 2, 1, 1, 1],
@@ -69,6 +84,20 @@ export const GOALS = Object.freeze({
     sprint: [1, 1, 2, 5, 1],
     long_distance_completion: [5, 2, 1, 1, 5],
 });
+// Same capability order as GOALS; for running "sprint" means short repetitions and strides.
+export const RUN_GOALS = Object.freeze({
+    general_running: [5, 2, 1, 1, 1],
+    first_5k: [5, 1, 1, 1, 1],
+    run_5k: [3, 3, 5, 2, 1],
+    run_10k: [4, 5, 4, 1, 2],
+    half_marathon: [4, 5, 2, 1, 3],
+    marathon: [5, 4, 1, 1, 5],
+    ultra_trail: [5, 2, 1, 1, 5],
+});
+export const SPORTS = Object.freeze(['cycling', 'running']);
+export const sportOf = profile => profile?.sport === 'running' ? 'running' : 'cycling';
+export const goalRegistry = sport => sport === 'running' ? RUN_GOALS : GOALS;
+export const sportForGoalType = type => Object.hasOwn(RUN_GOALS, type) ? 'running' : 'cycling';
 export const CAPABILITIES = ['endurance', 'threshold', 'aerobic', 'sprint', 'durability'];
 export const sum = values => values.reduce((a, b) => a + b, 0);
 export const mean = values => values.length ? sum(values) / values.length : null;
@@ -94,6 +123,8 @@ export function validateCoachingConfig(overrides = {}) {
         'progressionMaximumLevel', 'adaptationWindowDays', 'libraryTechniqueSeparationDays',
         'recoveryWeekInterval', 'recoveryWeekOffset',
         'taperDaysPriorityA', 'taperDaysPriorityB', 'taperDaysPriorityC',
+        'taperQualityMinimumPlanDays', 'taperQualityMinimumDaysBeforeEvent', 'hardFocusCandidates',
+        'runLongestSessionReferenceDays', 'runBeginnerMaximumDays', 'runWalkStageWeeks',
         'maxPlanDays',
         'durabilityMinimumSeconds', 'durabilityWarmupSeconds', 'cpMinimumEfforts',
         'cpMinimumDuration', 'cpMaximumDuration'];
@@ -109,7 +140,9 @@ export function validateCoachingConfig(overrides = {}) {
         'weeklyHardTimeShare', 'progressionMinimumQuality', 'libraryMaximumHardTimeShare',
         'libraryProgressionBaseShare', 'libraryProgressionIncrement', 'libraryTechniqueFitTolerance',
         'durabilityMinimumPowerShare', 'durabilityMaximumPowerShare',
-        'durabilityMaximumPowerVariation', 'cpMinimumFitQuality'];
+        'durabilityMaximumPowerVariation', 'cpMinimumFitQuality', 'taperMaximumPlanShare',
+        'runInitialLoadPower', 'runWeeklyPlanningLoadPower', 'runLongRunShare',
+        'runThresholdWeeklyShare', 'runIntervalWeeklyShare', 'runRepetitionWeeklyShare', 'runRaceReadinessShare'];
     if(shares.some(key => !bounded(config[key], 0, 1)) ||
        !positive(config.initialMinutes) || !positive(config.minimumSessionMinutes) ||
        !positive(config.minimumHardSessionMinutes) ||
@@ -149,7 +182,13 @@ export function validateCoachingConfig(overrides = {}) {
        config.durabilityMinimumPowerShare >= config.durabilityMaximumPowerShare ||
        !increasingThresholds(config.powerZones) || !increasingThresholds(config.heartRateZones) ||
        !increasingThresholds(config.powerThreeZoneThresholds) ||
-       !increasingThresholds(config.heartRateThreeZoneThresholds)) {
+       !increasingThresholds(config.heartRateThreeZoneThresholds) ||
+       !increasingThresholds(config.runPaceZones) || config.runBeginnerMaximumDays > 7 ||
+       !bounded(config.runSessionSpikeLimit, 1, 2) || !positive(config.runInitialLongestSessionMinutes) ||
+       !positive(config.runWalkThresholdMinutes) || !bounded(config.riegelExponent, 1, 1.2) ||
+       !positive(config.runLongEventDurationThreshold) || !positive(config.runLongEventDistanceThreshold) ||
+       !positive(config.runClimbingElevationThreshold) || !positive(config.runThresholdPaceMinimum) ||
+       config.runThresholdPaceMaximum <= config.runThresholdPaceMinimum) {
         throw new Error('Invalid coaching configuration thresholds or ranges.');
     }
     return config;
@@ -224,6 +263,11 @@ export function validateProfile(profile) {
         throw new Error('The long-ride day must be available.');
     }
     if(profile.unitSystem != null && !['metric', 'imperial'].includes(profile.unitSystem)) throw new Error('Invalid unit system.');
+    if(profile.sport != null && !SPORTS.includes(profile.sport)) throw new Error('Invalid coaching sport.');
+    if(profile.thresholdPace != null && !bounded(profile.thresholdPace, DEFAULTS.runThresholdPaceMinimum,
+        DEFAULTS.runThresholdPaceMaximum)) {
+        throw new Error('Threshold pace must be 2:00-15:00 per kilometre.');
+    }
     for(const key of ['maxHeartRate', 'thresholdHeartRate', 'restingHeartRate']) {
         if(profile[key] != null && (!positive(profile[key]) || profile[key] > 255)) throw new Error(`Invalid ${key}.`);
     }

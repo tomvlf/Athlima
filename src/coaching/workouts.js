@@ -16,9 +16,10 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { VERSION, DEFAULTS, sum, round, validateCoachingConfig } from './domain.js';
+import { VERSION, DEFAULTS, sum, round, sportOf, validateCoachingConfig } from './domain.js';
 import { explainWorkout } from './explanations.js';
 import { powerAccumulator } from './power.js';
+import { RUN_FAMILIES, RUN_TITLES, STRIDE, runSteps } from './running.js';
 
 export const FAMILIES = Object.freeze({
     endurance: {power: 0.65, rpe: 3, hard: false},
@@ -28,6 +29,9 @@ export const FAMILIES = Object.freeze({
     sprint: {power: 1.3, rpe: 8, hard: true},
     durability: {power: 0.65, rpe: 4, hard: false},
 });
+
+/** Family intensity/RPE for a sport; both sports share family keys and hard/easy classification. */
+export const familySpec = (family, sport = 'cycling') => (sport === 'running' ? RUN_FAMILIES : FAMILIES)[family];
 
 export function stepLoad(steps) {
     const calculation = powerAccumulator();
@@ -52,13 +56,23 @@ function validateSlot({minutes, family, level = 1}, rules) {
  * @returns {object} A scheduled coaching workout.
  */
 export function buildWorkout({id, date, family, steps, level = 1, phaseId, weekId, phaseType,
-    profile, title, description, library = null}) {
-    const spec = FAMILIES[family];
+    profile, title, description, library = null, runFormat: requestedFormat = null}) {
+    const sport = sportOf(profile);
+    const spec = familySpec(family, sport);
     const seconds = sum(steps.map(s => s.duration));
-    const reason = explainWorkout(family, phaseType, level);
+    // Describe what the steps contain, not what the slot requested (fallbacks may drop strides or walks).
+    const runFormat = sport === 'running' && requestedFormat ? {
+        runWalk: requestedFormat.runWalk && !spec.hard ? [...requestedFormat.runWalk] : null,
+        strides: spec.hard ? 0 : steps.filter(s => s.power === STRIDE).length,
+    } : null;
+    const reason = explainWorkout(family, phaseType, level, sport, runFormat);
+    const name = sport === 'running'
+        ? runFormat?.runWalk && !spec.hard ? 'Run-walk' : RUN_TITLES[family]
+        : `${family[0].toUpperCase()}${family.slice(1)}`;
     return {
         id, externalId: id, date, family, type: spec.hard ? 'intervals' : 'steady',
-        title: title || `${family[0].toUpperCase()}${family.slice(1)} ${Math.round(seconds / 60)} min`,
+        ...(sport === 'running' ? {sport, runFormat} : {}),
+        title: title || `${name} ${Math.round(seconds / 60)} min`,
         description: description || reason, reason,
         purpose: family, duration: seconds, targetLoad: round(stepLoad(steps)),
         targetIntensity: Math.sqrt(stepLoad(steps) / (seconds / 3600 * 100)),
@@ -80,6 +94,15 @@ export function progressWorkout(args) {
     validateSlot(args, config);
     const {minutes, level = 1} = args;
     let {family} = args;
+    if(sportOf(args.profile) === 'running') {
+        if(RUN_FAMILIES[family].hard && minutes < config.minimumHardSessionMinutes) family = 'endurance';
+        let steps = runSteps({...args, family}, config);
+        if(!steps) {
+            family = 'endurance';
+            steps = runSteps({...args, family}, config);
+        }
+        return buildWorkout({...args, family, steps});
+    }
     if(FAMILIES[family].hard && minutes < config.minimumHardSessionMinutes) family = 'endurance';
     if(FAMILIES[family].power > config.libraryMaximumPower) {
         family = FAMILIES.endurance.power <= config.libraryEnduranceMaximumPower ? 'endurance' : 'recovery';
@@ -119,9 +142,11 @@ export function toAppWorkout(workout) {
 export function exportZwo(workout) {
     const escape = value => String(value).replace(/[&<>"']/g, c =>
         ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'}[c]));
+    // Zwift run steps scale a reference race pace; pace="2" (10 km) approximates threshold pace.
+    const run = workout.sport === 'running';
     return `<?xml version="1.0" encoding="UTF-8"?>\n<workout_file><author>Athlima</author>` +
         `<name>${escape(workout.title)}</name><description>${escape(workout.description)}</description>` +
-        `<sportType>bike</sportType><workout>` +
-        workout.steps.map(s => `<SteadyState Duration="${s.duration}" Power="${s.power}"${Number.isFinite(s.cadence) ? ` Cadence="${s.cadence}"` : ''}/>`).join('') +
+        `<sportType>${run ? 'run' : 'bike'}</sportType><workout>` +
+        workout.steps.map(s => `<SteadyState Duration="${s.duration}" Power="${s.power}"${run ? ' pace="2"' : ''}${Number.isFinite(s.cadence) ? ` Cadence="${s.cadence}"` : ''}/>`).join('') +
         '</workout></workout_file>';
 }

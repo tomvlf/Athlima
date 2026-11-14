@@ -19,6 +19,7 @@ import { isoDate } from '../utils.js';
 import { coachingService, coachingData } from '../coaching/service.js';
 import { toAppWorkout, exportZwo } from '../coaching/workouts.js';
 import { localDay } from '../coaching/domain.js';
+import { describeRunPaces } from '../coaching/running.js';
 import { estimateState } from '../coaching/state.js';
 import { fileHandler } from '../file.js';
 import { accountStorage, accountKey } from '../storage/account.js';
@@ -514,8 +515,9 @@ class TrainingCalendar extends HTMLElement {
                     </div>
                     ${entry.source === 'coaching' ? `
                         <div class="training-calendar--description">
-                            ${escapeHTML(entry.coaching.status)}; ${Math.round(entry.coaching.targetLoad)} planned power-load points;
+                            ${escapeHTML(entry.coaching.status)}; ${Math.round(entry.coaching.targetLoad)} planned ${entry.coaching.sport === 'running' ? 'load' : 'power-load'} points;
                             RPE ${entry.coaching.expectedRpe}. ${escapeHTML(entry.coaching.description)}
+                            ${entry.coaching.sport === 'running' ? escapeHTML(this.runGuide(entry.coaching)) : ''}
                         </div>` : ''}
                     ${profile}
                     ${details}
@@ -707,7 +709,7 @@ class TrainingCalendar extends HTMLElement {
             ${workout.status === 'scheduled' && workout.date <= today && data.plan.status === 'active' ? `
                 <button type="button" data-action="coach-missed" data-entry="${escapeHTML(entry.id)}">Missed</button>
                 <button type="button" data-action="coach-failed" data-entry="${escapeHTML(entry.id)}">Not completed</button>
-                ${activities.length ? `<select aria-label="Completed substitute ride" data-substitute="${escapeHTML(entry.id)}">
+                ${activities.length ? `<select aria-label="Completed substitute session" data-substitute="${escapeHTML(entry.id)}">
                     ${activities.map(a => `<option value="${escapeHTML(a.id)}">${escapeHTML(a.day)}
                         ${Math.round(a.duration / 60)} min</option>`).join('')}</select>
                     <button type="button" data-action="coach-substitute" data-entry="${escapeHTML(entry.id)}">Use substitute</button>` : ''}
@@ -716,8 +718,16 @@ class TrainingCalendar extends HTMLElement {
 
     canStartCoaching(workout) {
         const data = coachingData();
-        return data.plan.status === 'active' && workout.status === 'scheduled' &&
+        // Runs happen away from the indoor player: follow them on a watch or export the ZWO.
+        return workout.sport !== 'running' && data.plan.status === 'active' && workout.status === 'scheduled' &&
             workout.date === localDay(new Date().toISOString(), data.profile.timeZone);
+    }
+
+    runGuide(workout) {
+        const profile = coachingData()?.profile;
+        const paces = describeRunPaces(workout.steps, profile?.thresholdPace, profile?.unitSystem);
+        return paces ? `Pace guide: ${paces}. Run by effort on hills, heat or trails.`
+            : 'Set a threshold pace to see pace targets; until then run by effort (RPE).';
     }
 
     render() {
@@ -780,7 +790,8 @@ class TrainingCalendar extends HTMLElement {
                 const workout = service.data.plan.workouts.find(w => w.id === action.dataset.entry);
                 if(!workout) throw new Error('Coaching workout not found.');
                 if(action.dataset.action === 'coach-export') {
-                    fileHandler.download()(exportZwo(workout), `${workout.date}-${workout.family}.zwo`, 'application/xml');
+                    fileHandler.download()(exportZwo(workout),
+                        `${workout.date}-${workout.sport === 'running' ? 'run-' : ''}${workout.family}.zwo`, 'application/xml');
                 } else {
                     const select = [...this.querySelectorAll('[data-substitute]')]
                         .find(el => el.dataset.substitute === workout.id);

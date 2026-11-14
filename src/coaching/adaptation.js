@@ -16,16 +16,18 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { VERSION, DEFAULTS, sum, round, addDays, validateCoachingConfig } from './domain.js';
-import { progressWorkout, FAMILIES } from './workouts.js';
+import { VERSION, DEFAULTS, SPORTS, sum, round, addDays, sportOf, validateCoachingConfig } from './domain.js';
+import { progressWorkout, FAMILIES, familySpec } from './workouts.js';
 import { prescribeWorkout } from './library.js';
-import { validatePlan, rampReference } from './planner.js';
+import { validatePlan, rampReference, longestReference, qualityReferenceMinutes } from './planner.js';
 import { explainAdaptation } from './explanations.js';
+import { runQualityExcess } from './running.js';
 
 export function matchWorkout(activity, workouts, explicitId = null, rules = DEFAULTS) {
     const config = validateCoachingConfig(rules);
-    if(activity.sport !== 'cycling') return {workoutId: null, confidence: 0, quality: null, reason: 'Not a cycling activity.'};
-    const candidates = workouts.filter(w => w.status === 'scheduled' && w.date === activity.day);
+    if(!SPORTS.includes(activity.sport)) return {workoutId: null, confidence: 0, quality: null, reason: 'Not a coached sport.'};
+    const candidates = workouts.filter(w => w.status === 'scheduled' && w.date === activity.day &&
+        (w.sport ?? 'cycling') === activity.sport);
     if(explicitId && !candidates.some(w => w.id === explicitId)) {
         return {workoutId: null, confidence: 0, quality: null, reason: 'Explicit workout is not scheduled on this local date.'};
     }
@@ -44,6 +46,62 @@ export function matchWorkout(activity, workouts, explicitId = null, rules = DEFA
             reason: 'Insufficient evidence for an automatic match; confirm a substitution explicitly.'};
 }
 
+/**
+ * Re-applies the running safety rules after sessions were removed, missed or shortened: no future run
+ * may exceed the spike limit against the longest run actually kept in the previous 30 days, and the
+ * weekly share of demanding time stays bounded. Both rules only shorten or ease sessions.
+ */
+function enforceRunSafety(next, profile, config, date, changes) {
+    const initial = next.initialLimits.longestSessionMinutes ?? config.runInitialLongestSessionMinutes;
+    const rebuild = (workout, minutes, family, note) => {
+        const previous = JSON.parse(JSON.stringify(workout));
+        const index = next.weeks.findIndex(w => w.id === workout.weekId);
+        const modified = progressWorkout({id: workout.id, date: workout.date, minutes, family,
+            level: family === workout.family ? workout.progressionLevel : 1, phaseId: workout.phaseId,
+            weekId: workout.weekId, phaseType: next.weeks[index]?.phaseType, profile, rules: config,
+            weeklyMinutes: qualityReferenceMinutes(next.weeks, index),
+            runFormat: workout.runFormat ? {...workout.runFormat, strides: family === workout.family
+                ? workout.runFormat.strides : 0} : null});
+        modified.original = workout.original ?? {family: workout.family, duration: workout.duration,
+            targetLoad: workout.targetLoad, progressionLevel: workout.progressionLevel,
+            libraryWorkoutId: workout.libraryWorkoutId ?? null};
+        modified.adaptationNotes = [...workout.adaptationNotes, note];
+        Object.assign(workout, modified);
+        changes.push({id: workout.id, action: 'modified', previous, current: {...workout}});
+    };
+    const future = () => next.workouts.filter(w => w.date > date && w.status === 'scheduled')
+        .sort((a, b) => a.date.localeCompare(b.date));
+    for(const workout of future()) {
+        const cap = Math.floor(config.runSessionSpikeLimit * longestReference(workout.date, next.workouts, initial,
+            next.startDate, config, w => w.status !== 'missed'));
+        if(workout.duration / 60 <= cap) continue;
+        if(cap < config.minimumSessionMinutes) {
+            next.workouts = next.workouts.filter(w => w.id !== workout.id);
+            changes.push({id: workout.id, action: 'removed', previous: JSON.parse(JSON.stringify(workout)), current: null});
+            continue;
+        }
+        rebuild(workout, cap, workout.family,
+            'Shortened so this run stays within 10% of the longest run kept in the previous 30 days.');
+    }
+    for(const [index, week] of next.weeks.entries()) {
+        const members = () => next.workouts.filter(w => w.weekId === week.id);
+        const hardSeconds = () => sum(members().flatMap(w => w.steps.filter(s => s.power > config.hardPowerThreshold))
+            .map(s => s.duration));
+        while(true) {
+            const totalExceeded = hardSeconds() > sum(members().map(w => w.duration)) * config.weeklyHardTimeShare;
+            const excess = runQualityExcess(members(), qualityReferenceMinutes(next.weeks, index), config);
+            if(!totalExceeded && !excess.length) break;
+            const hard = future().filter(w => w.weekId === week.id && FAMILIES[w.family].hard &&
+                (totalExceeded || excess.includes(w.family))).at(-1);
+            if(!hard) break;
+            rebuild(hard, hard.duration / 60, 'endurance',
+                'Changed to an easy run so quality time stays within the weekly caps.');
+        }
+        week.scheduledMinutes = sum(members().map(w => w.duration / 60));
+        week.scheduledLoad = round(sum(members().map(w => w.targetLoad)));
+    }
+}
+
 export function adaptPlan({plan, profile, state, trigger, date, timestamp, workoutId = null,
     activity = null, match = null}) {
     if(!['completed', 'failed', 'missed', 'substituted', 'recovery', 'unplanned', 'feedback'].includes(trigger) ||
@@ -51,6 +109,8 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         throw new Error('Invalid adaptation trigger, timestamp or date.');
     }
     const config = validateCoachingConfig(state.config ?? plan.coachingConfig);
+    const sport = sportOf(profile);
+    const running = sport === 'running';
     const next = JSON.parse(JSON.stringify(plan));
     const changes = [];
     const target = workoutId ? next.workouts.find(w => w.id === workoutId) : null;
@@ -104,10 +164,11 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         if(!Number.isFinite(week.plannedLoad)) week.plannedLoad = round(originalLoad);
         const minuteCap = Math.min(originalMinutes,
             Math.max(...envelope().map(w => w.minutes)) * (1 + week.rampLimit));
-        let loadCap = Math.min(originalLoad,
+        // Running plans are bounded by target load rather than a weekly load ramp (see scheduleWorkouts).
+        let loadCap = running ? originalLoad : Math.min(originalLoad,
             Math.max(...envelope().map(w => w.load)) * (1 + week.rampLimit));
         if(['completed', 'substituted'].includes(trigger) && reduction === 1) {
-            const priorEnvelope = history.length
+            const priorEnvelope = running ? week.targetLoad : history.length
                 ? Math.max(...envelope().map(w => w.load)) * (1 + week.rampLimit)
                 : plan.initialLimits.load;
             loadCap = Math.min(week.targetLoad, priorEnvelope);
@@ -116,15 +177,17 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         const alreadyAccounted = activity && plan.adaptations.some(a => a.observations.activityId === activity.id);
         if(activity && trigger !== 'feedback' && !alreadyAccounted &&
            activity.day >= week.startDate && activity.day <= week.endDate) {
-            const actualLoad = activity.loadMetrics.power.value;
-            const excess = actualLoad == null ? Math.max(0, activity.duration / 60 - (target?.duration || 0) / 60) * 0.65 ** 2 * 100 / 60
+            const actualLoad = activity.loadMetrics[running ? 'pace' : 'power']?.value;
+            const excess = actualLoad == null ? Math.max(0, activity.duration / 60 - (target?.duration || 0) / 60) *
+                familySpec('endurance', sport).power ** 2 * 100 / 60
                 : Math.max(0, actualLoad - (target?.targetLoad || 0));
             loadCap = Math.max(sum(frozen.map(w => w.targetLoad)), loadCap - excess);
         }
         const frozenMinutes = sum(frozen.map(w => w.duration / 60));
         const frozenLoad = sum(frozen.map(w => w.targetLoad));
         let usedMinutes = frozenMinutes, usedLoad = frozenLoad;
-        const recoveryLoadPerMinute = FAMILIES.recovery.power ** 2 * 100 / 60;
+        const recoveryLoadPerMinute = familySpec('recovery', sport).power ** 2 * 100 / 60;
+        const weeklyMinutes = qualityReferenceMinutes(next.weeks, next.weeks.indexOf(week));
         const intended = future.map(workout => {
             const baseline = workout.original ?? workout;
             const factor = workout.date <= windowEnd ? reduction : 1;
@@ -154,7 +217,7 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
             const minutes = Math.floor(Math.min(baseline.duration / 60 * factor * scale, minuteCap - usedMinutes) + 0.000001);
             const forceEasy = factor < 1 && reduceIntensity;
             const family = forceEasy ? 'recovery' : baseline.family;
-            const loadPerMinute = forceEasy ? FAMILIES.recovery.power ** 2 * 100 / 60
+            const loadPerMinute = forceEasy ? recoveryLoadPerMinute
                 : baseline.targetLoad / (baseline.duration / 60);
             const fitMinutes = Math.min(minutes, Math.floor((loadCap - usedLoad + 0.000001) / loadPerMinute));
             if(fitMinutes < config.minimumSessionMinutes) {
@@ -174,6 +237,8 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
                 id: workout.id, date: workout.date, minutes: fitMinutes, family,
                 level: forceEasy ? 1 : progressionLevel, phaseId: workout.phaseId,
                 weekId: workout.weekId, phaseType: week.phaseType, profile, rules: config,
+                ...(running ? {weeklyMinutes, runFormat: workout.runFormat
+                    ? {...workout.runFormat, strides: forceEasy ? 0 : workout.runFormat.strides} : null} : {}),
             };
             // Keep the planned library workout and shorten it rather than swapping the session.
             const unchanged = fitMinutes * 60 === workout.duration && family === workout.family &&
@@ -181,7 +246,7 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
             const sessionBudget = loadCap - usedLoad - sum(intended.slice(futureIndex + 1).map(i => i.load)) * scale;
             let modified = unchanged ? {...workout} : prescribeWorkout(slot, {
                 history: next.workouts.filter(w => w.date < workout.date),
-                prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config,
+                prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config, library: !running,
                 maxLoad: Math.max(sessionBudget, fitMinutes * recoveryLoadPerMinute),
             });
             // Prefer a shorter session of the planned family over downgrading it to recovery.
@@ -189,7 +254,7 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
                 usedLoad + modified.targetLoad > loadCap + 0.01 && shorter >= config.minimumSessionMinutes; shorter -= 5) {
                 modified = prescribeWorkout({...slot, minutes: shorter}, {
                     history: next.workouts.filter(w => w.date < workout.date),
-                    prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config,
+                    prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config, library: !running,
                     maxLoad: Math.min(loadCap - usedLoad, baseline.targetLoad),
                 });
             }
@@ -221,7 +286,7 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
                 JSON.stringify(modified.steps) === JSON.stringify(workout.steps))) {
                 modified = prescribeWorkout({...slot, level: baseline.progressionLevel}, {
                     history: next.workouts.filter(w => w.date < workout.date),
-                    prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config,
+                    prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config, library: !running,
                 });
             }
             const restored = !forceEasy && factor === 1 && modified.family === baseline.family &&
@@ -274,6 +339,7 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         week.scheduledLoad = round(usedLoad);
         history.push(rampReference(week, usedMinutes, usedLoad));
     }
+    if(running) enforceRunSafety(next, profile, config, date, changes);
     next.revision++;
     next.sourceSnapshot = state.id;
     next.validationWarnings = validatePlan(next, profile, config);

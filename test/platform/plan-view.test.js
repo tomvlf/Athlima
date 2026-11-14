@@ -69,3 +69,14 @@ test('archived plans point the rider back to the Coach', () => {
     expect(html).toContain('This plan has been archived');
     expect(html).not.toContain('Prepare to ride');
 });
+
+test('running plans use running words and session names', () => {
+    const html = renderPlan({goal: {name: 'Spring 10 km', type: 'run_10k', priority: 'A'},
+        plan: {...data.plan, sport: 'running', adaptations: []}}, '2026-11-12');
+    const thisWeek = html.match(/<details class="plan-week current" open>[\s\S]*?<\/details>/)[0];
+    expect(html).toContain('10 km race');
+    expect(thisWeek).toContain('Threshold run');
+    expect(thisWeek).toContain('Long run');
+    expect(thisWeek).toContain('3 runs');
+    expect(html).not.toMatch(/\bride/i);
+});

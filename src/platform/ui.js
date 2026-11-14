@@ -21,6 +21,7 @@ import intervals from '../models/intervals.js';
 import { coachingData, coachingService } from '../coaching/service.js';
 import { toAppWorkout } from '../coaching/workouts.js';
 import { addDays } from '../coaching/domain.js';
+import { describeRunPaces, formatPace, paceForIntensity } from '../coaching/running.js';
 import { cadenceSummary, escape, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
 import { activityLists, historyActivityRow, localActivityRow, renderActivityOverview, renderActivityStreamData } from './activities.js';
 import { initialLibraryFilters, renderLibrary } from './library.js';
@@ -202,7 +203,8 @@ export async function launchPlatform(root) {
         }
         const todayBody = sessions.length ? sessions.map(workout => `<p class="eyebrow">${escape(workout.family)} / ${minutes(workout.duration)}</p>
             <h2 class="hero-title">${escape(workout.title)}</h2><p>${escape(workout.description)}</p>
-            ${profileGraph(workout.appWorkout || toAppWorkout(workout))}${link(`workout/${encodeURIComponent(workout.id)}`, 'Prepare to ride', 'button')}`).join('')
+            ${profileGraph(workout.appWorkout || toAppWorkout(workout))}${link(`workout/${encodeURIComponent(workout.id)}`,
+                workout.sport === 'running' ? 'View run' : 'Prepare to ride', 'button')}`).join('')
             : `<h2 class="hero-title">${data?.plan?.status === 'active' ? 'Space to recover.' : 'Your next ride starts here.'}</h2>
                 <p>${data?.plan?.status === 'active' ? 'No Coach session scheduled today. Follow your recovery guidance, or choose a ride.' : 'Build a training plan or choose a session from your library.'}</p>
                 ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
@@ -234,16 +236,22 @@ export async function launchPlatform(root) {
         const workout = selectedWorkout(data);
         if(!workout) return empty('This workout is not available on this device.');
         const planned = data?.plan?.workouts.find(w => w.id === selectedId);
-        const canStart = !planned || (data.plan.status === 'active' && planned.date === today(data) && planned.status === 'scheduled');
+        const run = planned?.sport === 'running';
+        const canStart = !run && (!planned || (data.plan.status === 'active' && planned.date === today(data) && planned.status === 'scheduled'));
+        const paces = run ? describeRunPaces(planned.steps, data.profile?.thresholdPace, data.profile?.unitSystem) : '';
+        const target = step => run ? paces ? formatPace(paceForIntensity(data.profile.thresholdPace, step.power), data.profile.unitSystem)
+            : `${number(step.power * 100)}% of threshold speed`
+            : step.power == null ? `Slope ${number(step.slope, 1)}%` : `${number(targetPower(step.power, db.ftp))} W`;
         return card(escape(workout.meta.name), `<p class="eyebrow">${escape(workout.meta.category)} / ${minutes(workout.meta.duration || 0)}</p>
             ${profileGraph(workout)}
             ${planned ? `<p>${escape(planned.date)} &middot; ${escape(planned.status)} &middot; Expected RPE ${planned.expectedRpe}/10</p>` : ''}
-            <div class="button-row">${canStart ? '<button data-action="start-workout">Start workout</button>' :
-                '<p class="muted">Coach sessions can be ridden on their scheduled date while unresolved.</p>'}${link('devices', 'Connect devices', 'button secondary')}</div>
+            ${run ? `<p>${paces ? `Pace guide: ${escape(paces)}.` : 'Set a threshold pace in Coach to see pace targets; run by effort (RPE) until then.'}</p>` : ''}
+            <div class="button-row">${canStart ? '<button data-action="start-workout">Start workout</button>' : run
+                ? '<p class="muted">Run this session outdoors or on a treadmill, or export the ZWO from the calendar to your watch. Recorded runs are matched automatically.</p>'
+                : '<p class="muted">Coach sessions can be ridden on their scheduled date while unresolved.</p>'}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
             ${mobileDetails('workout-notes', 'Workout notes', `<p class="description">${escape(workout.meta.description || 'No description supplied.')}</p>`)}
             ${mobileDetails('workout-intervals', 'Intervals', `<ol class="interval-list">${(workout.intervals || []).flatMap(interval => interval.steps || []).map(step => `<li>
-                ${time(step.duration)} &middot; ${step.power == null ? `Slope ${number(step.slope, 1)}%` : `${number(targetPower(step.power, db.ftp))} W`}
-                &middot; Cadence: ${escape(cadenceSummary([step]))}</li>`).join('')}</ol>`)}`);
+                ${time(step.duration)} &middot; ${escape(target(step))}${run ? '' : ` &middot; Cadence: ${escape(cadenceSummary([step]))}`}</li>`).join('')}</ol>`)}`);
     }
     function plan(data) {
         return renderPlan(data, today(data));
