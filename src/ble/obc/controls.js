@@ -1,24 +1,14 @@
 /*
- * controls.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Turns decoded bike-button presses into the same app events as screen controls.
+ * Increase/decrease follows the current trainer mode: watts, resistance or slope.
+ * Workout buttons respect timer state, and release/dial reports do not trigger
+ * actions here. Importing this module registers the button-event handler.
  */
 
 import { xf, isArray, equals } from '../../functions.js';
 import { ControlMode } from '../enums.js';
 
+// Keep action selection testable separately from dispatching events that change the app.
 function OpenBikeControl() {
 
     const upForMode = {
@@ -39,6 +29,7 @@ function OpenBikeControl() {
         [ControlMode.sim]: ControlMode.erg,
     };
 
+    // Count at most one increase and one decrease per report, even when two buttons mean the same thing.
     function pushArrow(actions, seen, direction, mode) {
         if(seen[direction]) return;
         seen[direction] = true;
@@ -48,7 +39,7 @@ function OpenBikeControl() {
         if(event) actions.push({event});
     }
 
-    // [Message], {mode, watchStatus} -> [{event, data?}]
+    // Return event descriptions without emitting them; invalid lists and non-press states are ignored.
     function controlsFor(messages = [], context = {}) {
         const list = isArray(messages) ? messages : [];
         const mode = context.mode;
@@ -97,6 +88,7 @@ function OpenBikeControl() {
         return actions;
     }
 
+    // Emit the selected UI events in order, preserving an optional event value such as the new mode.
     function dispatchActions(actions) {
         for(let i = 0; i < actions.length; i++) {
             const action = actions[i];

@@ -1,23 +1,13 @@
 /*
- * common.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Shared Bluetooth number-conversion and repeated-reading helpers.
+ * Sensors often report running revolution counts and timer ticks rather than
+ * cadence directly. State compares two readings; RateAdjuster estimates how many
+ * unchanged messages to tolerate before treating the sensor as stopped.
  */
 
 import { equals, existance, curry2, avg, clamp } from '../functions.js';
 
+// Build field conversions from declared step sizes, defaults and bounds; no device I/O occurs here.
 function Spec(args = {}) {
     const definitions = existance(args.definitions);
 
@@ -29,6 +19,7 @@ function Spec(args = {}) {
         return value * definitions[prop].resolution;
     });
 
+    // Choose the field's default if absent, apply its conversion, and round to a whole stored value.
     function encodeField(prop, input, transform = applyResolution(prop)) {
         const fallback = definitions[prop].default;
         const min      = applyResolution(definitions[prop].min);
@@ -38,6 +29,7 @@ function Spec(args = {}) {
         return Math.floor(clamp(min, max, transform(value)));
     }
 
+    // Convert the stored number back to the field's measurement unit.
     function decodeField(prop, input, transform = removeResolution) {
         return transform(prop, input);
     }
@@ -51,6 +43,12 @@ function Spec(args = {}) {
     };
 }
 
+/**
+ * Remember counters between packets. resolution is timer ticks per second;
+ * maxRevs/maxTime are the values at which counters wrap back to zero.
+ * Accessors expose the previous reading and repeated-message counts for callers.
+ * The optional transform converts revolutions/second into the desired output unit.
+ */
 function State(args = {}) {
 
     const defaults = {
@@ -118,6 +116,7 @@ function State(args = {}) {
         return maxRateCount;
     }
 
+    // Forget the previous sample so the next reading establishes a fresh starting point.
     function reset() {
         setRevs(defaults.revs);
         setTime(defaults.time);
@@ -126,6 +125,7 @@ function State(args = {}) {
         return { revs: revs_1, time: time_1 };
     }
 
+    // A smaller counter means it wrapped; subtracting its range repairs the later difference.
     function isRolloverTime(time_2) {
         return time_2 < getTime();
     }
@@ -152,6 +152,7 @@ function State(args = {}) {
         return equals(getTime(), time);
     }
 
+    // Hold the previous value for closely spaced/repeated readings, but only a limited number of times.
     function underRate(time) {
         if(equals(rateCount, maxRateCount)) {
             rateCount = 0;
@@ -169,6 +170,7 @@ function State(args = {}) {
         return false;
     }
 
+    // Use counter differences to find revolutions/second, handling wraps and eventual zero cadence.
     function defaultCalculate(revs_2, time_2) {
         if(getRevs() < 0) setRevs(revs_2); // set initial revs
         if(getTime() < 0) setTime(time_2); // set initial time
@@ -216,6 +218,11 @@ function State(args = {}) {
     };
 }
 
+/**
+ * Learn a sensor's notification interval from {ts} timestamps in milliseconds.
+ * After enough samples, call onDone with a repeat limit. Getters expose learning
+ * progress; cutoff counts samples and maxStillTime sets the tolerated pause in ms.
+ */
 function RateAdjuster(args = {}) {
     const defaults = {
         sampleSize: 0,
@@ -249,6 +256,7 @@ function RateAdjuster(args = {}) {
     function setCutoff(count) { _cutoff = count; }
     function setMaxStillTime(ms) { _maxStillTime = ms; }
 
+    // Start learning again, keeping any configured cutoff and maximum still time.
     function reset() {
         _sample = [];
         _sampleSize = defaults.sampleSize;
@@ -260,6 +268,7 @@ function RateAdjuster(args = {}) {
         return equals(_status, 'done');
     }
 
+    // Average arrival gaps in milliseconds, using one second for the first sample's unknown gap.
     function timestampAvgDiff(sample) {
         return sample.reduce(function(acc, x, i, xs) {
             let tsd = 1000;
@@ -271,6 +280,7 @@ function RateAdjuster(args = {}) {
         }, 0);
     }
 
+    // Convert the tolerated pause into a bounded number of unchanged messages (2–15).
     function calculate(sample) {
         const tsAvgDiff = timestampAvgDiff(sample);
 
@@ -281,6 +291,7 @@ function RateAdjuster(args = {}) {
         return maxRateCount;
     }
 
+    // Collect timestamps until the cutoff, notify once, then ignore further samples.
     function update(value) {
         if(isDone()) return;
 

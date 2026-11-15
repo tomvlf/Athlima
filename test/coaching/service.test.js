@@ -1,19 +1,8 @@
-/*
- * service.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Checks the full local Coach cycle: configure, import, estimate, plan, record, adapt and reload.
+ * The service uses isolated memory storage and a controllable clock. Scenarios protect stable
+ * identities, feedback, saved revisions and explicit failures; repeated inputs must not create
+ * duplicate history or extra adaptations.
  */
 
 import { CoachingService } from '../../src/coaching/service.js';
@@ -21,6 +10,10 @@ import { addDays, sum } from '../../src/coaching/domain.js';
 import { validatePlan } from '../../src/coaching/planner.js';
 import { profile, goal, start, timestamp, history, memoryStorage } from './fixtures.js';
 
+/**
+ * Create and populate a fresh local service, then generate a plan at a fixed date. setDate moves
+ * only the injected test clock so overdue-session behavior can be tested without waiting.
+ */
 async function setup() {
     const storage = memoryStorage();
     let now = timestamp;

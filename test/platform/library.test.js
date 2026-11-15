@@ -1,4 +1,9 @@
 /** @jest-environment jsdom */
+/**
+ * Checks keyword/category/type/duration filters, stable sorting, mobile pagination and accessible
+ * workout cards. Missing metrics must sort last; imported names must remain safe text; prescribed
+ * cadence must remain distinct from self-selected cadence.
+ */
 import { filterWorkouts, initialLibraryFilters, renderLibrary } from '../../src/platform/library.js';
 
 const workouts = [

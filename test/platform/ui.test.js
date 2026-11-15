@@ -1,19 +1,8 @@
-/*
- * ui.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * A connected desktop-interface scenario using real platform rendering with controlled engine,
+ * storage and provider test doubles. Exercises navigation, filtering/imports, ride commands, live
+ * display updates, profile locking, save/delete failures and Coach-start acceptance.
+ * Provider-looking values and error strings are fictional; no external account or trainer is used.
  */
 
 /** @jest-environment jsdom */
@@ -28,6 +17,10 @@ import { idb } from '../../src/storage/idb.js';
 import { profile as coachingProfile } from '../coaching/fixtures.js';
 import { today } from '../../src/platform/format.js';
 
+/**
+ * Signal app:ready without launching hardware/recording initialization. Other mocks below provide
+ * predictable state and let the scenario deliberately fail storage or provider actions.
+ */
 jest.mock('../../src/index.js', () => {
     queueMicrotask(() => globalThis.window.dispatchEvent(new CustomEvent('app:ready')));
     return {};
@@ -64,7 +57,12 @@ jest.mock('../../src/functions.js', () => {
     return {...actual, xf: {...actual.xf, dispatch: jest.fn(actual.xf.dispatch)}};
 });
 
+/**
+ * Drain a bounded number of queued promise callbacks so assertions observe the result of the
+ * previous UI action.
+ */
 const settle = async () => { for(let i = 0; i < 10; i++) await Promise.resolve(); };
+/** Update the desktop hash route, emit the navigation event and wait for the page update. */
 const go = async route => {
     window.history.replaceState({}, '', `/#/${route}`);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -140,6 +138,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
             points: [{x: 0, y: 10}, {x: 12000, y: 300}]},
     );
     xf.dispatch('db:workouts', db);
+    /**
+     * Change one filter and emit the same bubbling event as user input, also asserting that
+     * rendering preserves keyboard focus.
+     */
     const change = (id, value) => {
         const field = root.querySelector(`#${id}`);
         field.value = value;
@@ -165,6 +167,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(root.querySelectorAll('.workout-card')).toHaveLength(1);
     root.querySelector('[data-library-reset]').click();
 
+    /**
+     * Simulate one successful import followed by a storage failure: only the saved workout may
+     * appear in the library.
+     */
     const files = [new File(['first'], 'first.zwo'), new File(['second'], 'second.zwo')];
     models.workout.readFromFile.mockImplementation(async file => ({result: file.name, name: file.name}));
     models.workout.parse.mockImplementation((result, name) => ({
@@ -223,6 +229,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(window.location.hash).toBe('#/player');
     expect(dispatch.mock.calls.map(([event]) => event)).toEqual(['workout', 'ui:watchStart', 'ui:workoutStart']);
 
+    /**
+     * Follow the ride controls and live readings through start, pause, resume, skip, disconnect and
+     * save recovery without rebuilding the entire interface.
+     */
     db.workout.intervals[0].steps[0].cadence = 88;
     db.cadenceTarget = 88;
     await go('player');
@@ -421,6 +431,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     await settle();
     expect(models.activity.download).toHaveBeenCalledWith('synced');
 
+    /**
+     * Exercise two-stage deletion: local recording removal may succeed before Coach history removal
+     * fails, so the remaining history must stay retryable.
+     */
     const service = {data: {activities: []}, deleteRide: jest.fn()};
     coachingService.mockReturnValue(service);
     idb.removeChecked.mockResolvedValue();
@@ -499,6 +513,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(root.textContent).toContain('Training is paused while pain or illness is reported');
     coachingData.mockReturnValue({activities: [], plan: coachPlan, profile: profileData});
     await go('workout/coach-today');
+    /**
+     * The platform may request a Coach session, but must not start the clock until the engine has
+     * actually accepted that selection.
+     */
     let engineAccepts = false;
     xf.sub('ui:coaching:select', workout => { if(engineAccepts) db.workout = workout; });
     const loadedWorkout = db.workout;

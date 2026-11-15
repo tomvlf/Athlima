@@ -1,19 +1,8 @@
-/*
- * adaptation.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Reviews an existing plan after recordings, feedback or missed sessions. It works on a copy,
+ * records what changed and rechecks the result; saving happens in CoachingService. Completed work
+ * still uses the week's budget, and missing imports are not proof of rest. Temporary reductions
+ * retain the original prescription so they need not permanently shrink later weeks.
  */
 
 import { VERSION, DEFAULTS, SPORTS, sum, round, addDays, daysBetween, sportOf, validateCoachingConfig } from './domain.js';
@@ -56,6 +45,10 @@ export function returnToTraining(state, plan, config) {
     return daysBetween(gap.resumedOn, state.date) < length ? {days, resumedOn: gap.resumedOn, share} : null;
 }
 
+/**
+ * Translate a run/walk pattern into its progression index. Continuous running sits after all
+ * run/walk stages.
+ */
 const walkStage = format => format?.runWalk
     ? RUN_WALK_STAGES.findIndex(([run, walk]) => run === format.runWalk[0] && walk === format.runWalk[1])
     : RUN_WALK_STAGES.length;
@@ -100,6 +93,11 @@ export function intervalsVerified(activity, workout, rules = DEFAULTS) {
     return held >= sum(hardSteps.map(s => s.duration)) * config.intervalEvidenceTimeShare;
 }
 
+/**
+ * Compare an activity with unresolved sessions in the same sport and local day. Return a match only
+ * when confidence is sufficient; duration alone normally needs rider confirmation. A match and
+ * proof of hard-interval completion are separate decisions.
+ */
 export function matchWorkout(activity, workouts, explicitId = null, rules = DEFAULTS) {
     const config = validateCoachingConfig(rules);
     if(!SPORTS.includes(activity.sport)) return {workoutId: null, confidence: 0, quality: null, reason: 'Not a coached sport.'};
@@ -134,6 +132,10 @@ export function matchWorkout(activity, workouts, explicitId = null, rules = DEFA
  */
 function enforceRunSafety(next, profile, config, date, changes) {
     const {minutes: initial, date: initialDate} = initialSessionReference(next, config, true);
+    /**
+     * Replace only the chosen running prescription and record before/after details, retaining the
+     * original so the change remains explainable.
+     */
     const rebuild = (workout, minutes, family, note) => {
         const previous = JSON.parse(JSON.stringify(workout));
         const index = next.weeks.findIndex(w => w.id === workout.weekId);
@@ -187,6 +189,11 @@ function enforceRunSafety(next, profile, config, date, changes) {
     }
 }
 
+/**
+ * Apply one outcome or feedback event and recalculate remaining sessions within time, load, spacing
+ * and progression limits. Preserve completed prescriptions, account for overdue/unmatched work,
+ * record a revision and throw if the resulting plan breaks validation rules.
+ */
 export function adaptPlan({plan, profile, state, trigger, date, timestamp, workoutId = null,
     activity = null, match = null}) {
     if(!['completed', 'failed', 'missed', 'substituted', 'recovery', 'unplanned', 'feedback'].includes(trigger) ||
@@ -233,15 +240,32 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         reduction = Math.min(reduction, 0.85);
     }
     const history = [];
+    /**
+     * Use the initial limits and recent weekly references to bound growth. A temporary easy week
+     * alone must not force every later week permanently downward.
+     */
     const envelope = () => [plan.initialLimits, ...history].slice(-4);
+    /**
+     * Return this session's temporary reduction and whether it should become easy. Sessions beyond
+     * the adjustment window use the unreduced policy.
+     */
     const policy = w => {
         const factor = w.date <= windowEnd ? reduction : 1;
         return {factor, easy: factor < 1 && reduceIntensity};
     };
     // A session inside an earlier reduction window keeps that reduction until the window ends;
     // a later event may only make it stricter, never undo an athlete's or the Coach's caution early.
+    /**
+     * Keep an earlier caution reduction until its own window ends unless the new decision is
+     * stricter.
+     */
     const held = w => w.date >= date && w.status === 'scheduled' && w.original?.until >= w.date &&
         !(policy(w).factor < w.original.factor || (policy(w).easy && !w.original.easy));
+    /**
+     * Calculate the maximum session length from recent completed/substituted work and earlier
+     * projected weeks. Missed, failed and overdue unresolved sessions are not evidence of tolerated
+     * exposure.
+     */
     const sessionLimit = workout => {
         const referenceDays = running ? config.runLongestSessionReferenceDays : config.cyclingSessionReferenceDays;
         const {minutes: initial, date: initialDate} = initialSessionReference(next, config, running);
@@ -260,6 +284,10 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
     const comeback = returnToTraining(state, plan, config);
     const walkCeiling = running && profile.experience === 'beginner' ? runWalkCeiling(next, date) : Infinity;
     // Held sessions keep their reduced dose as a ceiling; they may still shrink to respect actual load.
+    /**
+     * Choose the original or held prescription, reduction factor and family before rebuilding a
+     * session. Run/walk limits and return-after-break stages can rule out hard efforts.
+     */
     const dose = workout => {
         const isHeld = held(workout);
         const baseline = isHeld ? workout : workout.original ?? workout;
@@ -272,6 +300,10 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         const family = forceEasy ? 'recovery' : FAMILIES[baseline.family]?.hard && noHard ? 'endurance' : baseline.family;
         return {baseline, factor, forceEasy, held: isHeld, family, plannedFormat};
     };
+    /**
+     * Limit running format to an earned run/walk stage and remove strides when easy work or walking
+     * is required.
+     */
     const formatFor = (plannedFormat, forceEasy) => {
         if(!plannedFormat) return null;
         const stage = Math.min(walkStage(plannedFormat), walkCeiling);
@@ -339,6 +371,11 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
             (loadCap - usedLoad) / Math.max(1e-9, sum(intended.map(i => i.load)))));
         const pristine = future.map(w => JSON.parse(JSON.stringify(w)));
         const startWorkouts = next.workouts.slice(), startChanges = changes.length;
+        /**
+         * Try one shared scale for the week from the same clean starting copies. Each trial
+         * rebuilds sessions and change records afresh, allowing comparison without accumulating
+         * reductions from previous trials.
+         */
         const fill = scale => {
         future.forEach((w, i) => {
             Object.keys(w).forEach(key => delete w[key]);

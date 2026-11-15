@@ -1,19 +1,8 @@
 /*
- * indoor-bike-data.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks FTMS indoor-bike decoding against explicit byte sequences: optional
+ * field order, valid zeros, three-byte distance, and speed omission. DataView
+ * slices mimic a message inside a larger buffer; short packets must fail rather
+ * than read unrelated bytes as measurements. No Bluetooth connection is needed.
  */
 
 import { indoorBikeData } from '../../src/ble/ftms/indoor-bike-data.js';
@@ -104,6 +93,7 @@ describe('Indoor Bike Data', () => {
         });
     });
 
+    // A truncated packet ends before a field promised by its flags is complete.
     describe('truncated packets', () => {
         test.each([
             { name: 'empty flags', bytes: [] },
@@ -127,6 +117,7 @@ describe('Indoor Bike Data', () => {
         });
     });
 
+    // Unlike most presence flags, setting More Data removes the speed field from this packet.
     describe('More Data flag', () => {
         test.each([
             {

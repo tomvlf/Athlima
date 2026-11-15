@@ -1,19 +1,8 @@
-/*
- * planning.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Exercises cycling-plan generation, workout matching and future-only adaptation against repeatable
+ * fictional history. Scenarios check availability, progression/load budgets, exact workout
+ * duration, temporary reductions and preservation of already-resolved sessions. A "safe" plan in a
+ * test name means it passes the configured software limits, not that injury is impossible.
  */
 
 import { GOALS, addDays, sum, daysBetween } from '../../src/coaching/domain.js';
@@ -24,6 +13,10 @@ import { adaptPlan, matchWorkout } from '../../src/coaching/adaptation.js';
 import { normalizeActivity } from '../../src/coaching/normalizer.js';
 import { profile, goal, start, timestamp, state, history } from './fixtures.js';
 
+/**
+ * Generate the same baseline plan unless a scenario supplies an explicit override, making changes
+ * attributable to the input under test.
+ */
 const plan = overrides => generatePlan({profile, goal, state: state(), startDate: start,
     generatedAt: timestamp, ...overrides});
 
@@ -243,6 +236,10 @@ describe('matching and future-only adaptation', () => {
     test('a recorded power stream can prove hard intervals; skipped intervals cannot', () => {
         const p = plan();
         const w = p.workouts.find(x => FAMILIES[x.family].hard);
+        /**
+         * Build one-second power evidence for every prescribed step, with a supplied watts function
+         * able to simulate following or skipping the hard work.
+         */
         const ride = (id, watts) => normalizeActivity({id, start: `${w.date}T10:00:00Z`, duration: w.duration,
             ftp: profile.ftp, streams: {power: w.steps.flatMap(s => Array(s.duration).fill(watts(s)))}}, profile);
         const followed = ride('followed', s => Math.round(s.power * profile.ftp));
@@ -339,6 +336,11 @@ describe('matching and future-only adaptation', () => {
         expect(adapted.adaptations[0].loadChange).toBeLessThan(0);
         expect(adapted.workouts.length).toBeLessThanOrEqual(p.workouts.length);
     });
+    /**
+     * Resolve a sample workout through the real adaptation function with explicit
+     * matching/progression evidence, so later scenarios can test preserved history and remaining
+     * budgets.
+     */
     const complete = (p, w, progressionEligible = false, s = state()) => adaptPlan({plan: p, profile, state: s,
         trigger: 'completed', date: w.date, timestamp, workoutId: w.id,
         activity: normalizeActivity({id: `done-${w.id}`, start: `${w.date}T10:00:00Z`, duration: w.duration,

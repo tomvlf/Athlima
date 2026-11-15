@@ -1,19 +1,9 @@
 /*
- * data.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * A four-sample, one-lap ride used by FIT tests. appData supplies current export
+ * input; the named FITjs list and grouped/flat bytes preserve an older file layout
+ * for import compatibility checks. These are fixed expectations, not generated
+ * using the encoder under test. Timestamps use milliseconds, distances metres,
+ * speed m/s and power watts; position integers use FIT's angle scale.
  */
 
 // App Data Input
@@ -87,7 +77,8 @@ const appData = {records, laps};
 
 
 
-// Expected FITjs
+// Return a fresh expected record list; crc selects saved checksums rather than calculating them.
+// Without crc, the header checksum is zero and the trailing checksum value is undefined.
 function FITjs(args = {}) {
     const headerCRC = args.crc ? 40815 : 0;
     const fileCRC   = args.crc ? 14083 : undefined;
@@ -595,6 +586,7 @@ const fitBinary = [
     ],
 ];
 
+// Remove visual record grouping so the fixture can be passed to the parser as one byte sequence.
 const flatFitBinary = fitBinary.flat();
 // END Expected FIT binary
 

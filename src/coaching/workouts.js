@@ -1,19 +1,8 @@
-/*
- * workouts.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Creates the Coach's individual session records and converts them for the player or ZWO download.
+ * A family describes the session purpose; steps describe what to do for how long. Cycling step
+ * power is a fraction of FTP (0.65 means 65%); running reuses that field for a fraction of
+ * threshold speed. Planned load is an estimate from ideal execution, not measured effort.
  */
 
 import { VERSION, DEFAULTS, sum, round, sportOf, validateCoachingConfig } from './domain.js';
@@ -33,6 +22,11 @@ export const FAMILIES = Object.freeze({
 /** Family intensity/RPE for a sport; both sports share family keys and hard/easy classification. */
 export const familySpec = (family, sport = 'cycling') => (sport === 'running' ? RUN_FAMILIES : FAMILIES)[family];
 
+/**
+ * Estimate load from the effort-weighted intensity of every prescribed second, including interval
+ * transitions. Require at least 30 seconds for the rolling calculation; the output is modelled load
+ * points.
+ */
 export function stepLoad(steps) {
     const calculation = powerAccumulator();
     steps.forEach(step => calculation.add(step.power, step.duration));
@@ -41,6 +35,10 @@ export function stepLoad(steps) {
     return sum(steps.map(s => s.duration)) / 3600 * expectedIntensity ** 2 * 100;
 }
 
+/**
+ * Reject unknown families, non-whole-minute durations and unsupported progression levels before
+ * constructing a session.
+ */
 function validateSlot({minutes, family, level = 1}, rules) {
     if(!FAMILIES[family] || !Number.isInteger(minutes) ||
        minutes < rules.minimumSessionMinutes || !Number.isInteger(level) ||
@@ -89,6 +87,11 @@ export function buildWorkout({id, date, family, steps, level = 1, phaseId, weekI
     };
 }
 
+/**
+ * Generate a session at an earned level when a library template is not used. Fit running or cycling
+ * steps into the requested duration and ease unsuitable hard prescriptions rather than force them
+ * into a short slot.
+ */
 export function progressWorkout(args) {
     const config = validateCoachingConfig(args.rules);
     validateSlot(args, config);
@@ -130,6 +133,10 @@ export function progressWorkout(args) {
     return buildWorkout({...args, family, steps});
 }
 
+/**
+ * Translate a Coach session into the workout player's metadata/interval format while retaining its
+ * coaching ID for matching the recording back to the plan.
+ */
 export function toAppWorkout(workout) {
     return {
         id: workout.id, coachingWorkoutId: workout.id,
@@ -139,6 +146,11 @@ export function toAppWorkout(workout) {
     };
 }
 
+/**
+ * Build downloadable XML, escaping text so workout names cannot become XML instructions. Cycling
+ * targets remain fractions of FTP; running targets are converted to the ZWO 10-km pace reference
+ * and require a threshold pace.
+ */
 export function exportZwo(workout, thresholdPace = workout.runThresholdPace) {
     const escape = value => String(value).replace(/[&<>"']/g, c =>
         ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'}[c]));

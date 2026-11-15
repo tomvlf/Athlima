@@ -1,3 +1,9 @@
+/**
+ * Maps Intervals.icu activity fields into Athlima's vocabulary without making network requests. A
+ * mapping renames provider fields and preserves selected details; the Coach normalizer performs the
+ * common validation afterwards. Compact profiles are chart previews, not full-resolution sensor
+ * streams.
+ */
 import { sportForType } from '../coaching/activity-types.js';
 
 const detailFields = {
@@ -34,6 +40,10 @@ const detailFields = {
     pairedEventId: 'paired_event_id', stravaId: 'strava_id',
 };
 
+/**
+ * Keep supported detail values while limiting text length and list size. This prepares display
+ * data, not HTML; screens must still escape text when rendering it.
+ */
 function detailValue(value) {
     if(typeof value === 'number') return Number.isFinite(value) ? value : undefined;
     if(typeof value === 'boolean') return value;
@@ -53,14 +63,27 @@ function detailValue(value) {
     return undefined;
 }
 
+/**
+ * Accept only a time-zone name the browser understands, otherwise leave it missing so the caller
+ * can use an appropriate fallback.
+ */
 function validTimeZone(zone) {
     if(typeof zone !== 'string' || !zone) return null;
     try { new Intl.DateTimeFormat('en', {timeZone: zone}); return zone; } catch { return null; }
 }
 
+/**
+ * Accept a finite numeric measurement within bounds without treating text as a number. Missing or
+ * invalid input returns null for later validation.
+ */
 const finite = (value, min = 0, max = Infinity) =>
     typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : null;
 
+/**
+ * Translate one provider activity into the shared import shape, using moving time when available.
+ * Only the exact athlima: external-ID prefix links it to a local recording; other provider IDs stay
+ * separate.
+ */
 export function intervalsActivity(activity, syncedAt) {
     const type = typeof activity.type === 'string' && activity.type ? activity.type : 'Other';
     const duration = finite(activity.moving_time, 1) ?? finite(activity.elapsed_time, 1);
@@ -92,6 +115,10 @@ export function intervalsActivity(activity, syncedAt) {
     };
 }
 
+/**
+ * Average valid nonnegative measurements into a bounded number of chart points. Return null when
+ * fewer than two usable preview points remain.
+ */
 export function compactProfile(values, buckets = 120) {
     if(!Array.isArray(values)) return null;
     const count = Math.min(buckets, values.length);

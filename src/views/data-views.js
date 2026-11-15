@@ -1,19 +1,13 @@
 /*
- * data-views.js: front-end client module.
+ * Small live readouts and controls for the ride screen and settings.
+ * Values arrive through xf messages (usually db:...); controls send requests
+ * instead of changing trainer hardware or saving settings directly.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * These classes become custom HTML tags. The browser calls constructor to prepare
+ * a tag, connectedCallback when it joins the page, and disconnectedCallback when
+ * it leaves. AbortController cancels a tag's listeners together on removal.
+ * Watched attributes call attributeChangedCallback; render updates the visible
+ * text or styling. textContent displays words literally, not as HTML instructions.
  */
 
 import { xf, exists, existance, validate, equals, isNumber, last, empty, avg, toFixed, formatDate, } from '../functions.js';
@@ -29,17 +23,18 @@ import { webBle } from '../ble/web-ble.js';
 // Usage:
 // <data-view id="count-value" prop="db:count">--</data-view>
 //
-// Template Method:
-// overwrite methods to augment the general logic
+// Shared readout recipe: subclasses replace just the steps that differ.
 //
-// getDefaults() -> setup default and fallback values
-// config()      -> work with attributes and props here
-// subs()        -> subscribe to events or db
-// unsubs()      -> executes after abort signal
-// getValue()    -> getter for the value for state from a complex prop say an object or array
-// onUpdate()    -> determine the rules for state update that will trigger rendering
-// transform()   -> apply transforming functions to state just before rendering
+// postInit()    -> prepare extra subclass state during construction
+// getDefaults() -> choose the data topic and fallback display options
+// config()      -> read HTML settings and find child controls
+// subs()        -> listen for data or user actions
+// unsubs()      -> perform extra cleanup after listeners are cancelled
+// getValue()    -> pick a single value out of a larger received record, if needed
+// onUpdate()    -> store and redraw changed values unless the readout is disabled
+// transform()   -> turn the stored number/value into readable display text
 //
+// Base readout: prop="db:..." names its incoming message; disabled freezes updates.
 class DataView extends HTMLElement {
     constructor() {
         super();
@@ -108,6 +103,7 @@ class DataView extends HTMLElement {
 customElements.define('data-view', DataView);
 
 
+// Shows the automatic-start countdown; the special value -1 hides it.
 class AutoStartCounter extends HTMLElement {
     constructor() {
         super();
@@ -146,6 +142,7 @@ class AutoStartCounter extends HTMLElement {
 
 customElements.define('auto-start-counter', AutoStartCounter);
 
+// Requests trainer-mode locking and swaps the SVG lock icon when stored state changes.
 class ModeLockToggle extends HTMLElement {
     constructor() {
         super();
@@ -183,6 +180,7 @@ class ModeLockToggle extends HTMLElement {
 customElements.define('mode-lock-toggle', ModeLockToggle);
 
 
+// Elapsed ride seconds shown as a clock; the format attribute can override hh:mm:ss.
 class TimerTime extends DataView {
     getDefaults() {
         return {
@@ -201,6 +199,7 @@ class TimerTime extends DataView {
 customElements.define('timer-time', TimerTime);
 
 
+// Current interval/lap seconds shown as mm:ss unless another format is requested.
 class IntervalTime extends DataView {
     getDefaults() {
         return {
@@ -218,6 +217,7 @@ class IntervalTime extends DataView {
 
 customElements.define('interval-time', IntervalTime);
 
+// Convert stored metres per second to the rider's preferred km/h or mph display.
 class SpeedValue extends DataView {
     postInit() {
         this.measurement = this.getDefaults().measurement;
@@ -250,6 +250,7 @@ class SpeedValue extends DataView {
 
 customElements.define('speed-value', SpeedValue);
 
+// Reuse speed formatting for the app's calculated, rather than measured, speed.
 class SpeedVirtual extends SpeedValue {
     getDefaults() {
         return {
@@ -261,6 +262,7 @@ class SpeedVirtual extends SpeedValue {
 
 customElements.define('speed-virtual', SpeedVirtual);
 
+// Listen to both speeds but show only the source selected for the virtual ride.
 class SpeedSwitch extends SpeedValue {
     postInit() {
         this.measurement = this.getDefaults().measurement;
@@ -291,6 +293,7 @@ class SpeedSwitch extends SpeedValue {
 customElements.define('speed-switch', SpeedSwitch);
 
 
+// Display stored metres in metric or imperial units without changing the stored distance.
 class DistanceValue extends DataView {
     postInit() {
         this.measurement = this.getDefaults().measurement;
@@ -311,6 +314,7 @@ class DistanceValue extends DataView {
     metersToYards(meters) {
         return 1.09361 * meters;
     }
+    // Use whole metres/yards for short distances and two-decimal km/miles for longer ones.
     format(meters, measurement = 'metric') {
         let value   = `0`;
         const km    = (meters / 1000);
@@ -335,6 +339,7 @@ class DistanceValue extends DataView {
 customElements.define('distance-value', DistanceValue);
 
 
+// Current elevation with one decimal place.
 class AltitudeValue extends DataView {
     getDefaults() {
         return {
@@ -349,6 +354,7 @@ class AltitudeValue extends DataView {
 customElements.define('altitude-value', AltitudeValue);
 
 
+// Accumulated climbing with one decimal place.
 class AscentValue extends DataView {
     getDefaults() {
         return {
@@ -363,6 +369,7 @@ class AscentValue extends DataView {
 customElements.define('ascent-value', AscentValue);
 
 
+// Current pedalling rate, rounded to whole revolutions per minute.
 class CadenceValue extends DataView {
     getDefaults() {
         return {
@@ -376,6 +383,7 @@ class CadenceValue extends DataView {
 
 customElements.define('cadence-value', CadenceValue);
 
+// Current lap's average pedalling rate, using the same whole-number display.
 class CadenceLapValue extends DataView {
     getDefaults() {
         return {
@@ -389,6 +397,7 @@ class CadenceLapValue extends DataView {
 
 customElements.define('cadence-lap-value', CadenceLapValue);
 
+// Whole-ride average pedalling rate.
 class CadenceAvgValue extends DataView {
     getDefaults() {
         return {
@@ -403,6 +412,7 @@ class CadenceAvgValue extends DataView {
 customElements.define('cadence-avg-value', CadenceAvgValue);
 
 
+// Requested pedalling rate; zero means no target, so display nothing.
 class CadenceTarget extends DataView {
     getDefaults() {
         return {
@@ -421,6 +431,7 @@ class CadenceTarget extends DataView {
 customElements.define('cadence-target', CadenceTarget);
 
 
+// Highlight the measured/target cadence pair only while a non-zero target exists.
 class CadenceGroup extends DataView {
     getDefaults() {
         return {
@@ -445,6 +456,7 @@ class CadenceGroup extends DataView {
 customElements.define('cadence-group', CadenceGroup);
 
 
+// Current heart rate in whole beats per minute, coloured red to match its chart.
 class HeartRateValue extends DataView {
     getDefaults() {
         return {
@@ -459,6 +471,7 @@ class HeartRateValue extends DataView {
 
 customElements.define('heart-rate-value', HeartRateValue);
 
+// Current lap's average heart rate.
 class HeartRateLapValue extends DataView {
     getDefaults() {
         return {
@@ -472,6 +485,7 @@ class HeartRateLapValue extends DataView {
 
 customElements.define('heart-rate-lap-value', HeartRateLapValue);
 
+// Whole-ride average heart rate.
 class HeartRateAvgValue extends DataView {
     getDefaults() {
         return {
@@ -485,6 +499,7 @@ class HeartRateAvgValue extends DataView {
 
 customElements.define('heart-rate-avg-value', HeartRateAvgValue);
 
+// Highest heart rate recorded for the ride.
 class HeartRateMaxValue extends DataView {
     getDefaults() {
         return {
@@ -499,6 +514,7 @@ class HeartRateMaxValue extends DataView {
 customElements.define('heart-rate-max-value', HeartRateMaxValue);
 
 
+// Muscle oxygen saturation as a one-decimal percentage, matching the green chart line.
 class SmO2Value extends DataView {
     getDefaults() {
         return {
@@ -528,6 +544,7 @@ class SmO2Value extends DataView {
 customElements.define('smo2-value', SmO2Value);
 
 
+// Total haemoglobin concentration to two decimals, matching the orange chart line.
 class THbValue extends DataView {
     getDefaults() {
         return {
@@ -546,6 +563,7 @@ class THbValue extends DataView {
 customElements.define('thb-value', THbValue);
 
 
+// Core temperature arrives in Celsius; show Fahrenheit for the imperial unit setting.
 class CoreBodyTemperatureValue extends DataView {
     postInit() {
         this.measurement = this.getDefaults().measurement;
@@ -585,6 +603,7 @@ class CoreBodyTemperatureValue extends DataView {
 customElements.define('core-body-temperature-value', CoreBodyTemperatureValue);
 
 
+// Skin temperature readout, keeping the received unit and showing two decimal places.
 class SkinTemperatureValue extends DataView {
     getDefaults() {
         return {
@@ -602,6 +621,7 @@ class SkinTemperatureValue extends DataView {
 customElements.define('skin-temperature-value', SkinTemperatureValue);
 
 
+// Show a workout instruction while its message is non-empty; hide it between prompts.
 class WorkoutTextEvent extends DataView {
     getDefaults() {
         return {
@@ -625,6 +645,7 @@ customElements.define('workout-text-event', WorkoutTextEvent);
 
 
 
+// Extract the title from a complete workout record for a simple text label.
 class WorkoutName extends DataView {
     getDefaults() {
         return {
@@ -639,6 +660,7 @@ class WorkoutName extends DataView {
 customElements.define('workout-name', WorkoutName);
 
 
+// Current trainer power target in watts.
 class PowerTarget extends DataView {
     getDefaults() {
         return {
@@ -649,6 +671,7 @@ class PowerTarget extends DataView {
 
 customElements.define('power-target', PowerTarget);
 
+// Express target watts as a percentage of FTP, the rider's reference power.
 class PowerTargetFTP extends DataView {
     getDefaults() {
         return {
@@ -672,6 +695,7 @@ class PowerTargetFTP extends DataView {
 
 customElements.define('power-target-ftp', PowerTargetFTP);
 
+// A tap changes styling for a main/secondary readout pair without changing their data.
 class CompanionGroup extends DataView {
     getDefaults() {
         return {
@@ -703,6 +727,8 @@ class CompanionGroup extends DataView {
 
 customElements.define('companion-group', CompanionGroup);
 
+// Cycle through overlapping readouts; data-key optionally remembers the chosen index
+// in the shared sources setting so the app can restore that choice.
 class ZStack extends HTMLElement {
     constructor() {
         super();
@@ -747,11 +773,13 @@ class ZStack extends HTMLElement {
             this.backup();
         }
     }
+    // Send only this stack's index, rather than replacing all source preferences.
     backup() {
         const update = {};
         update[this.key] = this.activeIndex;
         xf.dispatch(`sources`, update);
     }
+    // Wrap the selection back to the first item, including when the stack is empty.
     incrementActive() {
         this.activeIndex = (this.activeIndex + 1) % Math.max(this.$items.length, 1);
     }
@@ -769,6 +797,7 @@ class ZStack extends HTMLElement {
 customElements.define('z-stack', ZStack);
 
 
+// Requested road gradient, shown as a percentage with one decimal place.
 class SlopeTarget extends DataView {
     getDefaults() {
         return {
@@ -783,6 +812,11 @@ class SlopeTarget extends DataView {
 customElements.define('slope-target', SlopeTarget);
 
 
+/**
+ * Numeric target input with plus/minus buttons. setDefaults supplies selectors,
+ * action names, and a parser; child controls reuse the wiring for other targets.
+ * onChange parses typed text and requests a new target; render follows stored data.
+ */
 class PowerTargetControl extends DataView {
     postInit() {
         const self = this;
@@ -833,6 +867,7 @@ class PowerTargetControl extends DataView {
 customElements.define('power-target-control', PowerTargetControl);
 
 
+// Use the target-control recipe for whole-number trainer resistance.
 class ResistanceTargetControl extends PowerTargetControl {
     setDefaults() {
         this.prop = 'db:resistanceTarget';
@@ -853,6 +888,7 @@ class ResistanceTargetControl extends PowerTargetControl {
 customElements.define('resistance-target-control', ResistanceTargetControl);
 
 
+// Use the same recipe for decimal slope targets and a one-decimal display.
 class SlopeTargetControl extends PowerTargetControl {
     setDefaults() {
         this.prop = 'db:slopeTarget';
@@ -876,6 +912,7 @@ class SlopeTargetControl extends PowerTargetControl {
 customElements.define('slope-target-control', SlopeTargetControl);
 
 
+// Current watts, rounded and coloured yellow to match the power chart.
 class PowerValue extends DataView {
     getDefaults() {
         return {
@@ -893,6 +930,7 @@ class PowerValue extends DataView {
 
 customElements.define('power-value', PowerValue);
 
+// Whole-ride average watts, rounded up.
 class PowerAvg extends DataView {
     getDefaults() {
         return {
@@ -909,6 +947,7 @@ class PowerAvg extends DataView {
 
 customElements.define('power-avg', PowerAvg);
 
+// Current lap's average watts, rounded up.
 class PowerLap extends DataView {
     getDefaults() {
         return {
@@ -925,6 +964,7 @@ class PowerLap extends DataView {
 
 customElements.define('power-lap', PowerLap);
 
+// Estimated energy expenditure from db:kcal, shown as whole kilocalories.
 class KcalAvg extends DataView {
     getDefaults() {
         return {
@@ -941,6 +981,7 @@ class KcalAvg extends DataView {
 
 customElements.define('kcal-avg', KcalAvg);
 
+// Virtual gear number; zero is displayed as "--" rather than as a usable gear.
 class VirtualGearValue extends DataView {
     getDefaults() {
         return {
@@ -958,6 +999,8 @@ class VirtualGearValue extends DataView {
 
 customElements.define('virtual-gear', VirtualGearValue);
 
+// Shows time spent in each power-intensity zone. Each incoming entry is
+// [fraction of ride, seconds]; tapping the unit toggles percentage/time labels.
 class PowerInZone extends HTMLElement {
     constructor() {
         super();
@@ -1001,6 +1044,7 @@ class PowerInZone extends HTMLElement {
             this.render();
         }
     }
+    // Label units can change, but bar heights always represent the fraction of the ride.
     render() {
         for(let i=0; i < this.state.length; i++) {
             let text;
@@ -1020,6 +1064,7 @@ class PowerInZone extends HTMLElement {
 customElements.define('power-in-zone', PowerInZone);
 
 
+// Builds newest-first lap summaries, including optional sensor averages.
 class LapsList extends DataView {
     postInit() {
         this.isEmpty = true;
@@ -1033,6 +1078,7 @@ class LapsList extends DataView {
     subs() {
         xf.reg(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
+    // Turn a recorded lap into a row, using zero for missing numeric sensor averages.
     toLap(lap, index) {
         const duration = lap.totalElapsedTime;
         const powerLap = validate(
@@ -1083,6 +1129,7 @@ class LapsList extends DataView {
         this.state = laps;
         laps.forEach((lap, index) => this.render(lap, index+1));
     }
+    // Restore the complete lap history once; later lap messages prepend only the newest.
     onUpdate(propValue, db) {
         if(empty(db.laps)) {
             return;
@@ -1103,10 +1150,12 @@ class LapsList extends DataView {
 customElements.define('laps-list', LapsList);
 
 
+// Express a reading as a percentage of the chart's maximum.
 function scale(value, max = 100) {
     return 100 * (value/max);
 }
 
+// Draw a scrolling power history with one-pixel HTML bars, coloured by FTP zone.
 class InstantPowerGraph extends HTMLElement {
     constructor() {
         super();
@@ -1164,6 +1213,7 @@ class InstantPowerGraph extends HTMLElement {
     shift() {
         this.removeChild(this.childNodes[0]);
     }
+    // Drop the oldest bar once the measured width is full, then append the new reading.
     render() {
         const zone = models.ftp.powerToZone(this.value, this.metricValue).name;
         const barHeight = scale(this.value, this.scaleMax);
@@ -1178,6 +1228,7 @@ class InstantPowerGraph extends HTMLElement {
 customElements.define('instant-power-graph', InstantPowerGraph);
 
 
+// Reusable indexed-choice control; subclasses name the setting and choose its effect.
 class SwitchGroup extends HTMLElement {
     constructor() {
         super();
@@ -1198,6 +1249,7 @@ class SwitchGroup extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Walk the tap's path through nested elements to find the choice carrying an index.
     eventOwner(e) {
         const path = e.composedPath();
         const pathLength = path.length;
@@ -1211,6 +1263,7 @@ class SwitchGroup extends HTMLElement {
 
         return e.path[0];
     }
+    // Ignore taps on the already-selected choice; otherwise request its numeric index.
     onSwitch(e) {
         const element = this.eventOwner(e);
 
@@ -1250,6 +1303,7 @@ class SwitchGroup extends HTMLElement {
     }
 }
 
+// Switch the ride tiles between speed/distance/power/slope and oxygen/temperature data.
 class DataTileSwitchGroup extends SwitchGroup {
     postInit() {
         this.prop = 'dataTileSwitch';
@@ -1299,6 +1353,7 @@ class DataTileSwitchGroup extends SwitchGroup {
 customElements.define('data-tile-switch-group', DataTileSwitchGroup);
 
 
+// Select top-level and nested panels; links and panels share an "active" styling flag.
 class NavigationStack extends HTMLElement {
     constructor() {
         super();
@@ -1356,6 +1411,7 @@ class NavigationStack extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Route named navigation requests; the profile request uses the app's URL route.
     onAction(action) {
         console.log(action);
 
@@ -1422,6 +1478,8 @@ customElements.define('navigation-stack', NavigationStack);
 // TODO:
 // - use data-<prop name> properties instead of attributes
 // - get them with this.dataset.<data name>
+// Turn a tap (or the configured "on" event) into action<topic> with the action as data.
+// stoppropagation keeps nested buttons from also triggering their surrounding row.
 class ViewAction extends HTMLElement {
     constructor() {
         super();
@@ -1459,6 +1517,7 @@ class ViewAction extends HTMLElement {
 customElements.define('view-action', ViewAction);
 
 
+// Fill the battery bar from a percentage and flag low (<21%) or critical (<11%) charge.
 class BatteryLevel extends HTMLElement {
     constructor() {
         super();
@@ -1498,6 +1557,7 @@ class BatteryLevel extends HTMLElement {
 customElements.define('battery-level', BatteryLevel);
 
 
+// Add Enter/Space keyboard activation to the pointer-based navigation action.
 class NavigationAction extends ViewAction {
     constructor() {
         super();
@@ -1525,6 +1585,8 @@ class NavigationAction extends ViewAction {
 customElements.define('navigation-action', NavigationAction);
 
 
+// Provider-account controls: reflect connection state and route Intervals.icu
+// connect/disconnect requests to the API model (authentication happens there).
 class OAuth extends HTMLElement {
     constructor() {
         super();
@@ -1549,6 +1611,7 @@ class OAuth extends HTMLElement {
         this.services = value;
         this.render(this.services);
     }
+    // Extract the provider from the addressed action; only Intervals is handled here.
     onAction(action) {
         const self = this;
         console.log(action);
@@ -1584,6 +1647,7 @@ customElements.define('o-auth', OAuth);
 
 
 
+// Open a blocking browser dialog with a plain-text error and a dismiss button.
 class ModalError extends HTMLElement {
     constructor() {
         super();
@@ -1618,6 +1682,7 @@ class ModalError extends HTMLElement {
 customElements.define('modal-error', ModalError);
 
 
+// Weight-unit label: kilograms for metric settings, pounds for imperial settings.
 class MeasurementUnit extends DataView {
     getDefaults() {
         return {
@@ -1639,6 +1704,7 @@ class MeasurementUnit extends DataView {
 
 customElements.define('measurement-unit', MeasurementUnit);
 
+// Text-only label for the stored theme name; it does not apply page styling.
 class ThemeValue extends DataView {
     getDefaults() {
         return {
@@ -1649,6 +1715,7 @@ class ThemeValue extends DataView {
 
 customElements.define('theme-value', ThemeValue);
 
+// Text-only label for the metric/imperial preference.
 class MeasurementValue extends DataView {
     getDefaults() {
         return {
@@ -1660,6 +1727,7 @@ class MeasurementValue extends DataView {
 customElements.define('measurement-value', MeasurementValue);
 
 
+// Toggle whether the virtual ride is driven by measured power or measured speed.
 class VirtualStateSource extends DataView {
     postInit() {
         this.sources = ['power', 'speed'];
@@ -1696,6 +1764,7 @@ class VirtualStateSource extends DataView {
 customElements.define('virtual-state-source', VirtualStateSource);
 
 
+// Toggle automatic pausing in the sources preferences and show On/Off.
 class AutoPause extends DataView {
     postInit() {
         this.effect  = 'sources';
@@ -1731,6 +1800,7 @@ class AutoPause extends DataView {
 
 customElements.define('auto-pause', AutoPause);
 
+// Reuse the On/Off control for automatic starting instead of automatic pausing.
 class AutoStart extends AutoPause {
     postInit() {
         this.effect  = 'sources';
@@ -1742,6 +1812,7 @@ class AutoStart extends AutoPause {
 
 customElements.define('auto-start', AutoStart);
 
+// Cycle dark/light/automatic appearance and apply its class to the whole page body.
 class Theme extends DataView {
     postInit() {
         this.effect  = 'sources';
@@ -1779,6 +1850,7 @@ class Theme extends DataView {
 
 customElements.define('theme-layout', Theme);
 
+// Toggle the stored default for dock mode, the compact ride display.
 class DockModeDefault extends DataView {
     postInit() {
         this.effect  = 'dockMode';
@@ -1812,6 +1884,7 @@ class DockModeDefault extends DataView {
 
 customElements.define('dock-mode-default', DockModeDefault);
 
+// Ask the dock-mode model to open the compact display after a tap.
 class DockModeBtn extends DataView {
     subs() {
         this.addEventListener('pointerup', this.onSwitch.bind(this), this.signal);
@@ -1824,6 +1897,7 @@ class DockModeBtn extends DataView {
 customElements.define('dock-mode-btn', DockModeBtn);
 
 
+// Route mute/volume button requests and show the app's current volume percentage.
 class SoundControl extends DataView {
     postInit() {
         this.volume = 100;
@@ -1866,6 +1940,7 @@ class SoundControl extends DataView {
 customElements.define('sound-control', SoundControl);
 
 
+// Show actionable guidance when this page cannot use the browser's Bluetooth feature.
 class CompatibilityCheck extends HTMLElement {
     constructor() {
         super();
@@ -1884,9 +1959,11 @@ class CompatibilityCheck extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Both an HTTPS/localhost context and Web Bluetooth support are needed.
     compatible() {
         return window.isSecureContext !== false && webBle.isAvailable();
     }
+    // Distinguish an insecure page address from missing/blocked browser support.
     show() {
         let guidance;
         if(window.isSecureContext === false) {

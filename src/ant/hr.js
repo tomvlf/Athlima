@@ -1,19 +1,8 @@
 /*
- * hr.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Translates ANT+ heart-rate pages between eight-byte messages and named values.
+ * A byte is one small storage unit. Every page shares the latest heart rate and
+ * beat counter; the first byte identifies any extra information, such as battery
+ * or manufacturer details. Some optional pages below are still placeholders.
  */
 
 import { equals, existance, curry2, setUint24LE, getUint24LE,
@@ -22,12 +11,18 @@ import { ids, channelTypes, keys, } from './constants.js';
 import { format } from '../utils.js';
 import { DataPage } from './common.js';
 
+/**
+ * Build the shared heart-rate layout and let page-specific callbacks fill/read
+ * bytes 1–3. Encoding takes beat time in seconds and rate in beats/minute.
+ * Decoding currently returns beat time as raw 1/1024-second ticks, not seconds.
+ */
 function HRDataPage(spec = {}) {
     const defaults = {
         number: 0,
         pageChange: 0,
     };
 
+    // Pages without extra fields leave the common bytes alone and add no decoded values.
     function defaultEncode(args) { return args.view; }
     function defaultDecode(args) { return {}; }
 
@@ -50,6 +45,7 @@ function HRDataPage(spec = {}) {
     const data   = DataPage({definitions});
     const length = data.length;
 
+    // Put the page-change flag in the top bit, then fill the common and page-specific fields.
     function encode(args = {}) {
         const pageChange         = existance(args.pageChange, defaults.pageChange);
         const heartBeatEventTime = data.encodeField(
@@ -70,6 +66,7 @@ function HRDataPage(spec = {}) {
         return specEncode({view, data, ...args});
     }
 
+    // Separate the page number from its change flag and merge in any optional page fields.
     function decode(dataview) {
         const combined   = dataview.getUint8(0, true);
         const dataPage   = combined & 0b01111111;
@@ -99,6 +96,7 @@ function HRDataPage(spec = {}) {
     });
 }
 
+// Heart-rate-only page: fill the unused three bytes with the protocol's reserved value.
 function DataPage0() {
     // Data Page 0 (0x00) – Default Data Page
     const number = 0;
@@ -117,6 +115,7 @@ function DataPage0() {
     return HRDataPage({number, encode, decode});
 }
 
+// Add the sensor's total operating time, converted between seconds and two-second steps.
 function DataPage1() {
     // Data Page 1 (0x01) – Cumulative Operating Time
     const number = 1;
@@ -145,6 +144,7 @@ function DataPage1() {
     return HRDataPage({number, definitions, encode, decode});
 }
 
+// Add the manufacturer ID and the upper part of the sensor's serial number.
 function DataPage2() {
     // Data Page 2 (0x02) – Manufacturer Information
     const number = 2;
@@ -175,6 +175,7 @@ function DataPage2() {
     return HRDataPage({number, encode, decode});
 }
 
+// Add the hardware/software versions and model number as three one-byte identifiers.
 function DataPage3() {
     // Data Page 3 (0x03) – Product Information
     const number = 3;
@@ -206,6 +207,7 @@ function DataPage3() {
     return HRDataPage({number, encode, decode});
 }
 
+// Placeholder: only the shared heart-rate fields work; the previous-beat detail is not handled yet.
 function DataPage4() {
     // Data Page 4 (0x04) – Previous Heart Beat Event Time for R-R Interval
     const number = 4;
@@ -223,6 +225,7 @@ function DataPage4() {
     return HRDataPage({number, encode, decode});
 }
 
+// Placeholder: swim-summary fields are not handled; common heart-rate fields still pass through.
 function DataPage5() {
     // Data Page 5 (0x05) – Swim Interval Summary
     const number = 5;
@@ -240,6 +243,7 @@ function DataPage5() {
     return HRDataPage({number, encode, decode});
 }
 
+// Placeholder for supported-feature flags; only common heart-rate fields are currently handled.
 function DataPage6() {
     // Data Page 6 (0x06) – Capabilities
     const number = 6;
@@ -257,6 +261,7 @@ function DataPage6() {
     return HRDataPage({number, encode, decode});
 }
 
+// Placeholder for battery details; only common heart-rate fields are currently handled.
 function DataPage7() {
     // Data Page 7 (0x07) – Battery Status
     const number = 7;
@@ -274,10 +279,12 @@ function DataPage7() {
     return HRDataPage({number, encode, decode});
 }
 
+// Unimplemented mode-setting page; it is not registered in HR's supported pages.
 function DataPage76() {
     // Data Page 76(0x46) – Mode Settings Command
 }
 
+// Collect the known heart-rate pages into a decoder usable by the ANT device handler.
 function HR() {
     // Heart Rate Profile
     const pages = {
@@ -291,6 +298,7 @@ function HR() {
         dataPage7: DataPage7(),
     };
 
+    // Unexposed receiver preset; zero address values mean search for any matching sensor.
     function slave(args = {}) {
         const defaults = {
             transmissionType: 0, // for searching
@@ -314,6 +322,7 @@ function HR() {
         };
     };
 
+    // Ignore the changing high bit when choosing a page; preserve unknown pages unchanged.
     function decode(dataview) {
         const dataPage = dataview.getUint8(0, true) & 0b01111111;
         if(equals(dataPage, 0)) return pages.dataPage0.decode(dataview);

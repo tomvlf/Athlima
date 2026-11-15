@@ -1,19 +1,11 @@
 /*
- * workout-graph-svg.js: front-end client module.
+ * Draws planned-workout previews as SVG: a picture made of scalable shapes.
+ * Each interval becomes a coloured polygon whose width is time and height is
+ * target power. A separate custom HTML tag shows details when a shape is hovered.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * The view model returns SVG text without inserting it on the page. The element's
+ * connectedCallback attaches pointer listeners after insertion; its
+ * disconnectedCallback cancels them when the element is removed.
  */
 
 import { xf, exists, first, last, } from '../functions.js';
@@ -21,7 +13,7 @@ import { formatTime } from '../utils.js';
 import { listItemTemplate, } from './planned-list.js';
 import { models } from '../models/models.js';
 
-// Just keep here logic that calculates the graph as svg
+// Calculates graph coordinates and labels from intervals and FTP (reference watts).
 class WorkoutGraphViewModel {
     constructor() {
         const self = this;
@@ -32,6 +24,7 @@ class WorkoutGraphViewModel {
         this.yInRange = {min: 0, max: 1};
         this.powerMin = 0.1;
     }
+    // Convert time/power into drawing coordinates; callers use ranges starting at zero.
     translate(value, inRange, outRange) {
         const inSpan = inRange.max - inRange.min;
         const outSpan = outRange.max - outRange.min;
@@ -40,6 +33,7 @@ class WorkoutGraphViewModel {
 
         return inRange.min + (valueScaled * outSpan);
     }
+    // Find the largest power target, still expressed as a fraction of FTP.
     findMaxTarget(workout) {
         const intervals = workout.intervals;
         let interval;
@@ -58,11 +52,13 @@ class WorkoutGraphViewModel {
         const em = 8;
         return px * em;
     }
+    // Pick a watt scale that fits the hardest target, with headroom for easier workouts.
     calcYInRangeMax(data, ftp) {
         const self = this;
         const targetMax = Math.round(self.findMaxTarget(data) * ftp);
         return (targetMax > ftp) ? targetMax : ftp * 1.6;
     }
+    // Describe the first/last step as a range when a target changes across an interval.
     intervalToInfo(interval) {
         const firstStep = first(interval.steps);
         const lastStep = last(interval.steps);
@@ -86,9 +82,8 @@ class WorkoutGraphViewModel {
 
         return { duration, power, cadence, slope, };
     }
-    // Int
-    // ->
-    // String
+    // Return SVG for the interval list, using window width and an optional drawing height.
+    // First/last powers define each shape, so a changing target appears as a sloped top.
     toSVG(data, ftp = 200, size) {
         const self = this;
 
@@ -179,6 +174,7 @@ class WorkoutGraphViewModel {
                              duration="${info.duration}" />`;
         }
 
+        // Flip the drawing vertically because higher power should rise from the bottom.
         return `
             <svg
                 class="workout--graph"
@@ -193,7 +189,7 @@ class WorkoutGraphViewModel {
 }
 
 
-// The graph element itself, just holds some events and actions
+// Adds hover interaction to an already-built SVG; it does not generate workout data.
 class WorkoutGraph extends HTMLElement {
     constructor() {
         super();
@@ -223,6 +219,7 @@ class WorkoutGraph extends HTMLElement {
     onMouseOut(e) {
         this.$info.style.display = 'none';
     }
+    // Read the shape's prepared labels and place the tooltip near the hovered interval.
     // TODO: simplify
     renderInfo(target, contRect) {
         const power    = target.getAttribute('power');
@@ -259,6 +256,7 @@ customElements.define('workout-graph-svg', WorkoutGraph);
 // TODO:
 // - should extend the workout graph with watch actions
 // - it bridges session, activity and workout
+// Reserved tag for a future live SVG graph; it currently adds no behavior.
 class WorkoutGraphActive extends HTMLElement {
 }
 

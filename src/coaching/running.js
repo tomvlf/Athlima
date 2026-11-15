@@ -1,22 +1,10 @@
-/*
- * running.js: running-specific prescription rules for the deterministic coach.
- *
- * Why this exists:
- * Running shares the planner's periodisation, load envelopes and capability families with
- * cycling, but it needs its own intensity anchors (threshold pace instead of FTP), its own
- * session formats (cruise intervals, VO2max intervals, repetitions, strides, run-walk) and
- * running-specific safety caps. Keeping those rules here leaves the planner sport-neutral.
- *
- * What it does:
- * - Run family intensities are fractions of threshold SPEED (1000 / threshold pace in s/km),
- *   so the planner's load maths (hours x intensity^2 x 100) yields an rTSS-like estimate.
- * - Quality sessions follow Daniels-style weekly caps: threshold <=10%, interval <=8% and
- *   repetition <=5% of weekly running time (time is used as the proxy for mileage).
- * - Riegel (1981) T2 = T1 x (D2 / D1)^1.06 converts race results into a threshold pace.
- *
- * Developer note:
- * This module must not import workouts.js or planner.js (they import it). Update
- * doc/coaching.md and test/coaching/running.test.js when changing a rule.
+/**
+ * Running-specific sessions for the shared Coach. Threshold pace is seconds per kilometre; targets
+ * use threshold SPEED, so a larger fraction means faster running, not a longer time per kilometre.
+ * Session and weekly caps are coaching heuristics, not proven injury-prevention limits.
+ * Daniels-style quality caps use time as a proxy for distance; Riegel (1981) supplies race-time
+ * estimates. Keep this module independent of workouts.js and planner.js, which import it; rule
+ * changes also need the coaching guide and running tests updated.
  */
 
 import { DEFAULTS, sum } from './domain.js';
@@ -86,14 +74,26 @@ export function predictedRaceSeconds(thresholdPace, distanceKm, exponent = DEFAU
     return riegelTime(3600, 3600 / thresholdPace, distanceKm, exponent);
 }
 
+/**
+ * A speed fraction divides the pace: at 80% of threshold speed, each kilometre takes longer, not
+ * 80% as long.
+ */
 export const paceForIntensity = (thresholdPace, intensity) => thresholdPace / intensity;
 
+/**
+ * Show seconds per kilometre as a minutes:seconds pace, converting to per-mile units for an
+ * imperial display. Missing/nonpositive pace produces no pace label.
+ */
 export function formatPace(secondsPerKm, unitSystem = 'metric') {
     if(!(secondsPerKm > 0)) return '';
     const value = Math.round(unitSystem === 'imperial' ? secondsPerKm * 1.609344 : secondsPerKm);
     return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}/${unitSystem === 'imperial' ? 'mi' : 'km'}`;
 }
 
+/**
+ * Read a minutes:seconds entry into total seconds. Reject seconds above 59 and unrecognized text
+ * with null so callers can report invalid input.
+ */
 export function parsePace(text) {
     const match = /^\s*(\d{1,2}):([0-5]\d)\s*$/.exec(String(text ?? ''));
     return match ? Number(match[1]) * 60 + Number(match[2]) : null;
@@ -132,6 +132,11 @@ export function runWalkStage(longestMinutes, weekIndex, rules = DEFAULTS) {
     return stage < RUN_WALK_STAGES.length ? [...RUN_WALK_STAGES[stage]] : null;
 }
 
+/**
+ * Fill the available seconds with whole run/walk pairs, an initial walk when time allows and a
+ * final remainder. This preserves the requested duration without creating a partial fast
+ * repetition.
+ */
 function runWalkSteps(seconds, [run, walk], power) {
     const steps = [];
     let remaining = seconds;

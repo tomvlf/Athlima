@@ -1,19 +1,8 @@
-/*
- * local-storage.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * persists user and application data in the browser so settings and workouts survive reloads.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Stores one small browser setting, such as FTP or a theme choice. localStorage keeps text across
+ * reloads; parse converts that text back into a useful value and encode converts it for saving.
+ * Each setting provides its own validation and fallback value. This is local persistence, not cloud
+ * synchronization.
  */
 
 //
@@ -23,6 +12,10 @@
 import { equals, exists, existance } from '../functions.js';
 import { accountStorage } from './account.js';
 
+/**
+ * Build the read/write helpers for one named setting. A missing key is a programming error;
+ * optional conversion and checking functions customize the value format.
+ */
 function LocalStorageItem(args = {}) {
     const defaults = {
         fallback: '',
@@ -39,6 +32,10 @@ function LocalStorageItem(args = {}) {
 
     if(!exists(key)) throw new Error('LocalStorageItem needs a key!');
 
+    /**
+     * Read the setting and write its fallback into storage when that is the restored value, then
+     * return the saved value.
+     */
     function restore() {
         const inStorageValue = get();
 
@@ -49,6 +46,7 @@ function LocalStorageItem(args = {}) {
         return get();
     }
 
+    /** Read and parse the saved text, or log that it is missing and return the configured fallback. */
     function get() {
         const value = accountStorage.getItem(`${key}`);
 
@@ -60,6 +58,10 @@ function LocalStorageItem(args = {}) {
         return parse(value);
     }
 
+    /**
+     * Save an accepted value through its encoder. Invalid input is logged and replaced with the
+     * fallback rather than saved unchanged.
+     */
     function set(value) {
         if(isValid(value)) {
             accountStorage.setItem(`${key}`, encode(value));

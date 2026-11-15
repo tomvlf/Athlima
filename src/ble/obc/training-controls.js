@@ -1,19 +1,8 @@
 /*
- * training-controls.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Decodes Open Bike Control workout buttons and the cruise-control dial.
+ * Input pairs contain a numeric button ID and state byte (a value from 0 to 255).
+ * Output describes a press, release, ignored dial value or watt target; it does
+ * not itself pause a workout or command a trainer.
  */
 
 //
@@ -61,9 +50,10 @@ const cruiseControlId = 0x3C;
 const cruiseWattsPerStep = 5;
 const cruiseAbsoluteMin = 0x0A;
 
+// Stateless family decoder: decodePair handles one report and decode filters a list to recognized messages.
 function TrainingControls() {
 
-    // Int, Int -> Message?
+    // Digital buttons accept only released/pressed; other state values produce no message.
     function decodeDigital(id, state) {
         const action = digitalActions[id];
         if(equals(state, 0x00)) {
@@ -76,7 +66,7 @@ function TrainingControls() {
         return;
     }
 
-    // Int -> Message?
+    // Interpret a cruise dial state, keeping reserved values as an explicit "do nothing" message.
     // 0x02 through 0x09 are reserved and mean "do nothing".
     // From 0x0A upward the byte is a watt target in steps of 5 W.
     function decodeCruiseControl(state) {
@@ -113,7 +103,7 @@ function TrainingControls() {
         };
     }
 
-    // {id, state} -> Message?
+    // Select the digital or cruise decoder by ID; other button families are left to their own decoders.
     function decodePair(pair) {
         const id = pair.id;
         const state = pair.state;
@@ -124,7 +114,7 @@ function TrainingControls() {
         return;
     }
 
-    // [{id, state}] -> [Message]
+    // Preserve input order while dropping unknown IDs and invalid digital states.
     function decode(pairs = []) {
         const messages = [];
 

@@ -1,19 +1,8 @@
-/*
- * ui.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Connects real Coach forms, service logic, workout conversion and calendar elements inside a
+ * simulated browser. Fake IndexedDB keeps the scenario off the rider's real storage. Checks plan
+ * creation/adaptation, playable exports, start restrictions and running setup; it does not contact
+ * a trainer.
  */
 
 /** @jest-environment jsdom */
@@ -44,6 +33,10 @@ test('generated ZWO and app workouts expose the durations required by the existi
     expect(app.intervals).toEqual(parsed.intervals);
 });
 
+/**
+ * Follow a complete form workflow instead of checking HTML alone: enter settings, import fictional
+ * history, generate a plan, select a session and request easier training.
+ */
 test('coaching forms create a persistent plan that appears and adapts in the existing calendar', async () => {
     const service = await initializeCoaching(new IDBFactory());
     const panel = new CoachingPanel(), calendar = new TrainingCalendar();

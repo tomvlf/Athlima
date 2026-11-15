@@ -1,3 +1,8 @@
+/**
+ * Compatibility regression test: an obsolete server-mode preference must not revive network-backed
+ * coaching. A fresh fake browser database is reopened after resetting loaded modules to show that
+ * the local profile/goal, not an in-memory singleton alone, was saved.
+ */
 import { IDBFactory } from 'fake-indexeddb';
 import { profile, goal } from '../coaching/fixtures.js';
 

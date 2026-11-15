@@ -1,19 +1,8 @@
 /*
- * wcps.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks Wahoo command bytes and decoded replies without a trainer. Examples
+ * cover unlock, watts, percent grade, simulation mass/drag, wind, wheel size
+ * and resistance. Offset/reversed scales are checked against explicit numbers.
+ * Unsupported ERG-decoding examples remain skipped, not active coverage.
  */
 
 import { control } from '../../src/ble/wcps/control-point.js';
@@ -87,6 +76,7 @@ describe('Control Point', () => {
         });
     });
 
+    // Flat road is stored at 32768; downhill/uphill values fall below/above that midpoint.
     describe('Grade', () => {
         test('opCode', () => {
             const res = control.grade.opCode;
@@ -331,6 +321,7 @@ describe('Control Point', () => {
     });
 
 
+    // Intensity is a 0–1 fraction, and Wahoo's stored number decreases as resistance increases.
     describe('LoadIntensity', () => {
         test('opCode', () => {
             const res = control.loadIntensity.opCode;
@@ -406,6 +397,7 @@ describe('Control Point', () => {
     });
 
 
+    // Replies identify success/failure and the original request; longer replies also echo a raw value.
     describe('Response', () => {
 
         test('decode setPowerTarget success', () => {

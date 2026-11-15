@@ -1,19 +1,8 @@
 /*
- * data-record.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads/writes FIT data records using a previously announced definition.
+ * The definition supplies field order, byte widths and byte order; the profile
+ * supplies readable names and measurement scaling. Arrays occupy several values
+ * of one storage type. Timestamps are exposed as JavaScript milliseconds.
  */
 
 import { equals, } from '../functions.js';
@@ -29,6 +18,7 @@ import { profiles } from './profiles/profiles.js';
 import { recordHeader } from './record-header.js';
 import { fieldDefinition } from './field-definition.js';
 
+// Convert ordinary fields; developer bytes count toward record length but are not decoded into fields here.
 function DataRecord(args = {}) {
     const architecture     = args.architecture ?? true;
     const _type            = RecordType.data;
@@ -48,6 +38,7 @@ function DataRecord(args = {}) {
     // Int
     // ->
     // DataView
+    // Mutate the caller's view using this layout; data may be a fields object or a complete FITjs record.
     function encode(definition, data, view, start = 0) {
         const architecture = definition.architecture ?? 0;
         const endian       = !architecture; // arch wierdness?
@@ -107,6 +98,7 @@ function DataRecord(args = {}) {
     //     length: Int,
     //     fields: {field_name: Any,}
     // }
+    // Read typed values in layout order and return a record whose length lets the file parser skip extensions.
     function decode(definition, view, start = 0) {
         const header       = recordHeader.decode(view.getUint8(start, true));
         const local_number = header.localMessageType;
@@ -154,6 +146,7 @@ function DataRecord(args = {}) {
         };
     }
 
+    // Attach layout identity/length to supplied named values without converting or copying those values.
     function toFITjs(definition, values) {
         // if(!equals(definition.length, values.length)) {
         //     const msg = `DataRecord.toFITjs called with missing values for message: '${definition.name}'`;

@@ -1,19 +1,9 @@
 /*
- * messages.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * The eight-byte FE-C pages carried by the Bluetooth trainer connection.
+ * Encoders modify a supplied DataView in place, starting at byte 4 by default;
+ * the outer message adds framing and a checksum separately. Field definitions
+ * convert measurement units into whole-number steps small enough to transmit.
+ * Receive-only pages return named measurements or command-status fields.
  */
 
 //
@@ -22,6 +12,7 @@
 
 import { getBits, dataviewToArray, print, } from '../../functions.js';
 
+// Use the field default, divide by its step size and add its stored offset; no range check is applied.
 function applyDefinition(field, value) {
     const _value = value ?? field.default;
     const _resolution = field.resolution ?? 1;
@@ -29,6 +20,7 @@ function applyDefinition(field, value) {
     return (_value / _resolution) + (_offset / _resolution);
 }
 
+// Unused reverse-conversion helper retained alongside the page definitions.
 function removeDefinition(field, value) {
     const _value = value ?? field.default;
     const _resolution = field.resolution ?? 1;
@@ -36,6 +28,7 @@ function removeDefinition(field, value) {
     return (_value - (_offset * _resolution)) * _resolution;
 }
 
+// Basic resistance percent encoded in half-percent steps.
 function DataPage48() {
     // Data Page 48 (0x30) – Basic Resistance
     const number = 48;
@@ -68,6 +61,7 @@ function DataPage48() {
     });
 }
 
+// Wind speed in km/h, wind resistance in kg/m and drafting factor from 0 to 1.
 function DataPage50() {
     // DataPage 50 (0x32) - Wind Resistance
     const number = 50;
@@ -107,6 +101,7 @@ function DataPage50() {
     });
 }
 
+// Percent road grade shifted by +200, plus unitless rolling resistance for the simulated road.
 function DataPage51() {
     // DataPage 51 (0x33) - Track Resistance
     const number = 51;
@@ -144,6 +139,7 @@ function DataPage51() {
     });
 }
 
+// Watt target encoded in quarter-watt steps across the final two bytes.
 function DataPage49() {
     // Data Page 49 (0x31) – Target Power
     const number = 49;
@@ -177,6 +173,7 @@ function DataPage49() {
     });
 }
 
+// Rider/bike kg, wheel diameter in metres and gear ratio; bike mass shares a byte with wheel adjustment.
 function DataPage55() {
     // DataPage 55 (0x37) - User Configuration
     const number = 55;
@@ -216,6 +213,7 @@ function DataPage55() {
             payload?.gearRatio
         );
 
+        // Combine the low four bits of bike mass with the four-bit diameter adjustment.
         const combined1 = (getBits(0, 4, bikeWeight) << 4) + diameterOffset;
         const bikeWeightMSB = bikeWeight >> 4;
 
@@ -238,6 +236,7 @@ function DataPage55() {
     });
 }
 
+// Vendor road-feel command: select a surface and its raw vibration intensity, with simulation off by default.
 function DataPage252() {
     const number = 252;
     const length = 8;
@@ -299,6 +298,7 @@ function DataPage252() {
     });
 }
 
+// Placeholder only: this decoder returns zero speed/heart rate rather than reading the page yet.
 function DataPage16() {
     // DataPage 16 (0x10) - General FE Data
     const number = 16;
@@ -322,6 +322,7 @@ function DataPage16() {
     });
 }
 
+// Trainer readings: cadence in revolutions/minute and power in watts, extracted from a shared bit field.
 function DataPage25() {
     // DataPage 25 (0x19) - Trainer Specific
     const number = 25;
@@ -356,6 +357,7 @@ function DataPage25() {
     });
 }
 
+// Command outcome with sequence number and four uninterpreted result bytes, used to release waiting controls.
 function DataPage71() {
     // DataPage 71 (0x47) - Command Status
     const number = 71;

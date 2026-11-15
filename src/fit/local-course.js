@@ -1,25 +1,15 @@
 /*
- * local-course.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Turns decoded FIT distance/altitude samples into Athlima's course shape.
+ * Distances and elevations are metres; slopes are percent rise over horizontal
+ * distance. Missing elevations reuse the preceding elevation, and a simplified
+ * point list supports the course graph alongside the original detail.
  */
 
 import { exists, equals, first, toFixed, } from '../functions.js';
 import { FITjs } from './fitjs.js';
 import { g } from '../views/graph.js';
 
+// Simplify the elevation line, recalculate each segment's length/grade, and attach course metadata.
 function toCourse(points, distance, name, description) {
     const pointsSimplified = g.simplify(points, 0.5, true).map((p, i, xs) => {
         const x1 = xs[i].x;
@@ -49,6 +39,7 @@ function toCourse(points, distance, name, description) {
     };
 }
 
+// These predicates select ordinary ride samples and the distance/elevation values needed for a course.
 function isDataRecord(x) {
     return equals(x.type, 'data') && equals(x.name, 'record');
 }
@@ -61,16 +52,20 @@ function hasDistance(x) {
     return exists(x.fields.distance);
 }
 
+// Match the course-message shape used by the name lookup below.
 function isCourseDataMessage(x) {
     return equals(x.type, 'data') && equals(x.message, 'course');
 }
 
+// Prefer a course-message name, otherwise tidy the filename by dropping .fit and separator characters.
 function courseName(course, fileName) {
     const courseDataMessage = course.find(isCourseDataMessage);
     const name = courseDataMessage?.fields?.name ?? fileName;
     return name.replace(/.fit/gi, '').replace(/_|-/gi, ' ');
 }
 
+// Decode the file, fill elevation gaps and derive horizontal distance from travelled distance.
+// At least one distance sample with altitude is required to seed the elevation history.
 function decode(view, fileName) {
     const courseJS = FITjs.decode(view);
     console.log(courseJS);

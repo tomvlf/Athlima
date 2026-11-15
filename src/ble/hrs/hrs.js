@@ -1,19 +1,7 @@
 /*
- * hrs.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Wires Bluetooth Heart Rate Service updates to the heart-rate decoder.
+ * onData receives beats per minute, contact flags and any optional beat-to-beat
+ * intervals in seconds. The shared Service wrapper manages subscriptions.
  */
 
 //
@@ -26,6 +14,7 @@ import { Service } from '../service.js';
 import { Characteristic } from '../characteristic.js';
 import { heartRateMeasurement as heartRateMeasurementParser } from './heart-rate-measurement.js';
 
+// Require a discovered heart-rate service and expose the shared setup/start/stop lifecycle.
 function HRS(args = {}) {
 
     // config

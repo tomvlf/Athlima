@@ -1,10 +1,20 @@
 /** @jest-environment jsdom */
+/**
+ * Checks the Activities page's data preparation and HTML: deduplication, all-sport week/month
+ * totals, local dates, incomplete measurements, file actions and optional charts/routes. Fixed
+ * fictional records keep boundary cases repeatable, and imported labels must appear as text rather
+ * than executable markup.
+ */
 
 import {
     activityLists, historyActivityRow, localActivityRow, renderActivityOverview,
     renderActivityStreamData, summarizeActivityPeriods,
 } from '../../src/platform/activities.js';
 
+/**
+ * Create one known dated history record, then replace selected fields to test missing values, other
+ * sports or overlapping local recordings.
+ */
 const ride = (id, day, overrides = {}) => ({
     id, day, start: `${day}T12:00:00Z`, name: id, sport: 'cycling', source: 'manual',
     duration: 3600, distance: 10000, loadMetrics: {power: {value: 50}}, streams: {},
@@ -12,6 +22,10 @@ const ride = (id, day, overrides = {}) => ({
 });
 const data = activities => ({activities, profile: {timeZone: 'UTC'}});
 const date = Date.parse('2026-03-01T18:00:00Z');
+/**
+ * Read the displayed value beside a named definition-list label, checking user-visible totals
+ * rather than an internal calculation alone.
+ */
 const metric = (section, label) => {
     const term = [...section.querySelectorAll('dt')].find(item => item.textContent === label);
     return term?.nextElementSibling.textContent;

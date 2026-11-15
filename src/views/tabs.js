@@ -1,23 +1,15 @@
 /*
- * tabs.js: front-end client module.
+ * Connects tab buttons to the panels they select, including whole-page tabs.
+ * HTML attributes name the action (effect), selected value (param), and stored
+ * setting (prop). An "active" CSS class tells the page's styling what to show.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Constructors prepare each custom tag; connectedCallback attaches its behavior
+ * when the browser adds it to the page. onUpdate receives the chosen stored value.
  */
 
 import { xf } from '../functions.js';
 
+// Sends a selection request on a tap and marks itself active when that value is stored.
 class TabBtn extends HTMLElement {
     constructor() {
         super();
@@ -51,6 +43,7 @@ class TabBtn extends HTMLElement {
     }
 }
 
+// Applies the stored selection to child panels by matching their tab attribute.
 class TabGroup extends HTMLElement {
     constructor() {
         super();
@@ -86,6 +79,7 @@ customElements.define('tab-group', TabGroup);
 
 
 
+// Page navigation uses the same selection rules, but looks for .page and page="...".
 class PageBtn extends TabBtn {}
 class PageGroup extends TabGroup {
     defaultTabSelector() { return '.page'; }

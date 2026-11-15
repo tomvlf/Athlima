@@ -1,19 +1,8 @@
-/*
- * functions.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Small examples of the shared value, collection, function-composition, event and byte helpers.
+ * Read each describe group as a topic and each test name as the expected behavior. In particular,
+ * valid zero/false values must not be confused with missing input, and event subscriptions must
+ * receive the expected state.
  */
 
 /**

@@ -1,3 +1,8 @@
+/**
+ * Checks the ride profile independently of sensors: prescribed steps determine watts and duration,
+ * while interval/countdown state determines position through pauses and skips. Free rides and
+ * distance-only courses must not gain an invented timed power chart.
+ */
 import { rideTimeline, ridePosition, rideProfile } from '../../src/platform/ride.js';
 
 const watts = (power, ftp) => power < 9 ? Math.round(power * ftp) : power;

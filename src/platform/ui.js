@@ -1,19 +1,9 @@
-/*
- * ui.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Assembles the main interface around the ride engine and existing custom screen elements. A route
+ * is the page name after #/ in the address; rendering builds that page's HTML, while ride readings
+ * update in place to avoid rebuilding controls each second. Mobile layout is selected at 700 pixels
+ * or less and can change without restarting a ride. User/provider text must be escaped before
+ * insertion into HTML.
  */
 
 import { xf } from '../functions.js';
@@ -66,6 +56,11 @@ const devices = {
     controllable: 'Smart trainer', heartRateMonitor: 'Heart rate',
     powerMeter: 'Power meter', speedCadenceSensor: 'Speed / cadence',
 };
+/**
+ * These small helpers assemble repeated HTML fragments such as cards, links and statistics.
+ * body/text values that contain user data must already be escaped; intentional HTML fragments are
+ * kept as markup.
+ */
 const card = (title, body, className = '', compact = false) => `<section class="panel ${className}">${compact
     ? mobileDetails(title, title, `<h2 class="desktop-section-title">${title}</h2>${body}`)
     : `<h2>${title}</h2>${body}`}</section>`;
@@ -89,6 +84,10 @@ export async function launchPlatform(root) {
     let mobile = window.innerWidth <= 700;
     document.body.classList.add('platform-app');
     document.body.classList.toggle('mobile-app', mobile);
+    /**
+     * Build either desktop page links or mobile tabs plus the More menu; resizing replaces only
+     * this navigation, not the ride engine.
+     */
     const navigation = () => mobile
         ? `${mobileTabs.map(([route, label]) =>
             `<a class="tab" data-tab="${route}" href="#/${route}">${icons[route]}<span>${label}</span></a>`).join('')}
@@ -135,6 +134,7 @@ export async function launchPlatform(root) {
     let route = 'dashboard';
     // Detail screens (workout, editor) keep the tab the rider came from highlighted.
     let activeTab = 'dashboard';
+    /** Highlight the current page and preserve the originating mobile tab for detail screens. */
     const markNavigation = () => {
         if(moreRoutes.includes(route)) activeTab = 'more';
         else if(mobileTabs.some(([tab]) => tab === route)) activeTab = route;
@@ -142,6 +142,10 @@ export async function launchPlatform(root) {
             a.getAttribute('href') === `#/${route}` ? 'page' : 'false'));
         root.querySelectorAll('nav [data-tab]').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === activeTab));
     };
+    /**
+     * Open/close the mobile menu, keep its accessibility state in sync and move keyboard focus to
+     * the menu or back to its button when requested.
+     */
     const setMoreMenu = (open, returnFocus = false) => {
         const menu = root.querySelector('#more-menu');
         const button = root.querySelector('[data-tab="more"]');
@@ -158,6 +162,10 @@ export async function launchPlatform(root) {
     let busy = false;
     let ready = false;
     const mobileSections = new Map();
+    /**
+     * Restore each compact section's remembered open state on mobile, always expanding desktop
+     * content and sections containing an error.
+     */
     const updateMobileSections = () => {
         root.querySelectorAll('[data-mobile-details]').forEach(section => {
             section.open = !mobile || Boolean(section.querySelector('[role="alert"]')) ||
@@ -197,11 +205,19 @@ export async function launchPlatform(root) {
     let stateVersion = 0;
     const sensorStatus = {};
     const requestedDevices = new Set();
+    /**
+     * Show readable status or error text and use the matching accessibility role so assistive
+     * technology can announce it.
+     */
     const report = (text, error = false) => {
         message.textContent = text;
         message.setAttribute('role', error ? 'alert' : 'status');
         message.classList.toggle('error', error);
     };
+    /**
+     * Run one screen action at a time, mark the interface busy, surface failures and always release
+     * the busy state.
+     */
     const run = async action => {
         if(busy) return;
         busy = true;
@@ -210,6 +226,10 @@ export async function launchPlatform(root) {
         catch(error) { report(error.message || 'This action could not be completed.', true); }
         finally { busy = false; root.removeAttribute('aria-busy'); }
     };
+    /**
+     * Review missed Coach sessions only after any history import has finished, then notify
+     * interested screens of the updated data.
+     */
     const refresh = async () => {
         if(coachingService().syncPending) return;
         await coachingService().advance();
@@ -220,10 +240,18 @@ export async function launchPlatform(root) {
     const workoutRow = workout => `<li class="session-row"><div><span class="eyebrow">${escape(workout.date)} / ${escape(workout.family)}</span>
         <strong>${escape(workout.title)}</strong><span>${minutes(workout.duration)} &middot; ${escape(workout.status)}</span></div>
         ${link(`workout/${encodeURIComponent(workout.id)}`, 'View session', 'button secondary')}</li>`;
+    /**
+     * Choose the latest available plan-change or state explanation; without one, show setup
+     * guidance rather than inventing a recommendation.
+     */
     const recommendation = data => data?.plan?.adaptations?.at(-1)?.reasoning ||
         state?.readiness?.reason || data?.plan?.rationale ||
         'Set your availability and a dated goal to build a plan around your life.';
 
+    /**
+     * Combine today's Coach, manual-calendar and imported sessions with recent cycling totals. A
+     * missing Coach shows a recovery message while local riding remains available.
+     */
     function dashboard(data) {
         if(!data) return card('Training data unavailable', `<p>${escape(coachingError || 'Your local training data has not loaded.')}</p>
             <button data-action="reload">Reload training data</button><p class="muted">Your local workout library and ride controls remain available.</p>`);
@@ -265,17 +293,29 @@ export async function launchPlatform(root) {
             ${card('Coming next', next.length ? `<ul class="session-list">${next.slice(0, 3).map(workoutRow).join('')}</ul>${link('calendar', 'Open calendar')}` :
                 empty('No future Coach sessions scheduled.', 'coach', 'Build a plan'))}</div>`;
     }
+    /**
+     * Draw recent daily cycling minutes, scaling against at least one hour so tiny totals do not
+     * appear disproportionately large.
+     */
     function weekChart(summary) {
         const maximum = Math.max(3600, ...summary.days.map(day => day.seconds));
         return `<div class="week-chart" role="img" aria-label="Ride duration in minutes for the last seven days">${summary.days.map(day =>
             `<div><span>${Math.round(day.seconds / 60)}</span><i style="height:${Math.max(2, day.seconds / maximum * 100)}px"></i>
                 <small>${escape(new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, {weekday: 'short'}))}</small></div>`).join('')}</div>`;
     }
+    /**
+     * Resolve a detail-screen ID against the active plan, local library or cached provider
+     * workouts, converting a Coach session to the player format.
+     */
     function selectedWorkout(data) {
         const planned = data?.plan?.workouts.find(workout => workout.id === selectedId);
         const external = legacy.querySelector('training-calendar')?.plannedWorkouts.find(workout => workout.id === selectedId);
         return planned ? toAppWorkout(planned) : db.workouts.find(workout => workout.id === selectedId) || external;
     }
+    /**
+     * Explain why a planned session cannot currently start, rather than returning a bare yes/no.
+     * The engine performs its own final start checks too.
+     */
     function startBlocker(data, planned) {
         if(!planned) return '';
         if(data.plan.trainingPaused || data.safetyStatus) {
@@ -289,6 +329,10 @@ export async function launchPlatform(root) {
         }
         return '';
     }
+    /**
+     * Describe the selected workout with targets and notes. Running shows pace/effort guidance
+     * rather than a trainer Start action.
+     */
     function details(data) {
         const workout = selectedWorkout(data);
         if(!workout) return empty('This workout is not available on this device.');
@@ -314,6 +358,10 @@ export async function launchPlatform(root) {
     function plan(data) {
         return renderPlan(data, today(data));
     }
+    /**
+     * Show normalized history alongside pending/device-only FIT recordings without duplicating the
+     * same ride. File actions reflect which local/provider data is available.
+     */
     function activities(data) {
         const lists = activityLists(data, db.activity, false);
         const timeZone = data?.profile?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -333,6 +381,10 @@ export async function launchPlatform(root) {
                 empty('Your activities will appear here after you finish a workout or connect Intervals.icu.', 'settings', 'Connect an integration'), 'activity-history')}
             <p class="muted">Missing measurements are shown as --, not estimated. FIT downloads are retained locally for the most recent seven rides.</p>`;
     }
+    /**
+     * Show cycling-duration trends and available Coach estimates with their units and uncertainty,
+     * not a fabricated fitness score for missing history.
+     */
     function progress(data) {
         const summary = trainingSummary(data);
         return `${card('Last seven days', `<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}
@@ -346,6 +398,10 @@ export async function launchPlatform(root) {
                 ${state.powerDuration.map(effort => `<tr><td>${time(effort.seconds)}</td><td>${number(effort.watts)}</td><td>${number(effort.wKg, 2)}</td></tr>`).join('')}</tbody></table></div>`, '', true)}</div>` :
                 card('Training metrics', '<p>Configure your Coach profile to calculate training-load and power metrics from your history. No inferred fitness score is shown without sufficient data.</p>')}`;
     }
+    /**
+     * Build the ride screen once with target/actual readings, the timed profile and save-recovery
+     * controls. updateRide fills and refreshes those placeholders.
+     */
     function player() {
         timeline = rideTimeline(db.workout, db.ftp, targetPower);
         return `<section class="ride-panel"><div class="ride-heading"><div><p class="eyebrow">Workout player</p><h2>${escape(db.workout?.meta?.name || 'Free ride')}</h2></div>
@@ -382,6 +438,10 @@ export async function launchPlatform(root) {
             <p class="muted" id="ride-recovery">${db.elapsed ? 'Ride recovered on this device. Reconnect sensors before resuming.' : 'Connect a trainer and sensors, then start. Your ride is recovered locally after an interruption.'}</p>
         </section>`;
     }
+    /**
+     * Build local profile, integration and backup controls. Provider-managed FTP/body mass are
+     * read-only while connected.
+     */
     function settings() {
         const locked = integration?.connected;
         return `<div class="dashboard-grid">${card('Rider profile', `<p>Settings, workouts, recordings, calendar and coaching are stored only on this device.</p>
@@ -396,6 +456,10 @@ export async function launchPlatform(root) {
                 <p class="muted">Restore merges workout/recording files and replaces local coaching, settings and calendar. Integration API keys are not included.</p>
                 <button class="secondary" data-action="export">Export local training history</button>`, '', true)}</div>`;
     }
+    /**
+     * Present connection setup or import progress without displaying the saved API key. Imported
+     * history is separate from the connection credentials.
+     */
     function integrationView() {
         if(!integration) return '<p role="status">Loading integration status...</p>';
         if(!integration.connected) return `<p>Import history directly from Intervals.icu into your local Activities, analytics and Coach. Your personal API key is stored in this browser and sent only to Intervals.icu. Anyone with access to this browser profile can use it.</p>
@@ -416,6 +480,10 @@ export async function launchPlatform(root) {
                 <button class="secondary" data-action="disconnect">Disconnect</button></div>
             <p class="muted">Your API key is stored in this browser, not on an Athlima server. Disconnect removes it; imported history is retained. Sync runs while this app is open and rechecks the last seven days for updates.</p>`;
     }
+    /**
+     * Refresh connection status without overlapping another status load or overwriting a focused
+     * connection form.
+     */
     async function loadIntegration() {
         if(integrationLoading) return;
         integrationLoading = true;
@@ -431,6 +499,10 @@ export async function launchPlatform(root) {
         }
         finally { integrationLoading = false; }
     }
+    /**
+     * Coordinate provider profile/history refresh and local Coach review. Clear temporary
+     * detailed-data caches after success and restore visible integration status even on failure.
+     */
     async function syncIntegration({profileSynced = false} = {}) {
         if(integration?.status === 'running') return;
         integration = {...intervals.status(), status: 'running'};
@@ -457,6 +529,10 @@ export async function launchPlatform(root) {
     }
     let libraryFilters = initialLibraryFilters();
     let libraryPage = 0;
+    /**
+     * Draw the selected platform page or expose the existing calendar/Coach/device/editor elements.
+     * Do nothing before engine startup and profile handling finish.
+     */
     function render() {
         if(!ready) return;
         const data = coachingData();
@@ -478,6 +554,10 @@ export async function launchPlatform(root) {
         updateMobileSections();
         if(route === 'player') updateRide();
     }
+    /**
+     * Read the address fragment, safely decode a workout ID, close menus and render the
+     * destination. Move focus to its heading and request only the page-specific data needed.
+     */
     function navigate() {
         setMoreMenu(false);
         const [name, id] = window.location.hash.replace(/^#\/?/, '').split('/');
@@ -490,6 +570,11 @@ export async function launchPlatform(root) {
         if(route === 'calendar') void legacy.querySelector('training-calendar').loadPlannedMonth();
         root.querySelector('#route-title').focus?.();
     }
+    /**
+     * Refresh live values and profile position without replacing controls. Distinguish prescribed
+     * targets from readings, hide absent cadence prescriptions and show unavailable values for
+     * disconnected sensors.
+     */
     function updateRide() {
         if(!ready || route !== 'player') return;
         const intervals = db.workout?.intervals || [];
@@ -564,6 +649,11 @@ export async function launchPlatform(root) {
         input.focus();
         input.setSelectionRange(position, position);
     });
+    /**
+     * Use one parent listener for replaceable page controls. Backup restoration requires a stopped
+     * ride and confirmation; workout imports are saved before they are added to the displayed
+     * library.
+     */
     root.addEventListener('change', event => {
         const libraryField = {
             'workout-category': 'category', 'workout-type': 'type',
@@ -628,6 +718,11 @@ export async function launchPlatform(root) {
             }
         });
     });
+    /**
+     * Route clicks from child icons/labels to their owning control with closest(). File deletion,
+     * downloads, device connections and ride actions each keep their own confirmation or error
+     * path.
+     */
     root.addEventListener('click', event => {
         if(event.target.closest('.skip-link')) {
             event.preventDefault();
@@ -886,6 +981,10 @@ export async function launchPlatform(root) {
         if(page === 'home' && route !== 'player') window.location.hash = '/player';
     });
     xf.sub('coaching:error', error => { coachingError = error; report(error, true); });
+    /**
+     * Discard older asynchronous state-calculation results when a newer coaching update arrives,
+     * and avoid rebuilding active ride/settings/Coach forms unnecessarily.
+     */
     xf.sub('coaching:changed', () => {
         if(!ready) return;
         const data = coachingData();
@@ -925,6 +1024,10 @@ export async function launchPlatform(root) {
     for(const key of ['elapsed', 'lapTime', 'power1s', 'powerTarget', 'cadence', 'cadenceTarget', 'heartRate', 'watchStatus',
         'workoutStatus', 'intervalIndex', 'stepIndex', 'workoutTextEvent', 'mode', 'resistanceTarget', 'slopeTarget', 'sources']) xf.sub(`db:${key}`, updateRide);
     for(const key of ['workout', 'ftp']) xf.sub(`db:${key}`, () => { if(ready && route === 'player') render(); });
+    /**
+     * Keep both platform and legacy profile controls locked while Intervals.icu owns the values. A
+     * connection-read error leaves editing locked and shows the problem.
+     */
     const updateProfileLock = () => {
         let locked = true;
         try { locked = intervals.status().connected; }
@@ -936,6 +1039,11 @@ export async function launchPlatform(root) {
         updateProfileLock();
         if(ready && route === 'settings') void loadIntegration();
     });
+    /**
+     * Attach startup listeners before importing the engine, because its module immediately starts
+     * initialization. Await app:ready, then refresh provider-owned profile values before enabling
+     * the platform.
+     */
     const started = new Promise((resolve, reject) => {
         window.addEventListener('app:ready', resolve, {once: true});
         window.addEventListener('app:error', event => reject(new Error(event.detail.data)), {once: true});

@@ -1,19 +1,9 @@
 /*
- * hrv-data.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * FIT assembly fixtures mixing four timestamped ride samples with a separate
+ * heart-rate-variability (time-between-beats) record and start/stop events.
+ * The expected record list preserves the input's literal interval values.
+ * Historical binary arrays are retained too; they are not generated from that
+ * list and predate its added HRV fields. Keep fixture values independent of code.
  */
 
 // App Data Input
@@ -107,7 +97,8 @@ const appData = {records, laps, events};
 
 
 
-// Expected FITjs
+// Build a fresh expected list without running the exporter. crc only switches fixed checksum
+// values/placeholders; it does not calculate or validate a checksum for this record list.
 function FITjs(args = {}) {
     const headerCRC = args.crc ? 40815 : 0;
     const fileCRC   = args.crc ? 14083 : undefined;
@@ -507,7 +498,7 @@ function FITjs(args = {}) {
 
 
 
-// Expected FIT binary
+// Historical non-HRV byte example, retained separately from the HRV-aware record list above.
 const fitBinary = [
     // header
     [

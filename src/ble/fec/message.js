@@ -1,24 +1,14 @@
 /*
- * message.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Wraps FE-C trainer pages in the 13-byte ANT-shaped packets carried over Bluetooth.
+ * A packet is one complete message: four introductory bytes, an eight-byte page
+ * and a checksum used to detect corruption. Outgoing packets get a checksum;
+ * incoming decoding currently reads the page without validating that checksum.
  */
 
 import { xor, dataviewToArray } from '../../functions.js';
 import messages from './messages.js';
 
+// Create the fixed channel-5 message format used by this Bluetooth FE-C connection.
 function AcknowledgedData() {
     const sync = 164;
     const length = 13;
@@ -44,6 +34,7 @@ function AcknowledgedData() {
         'check',
     ];
 
+    // Build framing, let the chosen page write its payload, then combine bytes into the final checksum.
     function encode(args = {}) {
         const dataPage = args.dataPage;
         const payload = args.payload;
@@ -64,10 +55,12 @@ function AcknowledgedData() {
         return view;
     }
 
+    // The page encoder writes into this existing view at byte i; an unknown page has no encoder call.
     function encodeDataPage(dataview, i, dataPage, payload) {
         return messages[`dataPage${dataPage}`]?.encode(dataview, i, payload);
     }
 
+    // Locate the page inside the packet and return its decoded fields plus the page number.
     function decode(dataview) {
         return order.reduce(function(acc, fieldName) {
             const field = fields[fieldName];
@@ -81,10 +74,12 @@ function AcknowledgedData() {
         }, {i:0, data: {}}).data;
     }
 
+    // Read a number at byte i, using the least-significant byte first for multi-byte types.
     function getView(type, i, dataview) {
         return dataview[`get${type}`](i, architecture);
     }
 
+    // Dispatch the page body at byte 4; unrecognized pages contribute no decoded fields.
     function decodeDataPage(dataview, dataPage) {
         return messages[`dataPage${dataPage}`]?.decode(dataview, 4, 12) ?? {};
     }
@@ -95,6 +90,7 @@ function AcknowledgedData() {
     });
 }
 
+// Unexported diagnostic helper: format a number in base 16 with a 0x prefix.
 function hex(n) {
     let h = parseInt(n).toString(16).toUpperCase();
     if(h.length === 1) {

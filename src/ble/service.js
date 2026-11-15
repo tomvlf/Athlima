@@ -1,19 +1,9 @@
 /*
- * service.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Wires a Bluetooth service to its message decoders and app callbacks. A service
+ * groups related device features; each characteristic is one readable/writable
+ * value or source of updates. GATT is Bluetooth's service/characteristic system,
+ * and a UUID is the long identifier used to find a particular feature.
+ * The spec below says which incoming values to decode and where to deliver them.
  */
 
 import { equals, exists, expect, compose2, dataviewToArray, print, } from '../functions.js';
@@ -52,6 +42,11 @@ import { Characteristic } from './characteristic.js';
 //
 // service.characteristcics?.control.write(Dataview);
 //
+/**
+ * Wrap an already-discovered browser service. setup finds characteristics, starts
+ * updates, then runs any device-specific handshake. start/stop manage those
+ * updates, and isStarted reports the local lifecycle flag.
+ */
 function Service(args = {}) {
 
     // config
@@ -118,10 +113,12 @@ function Service(args = {}) {
     // Void -> Bool
     const protocol = args.protocol ?? defaultProtocol;
 
+    // Most measurement-only services need no handshake after notifications start.
     async function defaultProtocol() {
         return true;
     }
 
+    // Keep decoded messages visible in the console when no application callback was supplied.
     function defaultCallback(msg) {
         console.log(`ble: ${getName()} on-data: `, msg);
     }
@@ -186,12 +183,13 @@ function Service(args = {}) {
     }
     // end accessors
 
+    // Discover the service's values once and index them by UUID for the configured spec.
     async function getCharacteristics() {
         _gattCharacteristics = await _service.getCharacteristics();
         _characteristics = gattListToObject(_gattCharacteristics);
     }
 
-    // start notifications on the configured characteristics
+    // Wrap each configured value and connect its decoder to its update callback.
     //
     // Void -> Bool
     async function start() {
@@ -214,7 +212,7 @@ function Service(args = {}) {
         return true;
     }
 
-    // stop notifications on the configured characteristics
+    // Stop each configured stream of updates before marking the service inactive.
     //
     // Void -> Bool
     async function stop() {
@@ -256,7 +254,7 @@ function Service(args = {}) {
 
 // think of the following as static methods
 
-// BluetoothRemoteGATTService -> String
+// Produce a readable diagnostic label for a browser service, with an unknown-name fallback.
 function serviceToString(service) {
     for(let name in uuids) {
         if(uuids[name] === service.uuid) {
@@ -267,7 +265,7 @@ function serviceToString(service) {
     return `uuid: ${service.uuid} primary-service: unknown`;
 }
 
-// [BluetoothRemoteGATTService] -> {'<service-uuid>': BluetoothRemoteGATTService}
+// Index discovered services or characteristics by UUID; a later duplicate replaces an earlier one.
 function gattListToObject(xs) {
     return xs.reduce((acc, x) => {
         acc[x.uuid] = x;

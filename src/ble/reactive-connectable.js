@@ -1,19 +1,8 @@
 /*
- * reactive-connectable.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Bridges Bluetooth connections and Athlima's app events. Connection callbacks
+ * update device panels, decoded measurements feed the selected data sources,
+ * and training-target changes become trainer commands. Most connection details
+ * stay in Connectable; this file decides how they affect the running app.
  */
 
 import { equals, exists, isArray, xf, print, } from '../functions.js';
@@ -22,6 +11,11 @@ import Connectable from './connectable.js';
 import { webBle } from './web-ble.js';
 import { Device, Status, ControlMode, } from './enums.js';
 
+/**
+ * Create one device-category connection and immediately subscribe to its UI events.
+ * start/stop manage subscriptions, not the physical Bluetooth link. Identity and
+ * connection methods are forwarded from the underlying Connectable.
+ */
 function ReactiveConnectable(args = {}) {
     // config
     const deviceType = args.deviceType ?? Device.generic;
@@ -49,6 +43,7 @@ function ReactiveConnectable(args = {}) {
         return identifier;
     }
 
+    // Connection callbacks publish category-specific status and device-name updates.
     function onConnecting() {
         xf.dispatch(`${getIdentifier()}:connecting`);
     }
@@ -58,6 +53,7 @@ function ReactiveConnectable(args = {}) {
         xf.dispatch(`${getIdentifier()}:name`, connectable.getName());
     }
 
+    // Clear readings only where this connection is the selected source, not another live sensor.
     function onDisconnect() {
         xf.dispatch(`${getIdentifier()}:disconnected`);
         xf.dispatch(`${getIdentifier()}:name`, '--');
@@ -90,6 +86,8 @@ function ReactiveConnectable(args = {}) {
         xf.dispatch(`${getIdentifier()}:disconnected`);
     }
 
+    // Route decoded fields; selected speed arrives in km/h and becomes metres/second for the app.
+    // Button arrays and device-specific temperature/oxygen readings have their own event names.
     function onData(data) {
         if('power' in data && models.sources.isSource('power', identifier)) {
             xf.dispatch(`power`, data.power);
@@ -137,6 +135,7 @@ function ReactiveConnectable(args = {}) {
         }
     }
 
+    // A UI switch disconnects the current device or asks the browser to choose a new one.
     async function onSwitch() {
         if(connectable.isConnected()) {
             connectable.disconnect();
@@ -149,16 +148,19 @@ function ReactiveConnectable(args = {}) {
         mode = x;
     }
 
+    // Reserved subscription: weight updates currently do not send a Bluetooth command.
     function onUserWeight(x) {
         if(!connectable.isConnected()) return;
     }
 
+    // Send watts only in ERG mode, where the trainer holds a requested power.
     function onPowerTarget(powerTarget) {
         if(!connectable.isConnected() ||
            !equals(mode, ControlMode.erg)) return;
         connectable.services.trainer.setPowerTarget({power: powerTarget});
     }
 
+    // Send a resistance target only when resistance mode, rather than power/slope mode, is active.
     function onResistanceTarget(resistanceTarget) {
         if(!connectable.isConnected() ||
            !equals(mode, ControlMode.resistance)) return;
@@ -167,12 +169,14 @@ function ReactiveConnectable(args = {}) {
         });
     }
 
+    // Send percent road grade only in simulated-road mode.
     function onSlopeTarget(slopeTarget) {
         if(!connectable.isConnected() ||
            !equals(mode, ControlMode.sim)) return;
         connectable.services.trainer.setSimulation({grade: slopeTarget});
     }
 
+    // Request a reset only from connected trainer services that implement it.
     function onTrainerReset() {
         if(!connectable.isConnected() ||
            !exists(connectable.services?.trainer?.reset)) return;

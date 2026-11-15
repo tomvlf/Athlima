@@ -1,19 +1,10 @@
 /*
- * workout-graph.test.js: test coverage module.
+ * Checks that the older workout graph tolerates updates while hidden, then shows
+ * correct interval progress once revealed. The two one-minute steps make the
+ * expected halfway point easy to calculate.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * jsdom supplies page elements but does not calculate layout. Tests provide
+ * explicit rectangle sizes only when the graph should count as visible.
  */
 
 /** @jest-environment jsdom */
@@ -38,6 +29,7 @@ test('graph renders and updates progress after being revealed by the new player'
     const graph = new WorkoutGraph();
     document.body.append(graph);
     graph.onWorkout(workout);
+    // Simulate revealing a 600-pixel-wide graph; each equal interval takes half its width.
     graph.getBoundingClientRect = () => ({left: 0, width: 600, height: 150});
     graph.onFTP(250);
     graph.onWindowResize();

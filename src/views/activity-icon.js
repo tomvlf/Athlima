@@ -1,7 +1,10 @@
 /*
  * activity-icon.js: small inline SVG icons for activity sport categories.
  *
+ * SVG describes a picture with lines and shapes rather than a photograph.
  * Icons use currentColor so they follow the surrounding Athlima theme colour.
+ * The returned HTML includes a label for assistive tools; special characters
+ * in that label are escaped so they cannot become unwanted page instructions.
  */
 
 import { activityTypeLabel, sportForType } from '../coaching/activity-types.js';

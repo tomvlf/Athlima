@@ -1,19 +1,8 @@
 /*
- * heart-rate-measurement.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads a Bluetooth heart-rate message. Flags in its first byte say whether
+ * heart rate needs one or two bytes and whether energy/beat intervals follow.
+ * Results use beats/minute, energy in kilojoules and R–R intervals (time between
+ * successive heartbeats) in seconds. Missing optional values remain undefined.
  */
 
 //
@@ -21,9 +10,11 @@
 // Heart Rate Measurement characteristic
 //
 
+// A stateless decoder; dividing interval ticks by 1024 converts the sensor's timing units to seconds.
 function HeartRateMeasurement(args = {}) {
     const rrIntervalResolution = 1024;
 
+    // Follow the flags to keep optional-field positions aligned, then collect all complete two-byte intervals.
     function decode(dataview) {
         const flags = dataview.getUint8(0, true);
         const heartRateValueFormat    = ((flags >> 0) & 1) === 1;
@@ -52,6 +43,7 @@ function HeartRateMeasurement(args = {}) {
 
         if(rrIntervalPresent) {
             rrInterval = [];
+            // A lone trailing byte is not a complete interval and is left unread.
             while(i <= dataview.byteLength - 2) {
                 rrInterval.push(
                     dataview.getUint16(i, true) / rrIntervalResolution

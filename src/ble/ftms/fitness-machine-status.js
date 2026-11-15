@@ -1,19 +1,8 @@
 /*
- * fitness-machine-status.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Interprets trainer status notices, such as a changed target or lost control
+ * permission. An operation code names the event; some events also carry a new
+ * value. Supported value layouts reuse the command decoders, because their
+ * setting bytes appear in the same positions after the first byte.
  */
 
 //
@@ -29,6 +18,7 @@ import { control } from './control-point.js';
 
 const logs = true;
 
+// Keep status diagnostics behind one logging switch.
 function log(msg) {
     if(logs) {
         console.log(msg);
@@ -77,6 +67,7 @@ const spinDownStatusValue = {
     '0x04': 'Stop Pedaling'
 };
 
+// Create a status reader; encode is currently empty and unknown operation codes remain "Unknown".
 function FitnessMachineStatus() {
 
     const unknownOperation = {
@@ -87,6 +78,7 @@ function FitnessMachineStatus() {
 
     function encode() {}
 
+    // Read an event's associated value only when its format has a decoder; otherwise return an empty string.
     function decodeParam(operation, dataview) {
         if(exists(operation.decoder)) {
             return operation.decoder(dataview);
@@ -94,6 +86,7 @@ function FitnessMachineStatus() {
         return '';
     }
 
+    // Resolve the event name and optional setting, log them, and return {operation, value}.
     function decode(dataview) {
         const opCode = dataview.getUint8(0, dataview, true);
 
@@ -113,6 +106,7 @@ function FitnessMachineStatus() {
         };
     }
 
+    // Unexposed diagnostic formatter; display :na when a notice carries no value.
     function toString(decoded) {
         const str = `:operation '${decoded.operation}' :value ${existance(decoded.value, ':na')}`;
 

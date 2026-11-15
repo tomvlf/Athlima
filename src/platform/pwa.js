@@ -1,21 +1,14 @@
-/*
- * pwa.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Enables supported offline loading after app startup. A service worker is a browser-managed helper
+ * that can cache website files; PWA means Progressive Web App. This is separate from training-data
+ * backups and does not synchronize to another device.
  */
 
+/**
+ * Register the worker outside hot-reload development, wait until it is ready and send it the loaded
+ * resource URLs for filtering/caching. Report registration failures to the page without turning
+ * them into a successful offline claim.
+ */
 export async function registerPwa() {
     if(!('serviceWorker' in navigator) || (typeof module !== 'undefined' && module.hot)) return;
     try {

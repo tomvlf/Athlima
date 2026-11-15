@@ -1,3 +1,9 @@
+/*
+ * Foundation styles for the original custom screen components. The index below
+ * groups layout, controls and theme rules; some historical labels remain even
+ * though account screens are no longer used. platform.css and cyberpunk.css load
+ * afterward to adapt these components to the current interface.
+ */
 /* Reset */
 /* Defaults */
 /* Atomics */

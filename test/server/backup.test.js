@@ -1,21 +1,8 @@
 /**
- * @jest-environment node
- *
- * backup.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * provides the server-side API and integration logic that authenticates users and syncs external training data.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Local browser-backup tests kept in the historical server folder; there is no Athlima server here.
+ * A simulated database and settings store exercise exact FIT-byte round trips, calendar references,
+ * Coach restoration, credential exclusion and failures before/within writes. The database-file
+ * transaction check does not claim the whole multi-store restore is atomic.
  */
 
 import { indexedDB } from 'fake-indexeddb';
@@ -28,6 +15,10 @@ import { profile, goal } from '../coaching/fixtures.js';
 const workout = {id: 'custom-workout', meta: {name: 'My workout'}, intervals: []};
 const calendar = [{id: 'entry', date: '2026-01-01', workoutId: workout.id, name: 'My workout'}];
 let database;
+/**
+ * Run fixture setup or inspection in a database transaction and wait for completion, not merely for
+ * one individual request to succeed.
+ */
 const transaction = (callback, mode = 'readwrite') => new Promise((resolve, reject) => {
     const tx = database.transaction(['workouts', 'activity'], mode);
     callback(tx);

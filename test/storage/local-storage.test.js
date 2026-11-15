@@ -1,19 +1,7 @@
-/*
- * local-storage.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Checks the small-settings wrapper: save, parse, restore, remove and use an explicit fallback for
+ * missing/invalid values. The current suite uses the simulated browser's storage; the older
+ * LocalStorageMock below is retained but its assignment is disabled.
  */
 
 /**
@@ -22,6 +10,11 @@
 
 import { LocalStorageItem } from '../../src/storage/local-storage.js';
 
+/**
+ * Minimal historical storage stand-in backed by an object. Its familiar
+ * clear/getItem/setItem/removeItem methods mirror the interface, not every browser-storage edge
+ * case.
+ */
 class LocalStorageMock {
     constructor() {
         this.store = {};

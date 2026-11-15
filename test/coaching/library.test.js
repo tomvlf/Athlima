@@ -1,3 +1,9 @@
+/**
+ * Checks that the Coach can select and resize eligible library recipes without losing
+ * effort/recovery structure, prescribed cadence or exact total duration. It also checks rejection
+ * and fallback paths, easy-session intensity limits and optional technique spacing. Passing these
+ * software checks does not establish a workout's suitability for a particular person.
+ */
 import { addDays, sum } from '../../src/coaching/domain.js';
 import { workouts } from '../../src/workouts/workouts.js';
 import { generatePlan, validatePlan } from '../../src/coaching/planner.js';
@@ -6,6 +12,10 @@ import { coachCatalogue, fitWorkout, prescribeWorkout, zwoSteps } from '../../sr
 import { FAMILIES, stepLoad, toAppWorkout, exportZwo } from '../../src/coaching/workouts.js';
 import { profile, goal, start, timestamp, state } from './fixtures.js';
 
+/**
+ * Describe a fixed-date opening in the sample plan that needs a workout of the requested family,
+ * minutes and progression level.
+ */
 const slot = (family, minutes, level = 1) => ({id: 'w', date: start, minutes, family, level,
     phaseId: 'p', weekId: 'wk', phaseType: 'build', profile});
 

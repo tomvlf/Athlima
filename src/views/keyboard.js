@@ -1,24 +1,16 @@
 /*
- * keyboard.js: front-end client module.
+ * Adds ride-control keyboard shortcuts as soon as this file is imported.
+ * Keyboard translates key presses into app messages; KeyboardControls turns
+ * those messages into actions using the current trainer mode and timer state.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Arrows adjust the target; E/R/S select power, resistance, or simulated slope;
+ * Space starts/pauses and L marks a lap. Typing into form fields is left alone.
  */
 
 import { xf, exists } from '../functions.js';
 import { ControlMode, } from '../ble/enums.js';
 
+// Install one window-level listener; the small isKey helpers recognize physical keys.
 function Keyboard() {
 
     const isKeyUp    = (code) => code === 'ArrowUp';
@@ -31,6 +23,7 @@ function Keyboard() {
 
     window.addEventListener('keydown', onKeydown.bind(this));
 
+    // Ignore text composition and modified keys; prevent scrolling for handled arrows/Space.
     function onKeydown(e) {
         let keyCode = e.keyCode;
         let code = e.code;
@@ -72,6 +65,7 @@ function Keyboard() {
 }
 
 
+// Route shortcuts to the same requests as the on-screen controls, without storing data here.
 function KeyboardControls() {
     let mode = ControlMode.erg;
     xf.sub('db:mode', x => mode = x);

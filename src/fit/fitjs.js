@@ -1,19 +1,8 @@
 /*
- * fitjs.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Converts between FIT file bytes and an ordered list of JavaScript record objects.
+ * A definition record describes the fields in later data records, so decoding
+ * must remember the latest definition for each local message number. File/header
+ * checksums are represented as records; reading them is not full-file validation.
  */
 
 //
@@ -29,6 +18,11 @@ import { recordHeader } from './record-header.js';
 import { definitionRecord } from './definition-record.js';
 import { dataRecord } from './data-record.js';
 
+/**
+ * Dispatch one record to its specialized encoder/decoder. The is... helpers
+ * classify JavaScript record types. Encoding remembers definitions by message
+ * name; decoding updates the caller's map by local number, which files may reuse.
+ */
 function FitRecord() {
     function isHeader(record) {
         return equals(RecordType.header, record.type);
@@ -45,7 +39,7 @@ function FitRecord() {
 
     const definitions = {};
 
-    // RecordJS, Value{}, DataView, Int -> DataView
+    // Write one record at byte i. Definitions must precede their data; the final CRC is calculated last.
     function encode(recordJS, view, i = 0) {
         if(isHeader(recordJS)) {
             return fileHeader.encode(recordJS, view, i);
@@ -67,7 +61,8 @@ function FitRecord() {
         return view;
     }
 
-    // DataView, Int, Map, Bool -> FitRecord
+    // Read one record and its byte length, updating definitions when necessary.
+    // The unfinished-file flag is currently only a placeholder, not recovery logic.
     function decode(view, i = 0, definitions = new Map(), unfinished = false) {
         const header = recordHeader.decode(view.getUint8(i, true));
 
@@ -115,10 +110,11 @@ function FitRecord() {
     });
 }
 
+// Process an ordered file-sized record list using the shared single-record dispatcher.
 function FITjsParser() {
     // const fitRecord = FitRecord();
 
-    // [FITjs] -> Dataview
+    // Allocate from the header's declared sizes and write records in order, skipping ones that exceed it.
     function encode(fitJS) {
         const header = first(fitJS);
         const dataSize = header.dataSize;
@@ -142,7 +138,8 @@ function FITjsParser() {
         return view;
     }
 
-    // Dataview -> [FITjs]
+    // Advance by each record's declared length. A thrown read error stops decoding
+    // and returns the records already read; it does not reject the whole import.
     function decode(dataview) {
         // Note:
         // - RGT uses the same local_number 0 for all definitions

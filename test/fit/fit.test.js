@@ -1,19 +1,8 @@
 /*
- * fit.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * End-to-end in-memory FIT activity export checks: current field layouts,
+ * samples/statistics, complete file sizes and checksums. A CRC is the saved
+ * number used to detect damaged bytes. Re-decoding/re-encoding must preserve the
+ * exported file, and an older fixture must still be readable.
  */
 
 import { dataviewToArray } from '../../src/functions.js';
@@ -66,6 +55,7 @@ describe('Local activity export', () => {
     });
 });
 
+// This saved byte sequence intentionally predates today's export layout; it is not regenerated.
 describe('Legacy activity fixture', () => {
     test('decodes files generated before file-creator and HRV definitions were added', () => {
         const view = new DataView(Uint8Array.from(flatFitBinary).buffer);

@@ -1,24 +1,20 @@
 /*
- * connection-switch.js: front-end client module.
+ * Connect buttons and status lights for trainers/sensors, plus an ANT+ chooser.
+ * A tap sends an app message; connection/search results update the visible controls.
+ * The wireless communication itself happens in the device modules.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * The browser calls constructors to prepare state, connectedCallback on page entry,
+ * and disconnectedCallback on removal. An AbortController lets each control cancel
+ * all its registered listeners together when it leaves the page.
  */
 
 import { xf, equals, exists, existance, } from '../functions.js';
 import { models } from '../models/models.js';
 
+/**
+ * A reusable connect/disconnect control; its for attribute names the device topic.
+ * on/off/loading change indicator classes (styling labels), not the connection itself.
+ */
 class ConnectionSwitch extends HTMLElement {
     constructor() {
         super();
@@ -92,6 +88,7 @@ class ConnectionSwitch extends HTMLElement {
 
 customElements.define('connection-switch', ConnectionSwitch);
 
+// Ask for confirmation before switching off an active or starting ANT+ driver.
 class ProtocolSwitch extends ConnectionSwitch {
     constructor() {
         super();
@@ -122,6 +119,7 @@ class ProtocolSwitch extends ConnectionSwitch {
 
 customElements.define('protocol-switch', ProtocolSwitch);
 
+// Choose which device supplies a measurement, such as power from a trainer or meter.
 class SourceSwitch extends HTMLElement {
     constructor() {
         super();
@@ -148,6 +146,7 @@ class SourceSwitch extends HTMLElement {
     onUpdate(sources) {
         this.render();
     }
+    // Send just this measurement's source change, leaving other source choices alone.
     onEffect(e) {
         const update = {};
 
@@ -155,6 +154,8 @@ class SourceSwitch extends HTMLElement {
 
         xf.dispatch(`${this.effect}`, update);
     }
+    // Despite these method names, disable marks the chosen source active and enables
+    // its readout; enable dims an unselected source and disables its readout updates.
     disable() {
         this.classList.add('active');
         this.$dataView.removeAttribute('disabled');
@@ -182,6 +183,7 @@ class SourceSwitch extends HTMLElement {
 
 customElements.define('source-switch', SourceSwitch);
 
+// Keeps discovered ANT+ device identifiers and lets the rider choose one for pairing.
 class ANTDeviceRequest extends HTMLElement {
     constructor() {
         super();
@@ -235,6 +237,7 @@ class ANTDeviceRequest extends HTMLElement {
     onLost(device) {
         this.remove(device);
     }
+    // Resolve a tap on any child to its device row, then remember the full device ID.
     onSelectAction(e) {
         const el = e.target.closest('.device-request--item');
         const els = this.$list.querySelectorAll('.device-request--item');
@@ -267,6 +270,7 @@ class ANTDeviceRequest extends HTMLElement {
         if(!channelId) return;
         this.selected = channelId;
     }
+    // Require a selection, close/reset the chooser, then hand the saved ID to pairing.
     pair() {
         if(!this.selected) {
             xf.dispatch('ui:modal:error:open', 'Select an ANT+ device before pairing.');
@@ -278,6 +282,7 @@ class ANTDeviceRequest extends HTMLElement {
         xf.dispatch('ant:search:stopped');
         xf.dispatch('ant:search:pair', selected);
     }
+    // Display the search result's device number and type in a selectable row.
     deviceItemTemplate(args = { deviceNumber: '--', deviceType: '--'}) {
         return `<div class="device-request--item" id="${args.deviceNumber}">
         <div class="device-request--item--protocol">ANT+</div>
@@ -285,6 +290,7 @@ class ANTDeviceRequest extends HTMLElement {
         <div class="device-request--item--type">${args.deviceType}</div>
      </div>`;
     }
+    // Search may report a device repeatedly; keep only one row per device number.
     add(channelId) {
         if(this.devices.has(channelId.deviceNumber)) return;
 

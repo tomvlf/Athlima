@@ -1,26 +1,16 @@
 /*
- * q.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Matches ANT+ commands to their later replies. A promise is a result the caller
+ * can wait for: it succeeds on an accepted reply or fails on rejection/timeout.
+ * Commands with the same message ID are matched in the order they were added.
  */
 
 import { events, ids } from './constants.js';
 
+// Create one device's waiting list; timeout is in milliseconds (2000 means two seconds).
 function Q({timeout = 2000} = {}) {
     const pending = new Map();
 
+    // Register a packet before sending it, and return the promise for its reply.
     function push(dataview) {
         const id = dataview.getUint8(2, true);
         return new Promise((resolve, reject) => {
@@ -35,6 +25,7 @@ function Q({timeout = 2000} = {}) {
         });
     }
 
+    // Match decoded responses, treating channel-close and transfer events as command replies.
     function pull(decoded) {
         let id = decoded.initMsgId;
         if(decoded.eventCode !== undefined) {
@@ -65,6 +56,7 @@ function Q({timeout = 2000} = {}) {
         }
     }
 
+    // Remove this particular wait, not another command that happens to have the same ID.
     function remove(id, entry) {
         const queue = pending.get(id);
         if(!queue) return;
@@ -73,6 +65,7 @@ function Q({timeout = 2000} = {}) {
         if(queue.length === 0) pending.delete(id);
     }
 
+    // Cancel the timeout and settle the caller's wait exactly when the entry is removed.
     function finish(id, entry, error, value) {
         clearTimeout(entry.timer);
         remove(id, entry);
@@ -80,6 +73,7 @@ function Q({timeout = 2000} = {}) {
         else entry.resolve(value);
     }
 
+    // Fail outstanding waits when the adapter stops being usable.
     function rejectAll(error = new Error('ANT+ driver closed.')) {
         for(const [id, queue] of pending) {
             for(const entry of queue) finish(id, entry, error);

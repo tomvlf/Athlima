@@ -1,23 +1,18 @@
 /*
- * common.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Shared helpers for ANT+ data pages: small messages containing eight bytes
+ * (eight numbered storage units, each holding a value from 0 to 255).
+ * Field rules translate measurements into whole numbers for transmission and
+ * back again. Pages 70 and 71 request information and report command status.
+ * A DataView lets the code read or write numbers at specific byte positions.
  */
 
 import { equals, existance, curry2, clamp } from '../functions.js';
 
+/**
+ * Build field converters from rules for units, step size, limits and missing data.
+ * Resolution helpers divide by the step size when encoding and multiply when
+ * decoding; offset helpers also shift ranges that include negative values.
+ */
 function DataPage(args = {}) {
     const defaults = {
         length: 8,
@@ -43,6 +38,7 @@ function DataPage(args = {}) {
         return (removeResolution(prop, value)) - (definitions[prop].offset);
     });
 
+    // Use the field default, preserve its "not available" marker, then limit and round down.
     function encodeField(prop, input, transform = applyResolution) {
         const invalid = definitions[prop].invalid;
         const min     = transform(prop, definitions[prop].min);
@@ -56,6 +52,7 @@ function DataPage(args = {}) {
         }
     }
 
+    // Return a measurement in its declared unit, or undefined for "not available".
     function decodeField(prop, input, transform = removeResolution) {
         if(equals(input, definitions[prop].invalid)) return undefined;
         return transform(prop, input);
@@ -72,6 +69,10 @@ function DataPage(args = {}) {
     };
 }
 
+/**
+ * Request another page from a sensor. encode creates eight bytes; decode returns
+ * the requested page number, repeat count/flags and addressing fields unchanged.
+ */
 function CommonPage70(args = {}) {
     // Common Page 70 (0x46) – Request Data Page
     const number = 70;
@@ -130,6 +131,10 @@ function CommonPage70(args = {}) {
     });
 }
 
+/**
+ * Describe the last command's outcome, sequence number and four-byte result data.
+ * encode builds a status page; decode reads those values without interpreting them.
+ */
 function CommonPage71(args = {}) {
     // Common Page 71 (0x47) – Command Status
     const number = 71;

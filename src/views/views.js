@@ -1,19 +1,13 @@
 /*
- * views.js: front-end client module.
+ * Loads the screen components and keyboard shortcuts used by the app.
+ * Importing these files registers custom HTML tags, such as <watch-control>,
+ * so the browser knows which JavaScript class should manage each screen part.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Shared pattern: constructor prepares a component; connectedCallback runs when
+ * it joins the page; disconnectedCallback is its cleanup hook. Watched HTML
+ * attributes trigger attributeChangedCallback. A render method updates what is
+ * visible. Through xf, db: messages report data and ui: messages request actions;
+ * a button usually sends a request rather than saving or controlling hardware itself.
  */
 
 import './connection-switch.js';

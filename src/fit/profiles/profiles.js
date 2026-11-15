@@ -1,25 +1,14 @@
 /*
- * profiles.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Lookup layer over the static FIT profile dictionaries. The profile describes
+ * what numbered messages/fields mean and how their values are stored. Decoders
+ * use it to turn numbers into readable names; encoders use it to select field
+ * numbers, storage types and sizes. Unknown decoded names get stable placeholders.
  */
 
 //
 // Profiles
 //
-// merge, shape, and export, data from the global and product profile json files
+// Expose the global dictionaries; the app's export subset is selected separately.
 //
 
 import { exists, equals } from '../../functions.js';
@@ -29,19 +18,25 @@ import global_message_definitions from './global-message-definitions.js';
 import global_type_definitions from './global-type-definitions.js';
 import global_field_definitions from './global-field-definitions.js';
 
+/**
+ * Bundle profile lookups. Size/type/name accessors are dictionary reads only;
+ * size results are bytes. Direct name lookups expect known entries, whereas
+ * number-to-name lookups supply message_N / field_N fallbacks.
+ */
 function Profiles(args = {}) {
 
-    // merge product types, messages, and fields with the global ones
+    // Keep the supplied static dictionaries intact rather than modifying them for a file.
     const types = global_type_definitions;
     const messages = global_message_definitions;
     const fields = global_field_definitions;
 
     // methods
+    // Resolve a global FIT message number while retaining unknown numbers in a readable name.
     function numberToMessageName(number) {
         return types['mesg_num'].values[(number).toString()] ?? `message_${number}`;
     }
 
-    // String -> Field{}
+    // Add the requested name to its field metadata, or return just the name if it is unknown.
     function Field(name) {
         return {name, ...(fields[name] ?? {})};
     }
@@ -56,6 +51,7 @@ function Profiles(args = {}) {
     //     bits: Int,
     //     accumulate: String
     // }
+    // Field numbers are message-specific, so find the name within this message before reading its metadata.
     function numberToField(messageName, fieldNumber) {
         const message = messages[messageName];
         if(!exists(message)) {
@@ -68,6 +64,7 @@ function Profiles(args = {}) {
         return Field(`field_${fieldNumber}`);
     }
 
+    // Use FIT's invalid-number marker when an encoding request names an unknown message.
     function messageNameToNumber(name) {
         return types.mesg_num.values[name] ?? 0xFFFF;
     }
@@ -113,6 +110,7 @@ function Profiles(args = {}) {
 }
 
 
+// Unused indexing helper: store each source item under two keys, both pointing to the same object.
 function toDualKeyMap(source, first_key, second_key) {
     return source.reduce(function (acc, sourceItem) {
         acc.set(sourceItem[first_key], sourceItem);

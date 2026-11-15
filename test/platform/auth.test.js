@@ -1,6 +1,15 @@
+/**
+ * Guards the removal of Athlima login/server mode: normal, mobile and old account links must open
+ * locally, preserve settings and show local startup errors. Platform/PWA functions are mocked, and
+ * any attempted backend fetch is made to fail.
+ */
 jest.mock('../../src/platform/ui.js', () => ({launchPlatform: jest.fn().mockResolvedValue()}));
 jest.mock('../../src/platform/pwa.js', () => ({registerPwa: jest.fn()}));
 
+/**
+ * Allow the startup module's queued promise callbacks to finish before inspecting the page; this is
+ * a bounded test wait, not a production delay.
+ */
 const settle = async () => { for(let i = 0; i < 30; i++) await Promise.resolve(); };
 
 beforeEach(() => {

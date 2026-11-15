@@ -1,25 +1,17 @@
 /*
- * ant-device-scan.js: front-end client module.
+ * Shows the popup for choosing an ANT+ wireless trainer or sensor.
+ * Device-search messages supply discovered devices; tapping a row sends its
+ * device number to the app. This view does not scan or pair hardware itself.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * The browser calls connectedCallback when the popup joins the page, and
+ * disconnectedCallback when it leaves. The constructor finds its existing controls.
  */
 
 import { xf, empty, last } from '../functions.js';
 import { models } from '../models/models.js';
 import { utils } from '../ant/message.js';
 
+// Owns the popup's selection highlight, discovered-device rows, and visibility.
 class Request extends HTMLElement {
     constructor() {
         super();
@@ -74,11 +66,13 @@ class Request extends HTMLElement {
         this.clear();
         this.hide();
     }
+    // Search results arrive as a growing list; append only the newest discovery.
     onDeviceFound(searchList) {
         if(!empty(searchList)) {
             this.add(last(searchList));
         }
     }
+    // A tap on any child of a device row selects that row and announces its ID.
     onSelect(e) {
         const el = e.target.closest('.device-chooser-item');
         const els = this.list.querySelectorAll('.device-chooser-item');
@@ -109,6 +103,7 @@ class Request extends HTMLElement {
 }
 
 
+// Turn a discovered device number and type code into one readable chooser row.
 function item(args) {
     let deviceType = utils.deviceTypeToString(args.deviceType);
 

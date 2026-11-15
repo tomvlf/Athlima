@@ -1,3 +1,8 @@
+/*
+ * Visual theme layered over platform.css: shared colours, angular panels and a
+ * bundled city photograph. This file changes appearance, not training-zone values
+ * or device behavior; player-specific rules keep the ride screen less decorative.
+ */
 :root {
     --platform-bg: #080b10;
     --platform-panel: #121b24;

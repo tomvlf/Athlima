@@ -1,19 +1,8 @@
 /*
- * virtual-gear-shifting.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Describes Open Bike Control shift paddles and direct gear selections.
+ * Each input pair is a numeric button ID plus a state byte (0–255). Outputs
+ * distinguish button presses from selected gear numbers; no mechanical or
+ * virtual gear is changed by this decoder itself.
  */
 
 //
@@ -46,9 +35,10 @@ const gearActions = {
     0x05: 'cassetteSet',
 };
 
+// Stateless decoder for shift-up/down, full gear, chainring and cassette selections.
 function VirtualGearShifting() {
 
-    // {id, state} -> Message?
+    // Interpret digital presses separately from direct gear picks, whose stored value is gear + 1.
     function decodePair(pair) {
         const id = pair.id;
         const state = pair.state;
@@ -77,7 +67,7 @@ function VirtualGearShifting() {
         return;
     }
 
-    // [{id, state}] -> [Message]
+    // Decode a list in order, dropping unknown IDs and unsupported digital states.
     function decode(pairs = []) {
         const messages = [];
 

@@ -1,19 +1,8 @@
 /*
- * graph.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Number-to-picture helpers for graphs: reduce a line's point count, choose a
+ * slope colour, and turn a road gradient into distances or angles.
+ * These functions return calculations; they do not draw on the page.
+ * The attributed Simplify.js section below is third-party code kept intact.
  */
 
 /*
@@ -128,7 +117,7 @@ function simplify(points, tolerance, highestQuality) {
 }
 
 
-//
+// Match percentage gradient to a colour band: downhill blue through uphill red.
 function slopeToColor(slope) {
     // avg hex
     const colors = new Map([
@@ -166,11 +155,14 @@ function slopeToColor(slope) {
     // end base hue
 }
 
+// Road gradient is a percentage (rise/run), not an angle measured in degrees.
 function gradeToDeg(grade) {
     // 10 % = 5.71 deg, 5% = 2.86
     return 180/Math.PI * Math.atan(grade/100);
 }
 
+// Split distance travelled along a slope into vertical rise and horizontal run.
+// The returned distances use the same unit as the supplied distance.
 function slopeToRise(slope, distance) {
     return distance * Math.sin(Math.atan(slope/100));
 }
@@ -179,6 +171,7 @@ function slopeToRun(slope, distance) {
     return distance * Math.cos(Math.atan(slope/100));
 }
 
+// Split a line of length r at angle deg into horizontal and vertical components.
 function adjacent(deg, r) {
     return r * Math.cos(Math.PI/180 * deg);
 }

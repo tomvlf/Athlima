@@ -1,4 +1,10 @@
 /** @jest-environment node */
+/**
+ * Runs the real header generator on tiny HTML examples in a disposable directory. Checks that the
+ * content security policy (CSP), a browser allowlist for page resources, authorizes exact
+ * inline-script/import-map hashes without allowing arbitrary inline or evaluated scripts. No
+ * running web server is reconfigured.
+ */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,6 +15,10 @@ let directory;
 beforeEach(() => { directory = mkdtempSync(join(tmpdir(), 'athlima-headers-')); });
 afterEach(() => { rmSync(directory, {recursive: true, force: true}); });
 
+/**
+ * Write a sample HTML file, invoke the build script in a child Node process and read its generated
+ * configuration for assertions.
+ */
 function headers(html) {
     const source = join(directory, 'index.html');
     const destination = join(directory, 'headers.conf');

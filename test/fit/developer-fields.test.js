@@ -1,19 +1,8 @@
 /*
- * developer-fields.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks a FIT definition with four ordinary fields and one developer field,
+ * an extra value defined by a device/app rather than the standard profile.
+ * Explicit bytes and a named layout verify the developer flag, extra count,
+ * descriptor and resulting record lengths in both directions.
  */
 
 import { dataviewToArray } from '../../src/functions.js';
@@ -21,6 +10,7 @@ import { definitionRecord } from '../../src/fit/definition-record.js';
 import { fit } from '../../src/fit/fit.js';
 
 describe('Developer Fields', () => {
+    // A layout description, not a sensor sample: each three-byte group describes a later value.
     const dev_definition_record = [
         0b01100000, // header
         0,          // reserved

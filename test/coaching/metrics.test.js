@@ -1,19 +1,8 @@
-/*
- * metrics.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Checks how activity evidence becomes training-load and readiness estimates. Scenarios distinguish
+ * missing sensors from real zero readings, keep different load scales separate, use local calendar
+ * days and retain calculation provenance. Synthetic power/feedback examples verify equations and
+ * decisions, not medical outcomes.
  */
 
 import { normalizeActivity, fromRecordedRide } from '../../src/coaching/normalizer.js';
@@ -22,6 +11,10 @@ import { estimateCriticalPower, estimateState, powerDuration, estimateDurability
 import { DEFAULTS, addDays, metric, localDay, validateProfile } from '../../src/coaching/domain.js';
 import { profile, start, history } from './fixtures.js';
 
+/**
+ * Start with one fixed-date, one-hour activity, then override only the measurements relevant to the
+ * current scenario.
+ */
 const ride = overrides => normalizeActivity({id: 'ride', start: `${start}T09:00:00Z`, duration: 3600, ...overrides}, profile);
 
 describe('activity normalization', () => {

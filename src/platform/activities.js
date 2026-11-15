@@ -1,3 +1,9 @@
+/**
+ * Prepares the Activities page from Coach history and locally cached FIT recordings. Merge by
+ * stable ID to avoid showing one ride twice. Totals include dated activities across sports; missing
+ * measurements remain visibly incomplete. Detailed charts/routes are rendered from data fetched
+ * elsewhere and do not themselves contact a service.
+ */
 import { addDays, localDay, weekday } from '../coaching/domain.js';
 import { renderPowerProfile } from '../views/power-profile.js';
 import { activityIcon, activityTypeLabel } from '../views/activity-icon.js';
@@ -11,6 +17,11 @@ const loadLabels = {
     duration: 'Training minutes',
 };
 
+/**
+ * Match local summaries to history, filling only missing display fields. Separate unmatched
+ * recordings into pending Coach hand-offs and cached device-only rides; keep unavailable history
+ * distinct from an empty history.
+ */
 export function activityLists(data, localActivities, authenticated) {
     const historyAvailable = Array.isArray(data?.activities);
     const localById = new Map(localActivities.map(activity => [String(activity.id), activity]));
@@ -34,6 +45,10 @@ export function activityLists(data, localActivities, authenticated) {
     };
 }
 
+/**
+ * Use a valid saved local calendar day, otherwise derive it from the activity timestamp in the
+ * requested time zone. Return null for undated/unreadable records.
+ */
 function activityDay(activity, timeZone) {
     if(typeof activity.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(activity.day)) {
         const parsed = Date.parse(`${activity.day}T00:00:00Z`);
@@ -45,6 +60,10 @@ function activityDay(activity, timeZone) {
     return Number.isFinite(instant.getTime()) ? localDay(instant, timeZone) : null;
 }
 
+/**
+ * Add known nonnegative measurements and mark whether every record supplied a value. No records is
+ * a complete zero; records with no usable measurements are unknown.
+ */
 function total(values) {
     if(!values.length) return {value: 0, complete: true};
     const known = values.filter(value => Number.isFinite(value) && value >= 0);
@@ -54,6 +73,10 @@ function total(values) {
     };
 }
 
+/**
+ * Calculate count, duration, distance and one chosen load scale for a group, carrying completeness
+ * information with each sum.
+ */
 function periodTotals(activities, loadSource) {
     return {
         count: activities.length,
@@ -65,6 +88,10 @@ function periodTotals(activities, loadSource) {
     };
 }
 
+/**
+ * Compute Monday-to-today and month-to-today totals from all displayed dated activities. Count
+ * undated records separately instead of assigning them an invented date.
+ */
 export function summarizeActivityPeriods(lists, {day, timeZone, loadSource = 'power'}) {
     const weekStart = addDays(day, -((weekday(day) + 6) % 7));
     const monthStart = `${day.slice(0, 7)}-01`;
@@ -85,11 +112,13 @@ function durationLabel(seconds) {
     return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 }
 
+/** Label a partial sum as "Known ..." so it cannot be mistaken for a complete total. */
 function totalMetric(label, metric, format) {
     const title = metric.complete ? label : `Known ${label[0].toLowerCase()}${label.slice(1)}`;
     return `<div><dt>${title}</dt><dd>${metric.value == null ? '--' : format(metric.value)}</dd></div>`;
 }
 
+/** Build one week/month totals panel using already-calculated values and the selected load label. */
 function periodMarkup(label, values, loadSource) {
     return `<section class="activity-period" aria-label="${label} activity totals">
         <h3>${label}</h3>
@@ -102,6 +131,10 @@ function periodMarkup(label, values, loadSource) {
     </section>`;
 }
 
+/**
+ * Choose the current day and a compatible display load scale, then render totals and only current,
+ * complete state estimates. Do not show zero totals when history could not be loaded.
+ */
 export function renderActivityOverview(data, lists, state, now = Date.now()) {
     if(!lists.historyAvailable) {
         return `<section class="activity-overview"><p role="status" class="muted">
@@ -143,6 +176,10 @@ export function renderActivityOverview(data, lists, state, now = Date.now()) {
     </section>`;
 }
 
+/**
+ * Prefer a local power preview, then an imported preview, then available full samples. Show an
+ * explicit no-profile message if none is usable.
+ */
 function profileMarkup(activity, local) {
     const samples = [local?.powerProfile, activity.powerProfile, activity.streams?.power]
         .find(values => Array.isArray(values) && values.filter(value => Number.isFinite(value) && value >= 0).length >= 2);
@@ -153,10 +190,18 @@ function profileMarkup(activity, local) {
     }) || '<small class="activity-no-profile">No recorded power profile</small>';
 }
 
+/**
+ * Display a valid nonnegative measurement with units, otherwise --; a missing value is not a
+ * measured zero.
+ */
 function measurement(value, unit, digits = 0) {
     return Number.isFinite(value) && value >= 0 ? `${number(value, digits)} ${unit}` : '--';
 }
 
+/**
+ * Display the first available supported load estimate alongside reported effort, naming its scale
+ * rather than adding incompatible scores.
+ */
 function loadAndFeedback(activity) {
     const source = ['power', 'sessionRpe', 'heartRate']
         .find(key => Number.isFinite(activity.loadMetrics?.[key]?.value));
@@ -166,6 +211,10 @@ function loadAndFeedback(activity) {
     return values.length ? values.join(' / ') : '--';
 }
 
+/**
+ * Describe a device-only recording with its locally available measurements, preview and
+ * download/delete controls.
+ */
 export function localActivityRow(activity, timeZone) {
     const day = activityDay(activity, timeZone);
     return `<li class="session-row activity-local">
@@ -179,6 +228,10 @@ export function localActivityRow(activity, timeZone) {
     </li>`;
 }
 
+/**
+ * Describe a history entry and offer only applicable file/provider actions. A history record can
+ * outlive its locally cached FIT file.
+ */
 export function historyActivityRow(activity, local, connected) {
     const intervalsId = activity.source === 'intervals' ? activity.externalId : null;
     const actions = local || activity.source === 'athlima' || (connected && intervalsId) ? `<div class="button-row activity-file-actions">
@@ -203,6 +256,10 @@ export function historyActivityRow(activity, local, connected) {
     </tr>`;
 }
 
+/**
+ * Draw a sampled preview of the available measurements. Break the line at missing values instead of
+ * connecting across gaps; the full values remain available for CSV export.
+ */
 function renderStreamChart(label, unit, values, className) {
     if(!Array.isArray(values)) return '';
     const valid = values.filter(value => Number.isFinite(value) && value >= 0);
@@ -228,6 +285,10 @@ function renderStreamChart(label, unit, values, className) {
     </figure>`;
 }
 
+/**
+ * Draw a simplified, locally projected route outline with start/finish markers. It uses supplied
+ * GPS coordinates, not a map-tile service or live location tracking.
+ */
 function renderActivityRoute(map) {
     const points = map?.latlngs;
     if(!Array.isArray(points) || points.length < 2) {
@@ -261,6 +322,10 @@ function renderActivityRoute(map) {
     </figure>`;
 }
 
+/**
+ * Combine optional route and sensor charts with the CSV action, explaining when data is unavailable
+ * or a route was rejected.
+ */
 export function renderActivityStreamData(data) {
     const streams = data?.streams || {};
     const charts = [

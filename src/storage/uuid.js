@@ -1,19 +1,8 @@
-/*
- * uuid.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * persists user and application data in the browser so settings and workouts survive reloads.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Assigns identifiers so saved workouts and rides can be found again without relying on their
+ * names. The wrapper prefers the browser's UUID generator. The attributed Xuid implementation below
+ * is an older third-party fallback and is kept intact; these IDs are record labels, not passwords
+ * or access tokens.
  */
 
 //
@@ -114,6 +103,10 @@ class Xuid {
   static ntohl32(v)/*:<Number>*/{return Number(this.ntohl(v))}
 }
 
+/**
+ * Choose the browser-provided random identifier when available, otherwise use the existing
+ * compatibility fallback.
+ */
 function uuid() {
     if('crypto' in window && crypto.randomUUID) {
         return crypto.randomUUID();

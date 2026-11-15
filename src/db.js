@@ -1,19 +1,8 @@
-/*
- * db.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Connects live ride data, button actions, models and browser storage. Despite the name, db here is
+ * the in-memory state of the open page, not an online database. xf.reg handlers update that state;
+ * top-level updates notify screens through db:<field> events. Persistence is explicit in
+ * model/storage calls, so changing a live reading alone does not save it.
  */
 
 import { xf, exists, equals } from './functions.js';
@@ -250,6 +239,10 @@ xf.reg('ui:page-set', (page, db) => {
 });
 
 // Modes
+/**
+ * Switch trainer-control mode only when controls are unlocked, then resend the matching power,
+ * resistance or slope target.
+ */
 xf.reg('ui:mode-set', (mode, db) => {
     if(db.lock) return;
 
@@ -316,6 +309,10 @@ xf.reg(`ui:slope-target-dec`, (_, db) => {
 });
 
 // Profile
+/**
+ * Allow manual FTP/body-mass changes only when Intervals.icu is disconnected. Connection errors and
+ * provider-owned values produce a visible message rather than silently enabling an override.
+ */
 function canEditProfile() {
     try {
         if(!intervals.status().connected) return true;
@@ -373,6 +370,11 @@ xf.reg(`ui:volume-up`, (_, db) => {
 xf.reg('workout', (workout, db) => {
     db.workout = models.workout.set(workout);
 });
+/**
+ * Recheck a coaching start at the final entry point: current plan, today's unresolved cycling
+ * session, adult confirmation, no pause and unchanged FTP. A stale calendar selection must not
+ * bypass these checks.
+ */
 xf.reg('ui:coaching:select', (workout, db) => {
     try {
         const data = coachingService().data, profile = data.profile;
@@ -422,6 +424,11 @@ xf.reg('ui:workout:upload', async function(files, db) {
     }
 
 });
+/**
+ * Save or retry the FIT recording first, then hand pending recordings to the local Coach. A
+ * coaching failure leaves the recording saved and marked for retry; a file-save failure keeps the
+ * session available for retry.
+ */
 async function saveStoppedRide(_, db) {
     try {
         xf.dispatch('activity:saving');
@@ -445,6 +452,10 @@ async function saveStoppedRide(_, db) {
     }
 
 }
+/**
+ * Discard and save are distinct paths. A discard resets the live session without creating a new
+ * activity; successful saves reset it only after persistence succeeds.
+ */
 xf.reg('watch:stopped', (event, db) => {
     if(event?.discard) {
         models.session.reset(db);
@@ -490,6 +501,7 @@ xf.reg('ui:ant:request:selected', (x, db) => {
         return d.deviceNumber === parseInt(x);
     })[0];
 });
+/** Avoid showing the same discovered ANT+ device number more than once in the scan list. */
 function includesDevice(devices, id) {
     return devices.some(d => d.deviceNumber === id.deviceNumber);
 }
@@ -513,6 +525,10 @@ xf.reg('services', (x, db) => {
 
 
 //
+/**
+ * Restore settings, open local storage, load history, retry saved-ride hand-offs and restore any
+ * unfinished session. Announce app:ready only after this sequence; errors become app:error.
+ */
 xf.reg('app:start', async function(_, db) {
     try {
 
@@ -572,6 +588,10 @@ xf.reg('app:start', async function(_, db) {
     }
 });
 
+/**
+ * Announce that the state/event wiring module has loaded. Actual storage restoration occurs later
+ * in the app:start handler.
+ */
 function start () {
     console.log('start db');
     xf.dispatch('db:start');

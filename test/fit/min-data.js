@@ -1,19 +1,9 @@
 /*
- * min-data.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Saved FIT examples, not tests by themselves. minimal is a complete short file
+ * as bytes; minimalFITjs is its expected ordered list of named records, used to
+ * test both reading and writing. Earlier activity/activity3R entries retain older
+ * object shapes and raw field values for reference, not today's export schema.
+ * Existing byte annotations are kept so fields can be checked by hand.
  */
 
 
@@ -276,6 +266,7 @@ const footer = [
     6,  19,36,144,57,  19,36,144,57,  1,0,  0,  26,  1,  0,
 ];
 
+// Definitions describe subsequent data; this example uses an older 12-byte header and a final CRC.
 const minimalFITjs = [
     // header
     {
@@ -594,6 +585,7 @@ const minimalFITjs = [
     }
 ];
 
+// The matching complete byte sequence keeps record boundaries visible through comments.
 const minimal = [
     // header
     12,  16,  100,0,  112,1,0,0,  46,70,73,84,

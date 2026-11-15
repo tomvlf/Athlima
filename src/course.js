@@ -1,25 +1,18 @@
-/*
- * course.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Follows an imported route as simulated ride distance advances. Detailed points provide map
+ * position; simplified segments provide road slope for the trainer. It listens to the app message
+ * bus and switches route rides to slope-simulation mode. This is route playback, not live GPS
+ * tracking.
  */
 
 import { xf, equals, exists, first, } from './functions.js';
 import { models } from './models/models.js';
 import { Status, ControlMode, } from './ble/enums.js';
 
+/**
+ * Set up one route follower with current distance, map-point and segment positions, then subscribe
+ * to workout and ride events.
+ */
 function Course() {
 
     const abortController = new AbortController();
@@ -54,6 +47,10 @@ function Course() {
         console.log(`:course :index ${courseIndex}`);
         index = courseIndex;
     }
+    /**
+     * While route playback is active, choose a nearby course point, wrap distance around the route
+     * and send a new trainer slope when the current segment ends.
+     */
     function onDistance(value) {
         if(!started) return;
 
@@ -99,6 +96,10 @@ function Course() {
             xf.dispatch(`ui:slope-target-set`, slope);
         }
     }
+    /**
+     * Use a selected workout as a route only when it has course points, then initialize segment
+     * bounds and starting altitude.
+     */
     function onWorkout(workout) {
         course = workout;
 
@@ -111,11 +112,19 @@ function Course() {
             xf.dispatch('altitude', first(course.points).y);
         }
     }
+    /**
+     * Start route playback alongside the ride clock only when the selected workout actually
+     * contains route points.
+     */
     function onWatchStart() {
         if(isCourse()) {
             start();
         }
     }
+    /**
+     * Initialize a route at its starting distance and announce slope-simulation mode plus the
+     * current slope.
+     */
     function start() {
         if(distance > 0) return;
         started = true;
@@ -130,17 +139,23 @@ function Course() {
         xf.dispatch(`ui:mode-set`, ControlMode.sim);
         console.log(`start a course ...`);
     }
+    /** Cache the route's point/segment bounds and total distance for subsequent distance updates. */
     function setCourse(course) {
         maxIndex = course.pointsSimplified.length-1;
         maxPointIndex = course.points.length-1;
         courseDistance = course.meta.distance;
     }
+    /** Load a simplified segment's distance span, slope and starting position for trainer control. */
     function setSegment(index) {
         segment = indexToSegment(index);
         r = segment.r;
         slope = segment.slope;
         segmentStart = segment.distance ?? distance;
     }
+    /**
+     * The segment lookup helpers read the simplified route rather than recomputing slopes from
+     * every detailed map point.
+     */
     function indexToSlope(index) {
         return course.pointsSimplified[index].slope;
     }

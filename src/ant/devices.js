@@ -1,19 +1,9 @@
 /*
- * devices.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Turns ANT+ radio messages into connected trainers and heart-rate sensors.
+ * A channel is one conversation managed by the USB adapter. Device first
+ * searches for compatible sensors, then tracks the rider's selection.
+ * The trainer and heart-rate wrappers publish measurements as app events and
+ * translate training targets into outgoing control messages.
  */
 
 import { xf, equals, exists, existance, dataviewToArray } from '../functions.js';
@@ -25,12 +15,18 @@ import { hr } from './hr.js';
 import { Q } from './q.js';
 import { driver } from './driver.js';
 
+// Translate the app's sensor category into ANT+'s numeric device category.
 function profileToDeviceType(profile) {
     if(equals(profile, 'hrm')) return 120;
     if(equals(profile, 'fec')) return 17;
     return undefined;
 }
 
+/**
+ * Manage one channel's search, pairing and reply queue. start/stop attach and
+ * remove app listeners; isConnected reports whether pairing has completed.
+ * onData receives the sensor's data page, without the outer ANT message framing.
+ */
 function Device(args = {}) {
     const defaults = {
         profile: 'generic',
@@ -74,6 +70,7 @@ function Device(args = {}) {
         _searching = false;
     }
 
+    // The same UI switch disconnects, cancels an active search, or begins a new search.
     async function onSwitch() {
         try {
             if(isConnected()) await disconnect();
@@ -90,6 +87,7 @@ function Device(args = {}) {
         }
     }
 
+    // Ignore selections for other sensor types; show a pairing error to the rider if needed.
     async function onPair(channelId) {
         if(channelId && equals(channelId.deviceType, deviceType)) {
             try {
@@ -103,6 +101,7 @@ function Device(args = {}) {
         }
     }
 
+    // Stop only an unpaired search; do not close a channel already tracking a sensor.
     async function onCancelSearch() {
         if(_connected || !_searching) return;
         _searching = false;
@@ -114,12 +113,14 @@ function Device(args = {}) {
         xf.dispatch('ant:search:stopped');
     }
 
+    // Remember the selected sensor's radio address, then configure it without interleaving commands.
     async function pair(channelId) {
         deviceNumber     = channelId.deviceNumber;
         transmissionType = channelId.transmissionType;
         await driver.runExclusive(track);
     }
 
+    // Configure a wildcard channel step by step, waiting for each adapter reply.
     async function search() {
         const config = channelConfig.get({
             profile, channelNumber, status: 'searching'
@@ -148,6 +149,7 @@ function Device(args = {}) {
         }
     }
 
+    // Replace the search channel with one addressed to the selected sensor before announcing success.
     async function track() {
         const config = channelConfig.get({
             profile,
@@ -173,6 +175,7 @@ function Device(args = {}) {
         xf.dispatch(`${name}:connected`);
     }
 
+    // Wait for the channel to close before clearing connection/search indicators.
     async function close() {
         await write(message.closeChannel.encode({channelNumber}));
         _connected = false;
@@ -185,16 +188,19 @@ function Device(args = {}) {
         return _connected;
     }
 
+    // Open the shared adapter if needed, then reserve it for this channel's search setup.
     async function connect() {
         await driver.open();
         await driver.runExclusive(search);
     }
 
+    // Serialize channel closure with other devices' adapter configuration.
     async function disconnect() {
         await driver.runExclusive(close);
         _connected = false;
     }
 
+    // Route complete messages to waiting commands or to sensor decoding; reject corrupt broadcasts.
     function onRx(dataview) {
         if(dataview.byteLength < 4 || dataview.getUint8(0) !== 0xA4 ||
            dataview.byteLength !== dataview.getUint8(1) + 4) return;
@@ -218,9 +224,11 @@ function Device(args = {}) {
             onData(decoded.payload);
         }
     }
+    // Let the reply queue accept or reject the command that produced this response.
     function onResponse(decoded) {
         q.pull(decoded);
     }
+    // Transfer/close events may finish a waiting command; closure also clears the UI connection state.
     function onEvent(decoded) {
         q.pull(decoded);
         if(equals(decoded.eventCode, events.event_channel_closed)) {
@@ -229,10 +237,12 @@ function Device(args = {}) {
         }
     }
 
+    // Convert any adapter error into failed command waits so callers are not left hanging.
     function onDriverError(error) {
         q.rejectAll(error instanceof Error ? error : new Error(String(error)));
     }
 
+    // Forget radio state and notify both the device panel and sensor-search dialog.
     function onDriverClosed() {
         q.rejectAll();
         _connected = false;
@@ -241,6 +251,7 @@ function Device(args = {}) {
         xf.dispatch('ant:search:stopped');
     }
 
+    // Begin waiting before dispatching bytes, so even an immediate reply can find its command.
     async function write(dataview) {
         console.log(`[${time()}] :ant :tx ${dataviewToArray(dataview)}`);
         const response = q.push(dataview);
@@ -260,6 +271,11 @@ function Device(args = {}) {
     };
 }
 
+/**
+ * Combine sensor-specific radio settings with searching/tracking settings.
+ * Periods are in 1/32768-second ticks; frequency is the ANT offset above 2400 MHz.
+ * The private lookups only retrieve presets; get adds the chosen device/channel IDs.
+ */
 function ChannelConfig() {
     const profiles = {
         hrm: {
@@ -319,6 +335,12 @@ function ChannelConfig() {
 
 const channelConfig = ChannelConfig();
 
+/**
+ * Trainer on channel 1. start/stop manage training-target subscriptions as well as
+ * the underlying device. Power targets use watts, resistance uses percent and
+ * slope uses percent grade. Automatic power updates apply only in ERG mode
+ * (the trainer adjusts resistance to hold a requested power).
+ */
 function Controllable() {
     const name          = 'ant:controllable';
     const channelNumber = 1;
@@ -364,6 +386,7 @@ function Controllable() {
         if(device.isConnected()) sendControl(setSlopeTarget, power);
     }
 
+    // Serialize a target change and report rejected or timed-out commands in the error dialog.
     async function sendControl(setTarget, value) {
         try {
             await driver.runExclusive(() => setTarget(value));
@@ -373,6 +396,7 @@ function Controllable() {
         }
     }
 
+    // Wrap an eight-byte trainer page in a message that asks the adapter for delivery confirmation.
     function control(dataPage) {
         const view = message.acknowledgedData.encode({channelNumber, payload: dataPage});
         return device.write(view);
@@ -390,6 +414,7 @@ function Controllable() {
         return control(fec.dataPage51.encode({grade}));
     }
 
+    // Publish only measurements present in this page: watts, revolutions/minute and km/h.
     function onData(payload) {
         const data = existance(fec.decode(payload), {});
 
@@ -419,6 +444,10 @@ function Controllable() {
     });
 }
 
+/**
+ * Heart-rate sensor on channel 2. Connection and lifecycle methods delegate to
+ * Device; received pages publish heartRate in beats per minute.
+ */
 function Hrm() {
     // {deviceNumber: 49647, deviceType: 120, transmissionType: 161}
 

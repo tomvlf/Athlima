@@ -1,19 +1,10 @@
 /*
- * compatibility-check.test.js: test coverage module.
+ * Checks which Bluetooth setup guidance the rider sees: insecure page address,
+ * missing browser capability, or no warning when Bluetooth is available.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * jsdom supplies a simulated page but no real Bluetooth hardware. Tests replace
+ * capability flags and browser names to check features, not guess from platform names.
+ * The model stub keeps unrelated app data out of these display-only checks.
  */
 
 /**
@@ -30,6 +21,7 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
+// Set the simulated browser capabilities, then mount the tag to run its startup check.
 function mount({ secure = true, bluetooth } = {}) {
     jest.replaceProperty(window, 'isSecureContext', secure);
     jest.replaceProperty(navigator, 'bluetooth', bluetooth);
@@ -38,6 +30,7 @@ function mount({ secure = true, bluetooth } = {}) {
     return element;
 }
 
+// Make browser-only properties replaceable so each scenario can set them independently.
 beforeAll(() => {
     Object.defineProperty(window, 'isSecureContext', {
         configurable: true, writable: true, value: true,

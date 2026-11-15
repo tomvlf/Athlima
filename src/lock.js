@@ -1,23 +1,15 @@
-/*
- * lock.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Requests a screen wake lock so supported browsers can keep the ride display awake. This is a
+ * best-effort browser permission, not a device lock: the browser may refuse or release it. Release
+ * and page-exit notifications let other modules attempt ride recovery checkpoints.
  */
 
 import { xf } from './functions.js';
 
+/**
+ * Track browser support, initial visibility and whether a screen-awake request is active.
+ * Constructing the helper installs its page listeners.
+ */
 class WakeLock {
     constructor(args) {
         this.lock = undefined;
@@ -26,6 +18,7 @@ class WakeLock {
         this.isVisible = false;
         this.init();
     }
+    /** Detect support, attempt a wake lock and listen for visibility/page-exit events. */
     init() {
         let self = this;
         self.isLocable = ('wakeLock' in navigator);
@@ -50,6 +43,7 @@ class WakeLock {
         }
         return isVisible;
     }
+    /** Attempt another request when the document reports it is visible again. */
     onVisibilityChange () {
         let self = this;
 
@@ -57,6 +51,10 @@ class WakeLock {
             self.lockScreen();
         }
     }
+    /**
+     * Ask to keep the screen awake when supported and marked visible. Announce release to
+     * checkpoint listeners; log a refusal without preventing the app from running.
+     */
     async lockScreen() {
         let self = this;
         if(self.isLocable && self.isVisible) {

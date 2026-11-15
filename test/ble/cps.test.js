@@ -1,23 +1,13 @@
 /*
- * cps.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Tests power-meter decoding from constructed Bluetooth messages: signed watts,
+ * optional wheel/crank fields and their changing byte positions. Consecutive
+ * crank samples check that cadence is calculated in revolutions/minute rather
+ * than read from an unrelated optional field. No power meter is needed.
  */
 
 import { CyclingPowerMeasurement } from '../../src/ble/cps/cycling-power-measurement.js';
 
+// Turn a readable list of byte values into the same DataView shape provided by Bluetooth.
 function view(bytes) {
     return new DataView(Uint8Array.from(bytes).buffer);
 }

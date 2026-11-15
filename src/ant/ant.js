@@ -1,19 +1,8 @@
 /*
- * ant.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Starts and stops ANT+ support with the app. ANT+ is the shared set of radio
+ * communication rules used by some trainers and heart-rate sensors. These two
+ * device handlers share one USB adapter; opening that adapter still requires
+ * the rider to choose it through the browser.
  */
 
 import { xf } from '../functions.js';
@@ -23,6 +12,7 @@ import { driver } from './driver.js';
 const devices = [Controllable(), Hrm()];
 let started = false;
 
+// Register the adapter and device listeners once, even if app:start is repeated.
 function start() {
     if(started) return;
     started = true;
@@ -30,6 +20,7 @@ function start() {
     devices.forEach(device => device.start());
 }
 
+// Remove device listeners before waiting for the shared adapter to close.
 async function stop() {
     if(!started) return;
     started = false;

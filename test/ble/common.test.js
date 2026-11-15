@@ -1,19 +1,8 @@
 /*
- * common.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Replays recorded Bluetooth arrival times to check repeat-limit learning.
+ * One-hertz and four-hertz samples mean roughly one and four updates per second.
+ * Tests check average gaps, the chosen repeat count, completion after twenty
+ * samples and reset behavior, with no live sensor or real-time waiting.
  */
 
 import { Spec, State, RateAdjuster } from '../../src/ble/common.js';
@@ -25,6 +14,8 @@ global.console = {
 };
 
 describe('RateAdjuster', () => {
+    // ts is arrival time in milliseconds; r/t/c retain the log's revolutions, device time and cadence.
+    // RateAdjuster uses only ts, so the recorded motion values are context rather than test inputs.
     var log_4hz = [
         {ts: 1641391417056, r: 5495, t: 41229, c: 0},
         {ts: 1641391417296, r: 5495, t: 41229, c: 0},
@@ -121,6 +112,7 @@ describe('RateAdjuster', () => {
         {ts: 1641378965576, r: 247, t: 47018, c: 84}, // 30
     ];
 
+    // No-op completion callback: this suite observes the learned state directly.
     function onDone (maxRateCount) {}
 
     const rateAdjuster = RateAdjuster({

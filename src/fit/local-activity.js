@@ -1,19 +1,9 @@
 /*
- * local-activity.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Builds an exportable FIT activity from Athlima's samples, laps and timer events.
+ * First it creates an ordered FITjs record list with layouts and ride summaries;
+ * then the binary encoder turns that list into bytes. Input timestamps are
+ * JavaScript milliseconds, while elapsed/riding totals are seconds. Timer time
+ * excludes pauses; elapsed time includes them. This file does not save/download.
  */
 
 //
@@ -31,6 +21,7 @@ import { type } from './common.js';
 import { FITjs } from './fitjs.js';
 import { EventType } from '../activity/enums.js';
 
+// Prepare the app's export layouts once and expose record-list construction plus binary encoding.
 function LocalActivity(args = {}) {
     const definitions = productMessageDefinitions
           .reduce(function(acc, x) {
@@ -39,7 +30,7 @@ function LocalActivity(args = {}) {
               return acc;
           }, {});
 
-    // [FITjs] -> {fileSize: Int, dataSize: Int}
+    // Sum byte lengths for allocation and for the header's data-only length (excluding header/final CRC).
     function getSize(fitjs) {
         // byteLength of the whole file start to end
         // this is needed for the DataView size
@@ -58,7 +49,7 @@ function LocalActivity(args = {}) {
         };
     }
 
-    // [Record] -> Record?
+    // Find the first timestamped ride sample, skipping beat-interval-only records.
     function findFirstRecord(records = []) {
         for(let i = 0; i < records.length; i+=1) {
             if(records[i].timestamp !== undefined) {
@@ -69,7 +60,7 @@ function LocalActivity(args = {}) {
         return records[0];
     }
 
-    // [Record] -> Record?
+    // Find the last timestamped ride sample; log and fall back to the first item if none has a timestamp.
     function findLastRecord(records = []) {
         for(let i = records.length-1; i >= 0 ; i-=1) {
             if(records[i].timestamp !== undefined) {
@@ -80,7 +71,8 @@ function LocalActivity(args = {}) {
         return records[0];
     }
 
-    // {records: [Record], events: [Event]} -> Int
+    // Sum adjacent start/stop event pairs in seconds. Without events, use sample endpoints,
+    // or zero when fewer than two samples exist; malformed event ordering is logged and skipped.
     function calcTotalTimerTime(args) {
         const records = args.records ?? [];
         const events = args.events ?? [];
@@ -120,7 +112,7 @@ function LocalActivity(args = {}) {
         }, 0);
     }
 
-    // {records: [Record], laps: [Lap], events: [Event], } -> Int
+    // Count wall-clock seconds, preferring the first event and last lap over sample endpoints.
     function calcTotalElapsedTime(args) {
         const records = args.records ?? [];
         const laps = args.laps ?? [];
@@ -155,6 +147,8 @@ function LocalActivity(args = {}) {
     // [{ timestamp: Int, type: EventType, }]
     // ->
     // Int
+    // Subtract pauses that begin inside this lap, clipping their end to the lap boundary.
+    // Bound the pause deduction so the resulting riding time cannot be negative.
     function calcLapTotalTimerTime(lap, events) {
         const _lap = expect(lap, `calcLapTotalTimerTime needs lap: Lap.`);
         const _events = events ?? [];
@@ -202,6 +196,7 @@ function LocalActivity(args = {}) {
     // },
     // ->
     // Int
+    // Whole seconds from this lap's start to finish, including any pauses.
     function calcLapTotalElapsedTime(lap) {
         return type.timestamp.elapsed(lap.start_time, lap.timestamp);
     }
@@ -209,6 +204,8 @@ function LocalActivity(args = {}) {
     // {records: [Record], total_timer_time: Int}
     // ->
     // Stats
+    // Average timestamped samples equally, collect maxima and take the last distance.
+    // total_calories uses the existing estimate average watts × riding seconds / 1000.
     function calcStats(args = {}) {
         const records = expect(
             args.records,
@@ -254,6 +251,7 @@ function LocalActivity(args = {}) {
         return stats;
     }
 
+    // Mutate diagnostic copies so selected millisecond timestamps print as readable dates.
     function timestampToDate(x) {
         const timeKeys = ['time_created', 'start_time', 'timestamp'];
         for(let timeKey of timeKeys) {
@@ -264,6 +262,7 @@ function LocalActivity(args = {}) {
         return x;
     }
 
+    // Log cloned input records with readable dates, without changing the real recorded activity.
     function printAppData(records, laps, events) {
         const _records = window.structuredClone(records);
         const _laps = window.structuredClone(laps);
@@ -281,6 +280,7 @@ function LocalActivity(args = {}) {
         console.log('----');
     }
 
+    // Log a cloned subset of useful data records, hiding definition/header detail for debugging.
     function printFITjs(structure) {
         const select = ['record', 'event', 'lap', 'session', 'activity'];
 
@@ -304,6 +304,8 @@ function LocalActivity(args = {}) {
     // {records: [{<field>: Any}], laps: [{<field>: Any}]}
     // ->
     // [FITjs]
+    // Assemble layouts before values, include beat-interval records, compute summaries,
+    // and update header size. ftp is the rider's threshold power in watts.
     function toFITjs(args = {}) {
         const records = args.records ?? [];
         const laps = args.laps ?? [];
@@ -428,6 +430,7 @@ function LocalActivity(args = {}) {
 
     // {records: [{<field>: Any}], laps: [{<field>: Any}]}
     // -> Dataview
+    // Build the activity record list and return its binary DataView, ready for the file/download layer.
     function encode(args = {}) {
         const fitjs = toFITjs(args);
         return FITjs.encode(fitjs);
@@ -440,10 +443,12 @@ function LocalActivity(args = {}) {
 }
 
 // Special Data Messages
+// Use the shared file-header defaults; the completed record list supplies its data size later.
 function FileHeader() {
     return fileHeader.toFITjs();
 }
 
+// Identify this as an activity file with creation time and device/product metadata.
 function FileId(args = {}) {
     return {
         time_created: args.time_created ?? Date.now(),
@@ -455,12 +460,14 @@ function FileId(args = {}) {
     };
 }
 
+// Software revision metadata for the program/device that created the file.
 function FileCreator(args = {}) {
     return {
         software_version: args.software_version ?? 0,
     };
 }
 
+// Translate a timestamped app timer event into FIT's numeric event fields.
 function Event(args = {}) {
     return {
         timestamp: expect(args.timestamp, 'Event needs timestamp.'),
@@ -470,6 +477,7 @@ function Event(args = {}) {
     };
 }
 
+// Build a numbered lap summary from required timestamps and elapsed/riding seconds.
 function Lap(args = {}) {
     return {
         timestamp: expect(args.timestamp, 'Lap needs timestamp.'),
@@ -482,6 +490,7 @@ function Lap(args = {}) {
     };
 }
 
+// Top-level completion summary for the single-session activity, including total riding seconds.
 function Activity(args = {}) {
     return {
         timestamp: expect(args.timestamp, 'Activity needs timestamp.'),
@@ -494,6 +503,7 @@ function Activity(args = {}) {
     };
 }
 
+// Combine virtual-cycling identity, ride statistics, lap count and threshold watts into the session summary.
 function Session(args = {}) {
     return {
         timestamp: expect(args.timestamp, 'Session needs timestamp.'),

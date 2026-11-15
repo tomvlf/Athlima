@@ -1,3 +1,5 @@
+# Local-build override: combine with compose.yaml or compose.https.yaml.
+# Despite this historical filename, it adds no application backend or database.
 services:
   athlima:
     build: .

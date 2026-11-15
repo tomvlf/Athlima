@@ -1,19 +1,9 @@
-/*
- * domain.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Shared vocabulary, date rules and input checks for the Coach. A profile describes the athlete and
+ * available training time; a goal describes what they are preparing for. DEFAULTS are adjustable
+ * software rules, not proven medical limits. Durations use seconds unless named Minutes/Hours, and
+ * intensity fractions use 1 for the athlete's threshold. Calendar dates have no time of day;
+ * timestamps identify a specific moment.
  */
 
 export const VERSION = 'coaching-1';
@@ -87,6 +77,11 @@ export const DEFAULTS = Object.freeze({
     runClimbingElevationThreshold: 1000, riegelExponent: 1.06,
     runThresholdPaceMinimum: 120, runThresholdPaceMaximum: 900,
 });
+/**
+ * Each goal gives relative importance to endurance, threshold, aerobic ability, sprint and
+ * durability, in that order. These weights rank planning priorities; they do not predict
+ * performance gains.
+ */
 export const GOALS = Object.freeze({
     general_fitness: [5, 2, 1, 1, 1],
     ftp_improvement: [2, 5, 3, 1, 1],
@@ -109,10 +104,18 @@ export const RUN_GOALS = Object.freeze({
     ultra_trail: [5, 2, 1, 1, 5],
 });
 export const SPORTS = Object.freeze(['cycling', 'running']);
+/**
+ * Older profiles with no sport still mean cycling. The goal helpers select the corresponding sport
+ * and its priority table.
+ */
 export const sportOf = profile => profile?.sport === 'running' ? 'running' : 'cycling';
 export const goalRegistry = sport => sport === 'running' ? RUN_GOALS : GOALS;
 export const sportForGoalType = type => Object.hasOwn(RUN_GOALS, type) ? 'running' : 'cycling';
 export const CAPABILITIES = ['endurance', 'threshold', 'aerobic', 'sprint', 'durability'];
+/**
+ * These small numerical helpers are shared by calculations. mean deliberately returns null for an
+ * empty list so missing observations are not mistaken for an average of zero.
+ */
 export const sum = values => values.reduce((a, b) => a + b, 0);
 export const mean = values => values.length ? sum(values) / values.length : null;
 export const positive = value => Number.isFinite(value) && value > 0;
@@ -247,6 +250,10 @@ export function date(value) {
  * @returns {string} The shifted date in YYYY-MM-DD format.
  */
 export const addDays = (value, days) => new Date(Date.parse(`${date(value)}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+/**
+ * Date arithmetic uses midnight UTC as a consistent counting convention, not as the athlete's
+ * training time. weekday follows JavaScript numbering: Sunday is 0 and Saturday is 6.
+ */
 export const daysBetween = (a, b) => (Date.parse(date(b)) - Date.parse(date(a))) / DAY;
 export const weekday = value => new Date(`${date(value)}T00:00:00Z`).getUTCDay();
 /**
@@ -341,6 +348,10 @@ export function validateGoal(goal, startDate, registry = GOALS, rules = DEFAULTS
     }
     return goal;
 }
+/**
+ * Keep an estimate together with its explanation, calculation version, inputs and confidence. A
+ * missing value stays unavailable; it does not become zero or evidence of fitness.
+ */
 export function metric(value, confidence, reason, inputs = {}) {
     return {value, confidence: value == null ? 'unavailable' : confidence, reason,
         source: 'derived', version: VERSION, inputs};

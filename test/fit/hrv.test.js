@@ -1,19 +1,8 @@
 /*
- * hrv.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks FIT heart-rate-variability (HRV) records, which store time between beats
+ * rather than beats per minute. A ten-byte field holds five two-byte intervals.
+ * The low-level byte test converts seconds to stored milliseconds and preserves
+ * the 0xFFFF missing marker; a separate assembly test uses a historical fixture.
  */
 
 import { dataviewToArray } from '../../src/functions.js';
@@ -86,6 +75,7 @@ describe('AppData', () => {
             ],
             dev_fields: [],
         };
+        // Two real intervals plus three missing slots: scaling must not alter the missing markers.
         const data = {time: [0.882, 0.906, 0xFFFF, 0xFFFF, 0xFFFF],};
         const arrayT = [4, 114,3, 138,3, 255,255, 255,255, 255,255]; // true
         const arrayF = [4, 3,114, 3,138, 255,255, 255,255, 255,255]; // false
@@ -105,6 +95,7 @@ describe('AppData', () => {
     });
 
     test('toFITjs', () => {
+        // Record assembly preserves this fixture's literal intervals; this case does not encode bytes.
         const res = fit.localActivity.toFITjs({
             records: appData.records,
             laps: appData.laps,

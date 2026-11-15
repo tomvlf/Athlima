@@ -1,24 +1,17 @@
-/*
- * demands.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Turns a goal into planning priorities, then compares only the targets that available data can
+ * support. "Gap" means a difference from an explicit target, not a diagnosis of weakness. Unknown
+ * capabilities stay unknown rather than receiving invented scores.
  */
 
 import { DEFAULTS, GOALS, CAPABILITIES, sum, metric, sportForGoalType, validateCoachingConfig } from './domain.js';
 import { predictedRaceSeconds } from './running.js';
 
+/**
+ * Read the goal's relative capability weights, increase relevant emphasis for long or climbing
+ * events, and divide by the total to return comparable shares. Keep the declared targets alongside
+ * the explanation.
+ */
 export function modelGoalDemand(goal, registry = GOALS, rules = DEFAULTS) {
     const config = validateCoachingConfig(rules);
     const weights = registry[goal.type];
@@ -46,6 +39,11 @@ export function modelGoalDemand(goal, registry = GOALS, rules = DEFAULTS) {
     };
 }
 
+/**
+ * Compare available duration and threshold evidence with declared targets, then rank priorities by
+ * demand and known gaps. Running finish-time comparisons are low-confidence estimates; cycling
+ * event power is compared with FTP only for roughly hour-long events.
+ */
 export function analyzeGaps(state, demand, goal) {
     const duration = demand.durationMinutes;
     const enduranceGap = duration && state.weeklyDuration != null ? Math.max(0, 1 - state.weeklyDuration / duration) : null;

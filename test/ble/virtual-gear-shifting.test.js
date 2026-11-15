@@ -1,19 +1,8 @@
 /*
- * virtual-gear-shifting.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks Open Bike Control shift presses and direct gear numbers, whose stored
+ * state is one greater than the selected gear. Full byte-message cases exercise
+ * mixed button families, unrelated message types and an incomplete final pair.
+ * These tests read reports only; they do not change a trainer's resistance.
  */
 
 import { virtualGearShifting } from '../../src/ble/obc/virtual-gear-shifting.js';
@@ -82,6 +71,7 @@ describe('VirtualGearShifting', () => {
     });
 });
 
+// A full report starts with its type byte before the repeated button-ID/state pairs.
 describe('decodeButtonState', () => {
 
     test('one notification can carry a gear press and a select press', () => {

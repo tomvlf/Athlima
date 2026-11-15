@@ -1,19 +1,8 @@
 /*
- * fec.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Tests ANT+ trainer pages without hardware: resistance %, watts, wind, slope,
+ * rider/bike mass and received trainer readings. Exact eight-byte expectations
+ * protect the agreed message layout, including missing-data markers and values
+ * sharing a byte. Decoding checks translate those examples back to named fields.
  */
 
 import { equals, dataviewToArray, nthBitToBool, xor } from '../../src/functions.js';
@@ -84,6 +73,7 @@ describe('Data Page 49 - Target Power', () => {
     });
 });
 
+// Special invalid markers must pass through unchanged instead of being scaled like measurements.
 describe('Data Page 50 - Wind Resistance', () => {
 
     describe('encode', () => {
@@ -130,6 +120,7 @@ describe('Data Page 50 - Wind Resistance', () => {
     });
 });
 
+// Percent slope includes negative grades, so flat road is stored at a nonzero midpoint.
 describe('Data Page 51 - Track Resistance', () => {
 
     describe('encode', () => {
@@ -184,6 +175,7 @@ describe('Data Page 51 - Track Resistance', () => {
     });
 });
 
+// These examples check the shared bike-mass/wheel-adjustment byte as well as kg/metre scaling.
 describe('Data Page 55 - User Configuration', () => {
 
     describe('encode', () => {
@@ -234,6 +226,7 @@ describe('Data Page 55 - User Configuration', () => {
     });
 });
 
+// The app-facing speed is km/h even though the trainer's field uses thousandths of m/s.
 describe('Data Page 16 - General FE Data', () => {
 
     describe('encode', () => {

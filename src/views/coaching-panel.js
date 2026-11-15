@@ -1,19 +1,12 @@
 /*
- * coaching-panel.js: front-end client module.
+ * The coaching setup form and plan dashboard: collect availability and goals,
+ * show upcoming sessions, record feedback/symptom reports, and offer history backup.
+ * Form submissions call the coaching service, which owns saved data and plan rules.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * connectedCallback listens when <coaching-panel> joins the page;
+ * disconnectedCallback cancels its listeners. render rebuilds the visible HTML.
+ * escape keeps names/messages as literal text, while label makes internal names
+ * readable. Training guidance is decision support, not a medical assessment.
  */
 
 import { xf } from '../functions.js';
@@ -53,7 +46,7 @@ const RPE = ['Rest', 'Very, very easy', 'Very easy', 'Easy', 'Moderate', 'Somewh
 const HEART_RATE = [['maxHeartRate', 'Maximum heart rate'], ['thresholdHeartRate', 'Threshold heart rate'],
     ['restingHeartRate', 'Resting heart rate']];
 const EQUIPMENT = [['powerMeter', 'Power meter'], ['heartRateMonitor', 'Heart-rate monitor'], ['smartTrainer', 'Smart trainer']];
-// The fourth entry restricts a field to one sport; running goals have no power targets.
+// The optional final entry restricts a field to one sport; running goals have no power targets.
 const GOAL_NUMBERS = [['distanceKm', 'Distance', 'km', '0.1'], ['elevationM', 'Climbing', 'm', '1'],
     ['expectedDurationMinutes', 'Expected duration', 'min', '1'], ['finishTimeMinutes', 'Target finish time', 'min', '1'],
     ['targetPower', 'Target power', 'W', '1', 'cycling'], ['targetFTP', 'Target FTP', 'W', '1', 'cycling'],
@@ -61,7 +54,7 @@ const GOAL_NUMBERS = [['distanceKm', 'Distance', 'km', '0.1'], ['elevationM', 'C
 const SPORT_GOALS = [['Cycling', GOALS], ['Running', RUN_GOALS]];
 const GOAL_LABELS = {first_5k: 'First 5 km', run_5k: '5 km race', run_10k: '10 km race', ultra_trail: 'Ultra / trail'};
 const goalLabel = type => GOAL_LABELS[type] || label(type);
-// "h:mm:ss" or "mm:ss" to seconds.
+// "h:mm:ss" or "mm:ss" to seconds; null means the race time was not in an accepted format.
 const parseClock = text => {
     const match = /^\s*(?:(\d{1,2}):)?(\d{1,3}):([0-5]\d)\s*$/.exec(String(text ?? ''));
     return match ? Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) : null;
@@ -69,12 +62,15 @@ const parseClock = text => {
 const TERRAIN = ['', 'flat', 'rolling', 'hilly', 'mountainous'];
 const HORIZONS = [[42, 'In about 6 weeks'], [91, 'Within 3 months'], [182, 'Within 6 months'], [365, 'Within a year']];
 
+// Treat a calendar day as a date, not an instant that could shift in another time zone.
 const dayLabel = (day, options = {weekday: 'short', day: 'numeric', month: 'short'}) =>
     new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, {...options, timeZone: 'UTC'});
 const minutes = seconds => `${Math.round(seconds / 60)} min`;
+// A blank optional field means "not supplied", not a numerical zero.
 const optional = value => value === '' || value == null ? undefined : Number(value);
 const selected = condition => condition ? 'selected' : '';
 
+// Chooses setup or the active plan, then routes all nested form/button actions centrally.
 class CoachingPanel extends HTMLElement {
     connectedCallback() {
         this.controller = new AbortController();
@@ -89,6 +85,8 @@ class CoachingPanel extends HTMLElement {
         this.render();
     }
     disconnectedCallback() { this.controller.abort(); }
+    // Preserve expanded sections and, on errors, field values while rebuilding the page.
+    // Render failures become a readable message rather than leaving a broken panel.
     render({keepInput = false} = {}) {
         const fields = keepInput ? [...this.querySelectorAll('[data-coach-form] [name]')]
             .map(el => [el.form?.dataset.coachForm, el.name, el.value]) : [];
@@ -128,6 +126,8 @@ class CoachingPanel extends HTMLElement {
         const sport = sportForGoalType(type);
         for(const el of this.querySelectorAll('[data-coach-form=setup] [data-sport]')) el.hidden = el.dataset.sport !== sport;
     }
+    // Return the plan dashboard: progress, next sessions, warnings, and adjustment tools.
+    // Adult confirmation and symptom status affect which next-session prompt is offered.
     planView(data, plan) {
         const profile = data.profile, state = data.snapshots.at(-1), goal = plan.goalDefinition || data.goal || {};
         const today = localDay(new Date().toISOString(), profile.timeZone);
@@ -234,6 +234,7 @@ class CoachingPanel extends HTMLElement {
             </details>
             ${this.historyTools()}`;
     }
+    // Offer recent activities for optional effort/recovery feedback; blank answers are skipped.
     feedbackForm(data) {
         const rides = [...data.activities].reverse().slice(0, 20);
         return `<details class="coach-card" ${rides.length ? '' : 'hidden'}>
@@ -253,6 +254,7 @@ class CoachingPanel extends HTMLElement {
             </form>
         </details>`;
     }
+    // Show the reported symptom status and a form to request a training pause/status update.
     safetyForm(data) {
         const status = data.safetyStatus || '';
         return `<section class="coach-card">
@@ -270,6 +272,7 @@ class CoachingPanel extends HTMLElement {
             </form>
         </section>`;
     }
+    // Return import/backup controls; importing parses activity JSON only when submitted.
     historyTools() {
         return `<details class="coach-card">
             <summary>Training history and backup</summary>
@@ -283,6 +286,8 @@ class CoachingPanel extends HTMLElement {
             <button type="button" class="secondary" data-coach="export">Download coaching history</button>
         </details>`;
     }
+    // Build a four-step form, prefilled from any earlier profile/goal and current settings.
+    // Sport-specific fields are present but hidden when they do not match the chosen goal.
     setupForm(data) {
         const profile = data.profile, goal = data.goal;
         const timeZone = profile?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -406,6 +411,8 @@ class CoachingPanel extends HTMLElement {
             </form>
             ${profile ? this.historyTools() : ''}`;
     }
+    // Convert browser FormData into an athlete profile without saving it yet.
+    // Cross-check available days, long-session day, and weekly hours before proceeding.
     profileFrom(values, service) {
         const sport = sportForGoalType(values.get('type'));
         const limits = Object.fromEntries(Array.from({length: 7}, (_, day) =>
@@ -465,6 +472,8 @@ class CoachingPanel extends HTMLElement {
         }
         return pace;
     }
+    // Build the goal, using either the explicit event date or a period after plan start.
+    // Reject dates outside the planning window and omit the other sport's numeric targets.
     goalFrom(values) {
         const start = values.get('start');
         const date = values.get('date') || addDays(start, Number(values.get('horizon')) || 91);
@@ -480,6 +489,7 @@ class CoachingPanel extends HTMLElement {
         if(values.get('completionObjective')) goal.completionObjective = values.get('completionObjective');
         return goal;
     }
+    // Notify other coaching views, then keep this panel's success notice visible and in view.
     changed() {
         this.error = '';
         const notice = this.notice;
@@ -488,6 +498,9 @@ class CoachingPanel extends HTMLElement {
         this.render();
         this.querySelector('.coach-notice')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
     }
+    // Handle setup, symptom, history-import, or feedback forms through the service.
+    // Setup also imports local ride summaries before optional plan generation.
+    // On failure, show the error and retain field values so the rider can correct them.
     async submit(event) {
         const form = event.target.closest('[data-coach-form]');
         if(!form) return;
@@ -530,6 +543,8 @@ class CoachingPanel extends HTMLElement {
             this.querySelector('[role=alert]')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
         }
     }
+    // Route dashboard buttons: confirm/archive a plan, review missed sessions, ease future
+    // training, or download a JSON backup. Confirmation clicks alone do not archive data.
     async click(event) {
         const button = event.target.closest('[data-coach]');
         if(!button) return;

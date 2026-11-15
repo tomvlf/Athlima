@@ -1,19 +1,11 @@
 /*
- * training-calendar.test.js: test coverage module.
+ * Checks the combined training calendar: date grids, activity totals, stored schedules,
+ * provider imports, start requests, escaped text, and keyboard focus after redraws.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * jsdom supplies a simulated page and local storage. Coaching answers and provider
+ * responses are controlled so no real account is needed. Most calendars stay detached
+ * to avoid startup subscriptions; focus tests mount them because focus belongs to a page.
+ * Fixed dates and fake clocks make "today", week boundaries, and history repeatable.
  */
 
 /** @jest-environment jsdom */
@@ -35,6 +27,7 @@ jest.mock('../../src/coaching/state.js', () => ({
 }));
 
 describe('training calendar', () => {
+    // Build an unmounted November calendar with known inputs, without running startup hooks.
     function createCalendar(workouts = []) {
         const calendar = new TrainingCalendar();
         calendar.displayMonth = new Date(2026, 10, 1);
@@ -49,6 +42,7 @@ describe('training calendar', () => {
         return calendar;
     }
 
+    // Submit the actual scheduling form so persistence is exercised, not manually imitated.
     function schedule(calendar, workoutId) {
         const form = calendar.querySelector('.training-calendar--form');
         form.elements.workout.value = workoutId;
@@ -58,6 +52,7 @@ describe('training calendar', () => {
         });
     }
 
+    // Clear guest-account browser storage and coaching answers between independent scenarios.
     beforeEach(() => {
         window.localStorage.clear();
         setAccountScope(null);
@@ -188,6 +183,7 @@ describe('training calendar', () => {
         expect(summary.textContent).toMatch(/Known load\s*42/);
     });
 
+    // The fake fitness value encodes the requested day, exposing wrong dates or cache reuse.
     test('calculates historical models at each week end and never forecasts future weeks', () => {
         jest.useFakeTimers().setSystemTime(new Date('2026-11-18T12:00:00Z'));
         const data = {
@@ -220,6 +216,7 @@ describe('training calendar', () => {
         expect(estimateState).toHaveBeenCalledTimes(6);
     });
 
+    // Restore the real estimator for one case: a mocked number alone cannot prove integration.
     test('renders historical weekly metrics from the real coaching model', () => {
         jest.useFakeTimers().setSystemTime(new Date('2026-11-18T12:00:00Z'));
         const activity = normalizeActivity({
@@ -261,6 +258,7 @@ describe('training calendar', () => {
         expect(console.error).toHaveBeenCalled();
     });
 
+    // HTML-looking names must be visible words, not executable elements in the calendar.
     test('escapes workout names displayed in calendar cells', () => {
         const calendar = new TrainingCalendar();
         calendar.displayMonth = new Date(2026, 10, 1);
@@ -338,6 +336,7 @@ describe('training calendar', () => {
         expect(calendar.querySelector('img')).toBeNull();
     });
 
+    // Storage cases protect lightweight references and prevent one calendar overwriting another.
     test('stores a library reference instead of copying a large course', () => {
         const course = {
             id: 'course-1',
@@ -390,6 +389,7 @@ describe('training calendar', () => {
             .toEqual([secondEntry]);
     });
 
+    // Record requested app events rather than running a real trainer or ride timer.
     test('starts the selected workout and returns to the home page', () => {
         const workout = {id: 'workout-1', meta: {name: 'Workout'}};
         const calendar = createCalendar([workout]);
@@ -437,6 +437,7 @@ describe('training calendar', () => {
         ['week', '2026-12-15', ['2026-12-14', '2026-12-20']],
     ])('loads connected Intervals.icu plans for the entire visible %s', async (view, futureDate, range) => {
         const originalFetch = global.fetch;
+        // A tiny encoded ZWO exercises real workout import using only fake HTTP responses.
         const workoutFile = Buffer.from(
             '<workout_file><name>Intervals workout</name><workout><SteadyState Duration="60" Power="0.5"/></workout></workout_file>',
         ).toString('base64');
@@ -543,6 +544,7 @@ describe('training calendar', () => {
         expect(JSON.parse(window.localStorage.getItem('training-calendar'))[0].date).toBe('2026-11-05');
     });
 
+    // Mounted elements can hold document focus; redraws must transfer it to their replacements.
     test('preserves scroll position and preview focus during a calendar rerender', () => {
         const calendar = createCalendar();
         document.body.append(calendar);

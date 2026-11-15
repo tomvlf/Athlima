@@ -3,6 +3,9 @@
  *
  * Used by the activity history and the training calendar so both show the same
  * Intervals.icu summary values. Values that were not provided are omitted.
+ * Helpers return display text, not changed activity data. Before text enters
+ * HTML (the browser's page format), special characters are escaped so imported
+ * descriptions and device names appear as words, not as page instructions.
  */
 
 const escapeHTML = value => String(value).replace(/[&<>"']/g, c =>
@@ -10,6 +13,7 @@ const escapeHTML = value => String(value).replace(/[&<>"']/g, c =>
 const num = value => typeof value === 'number' && Number.isFinite(value);
 const round = (value, digits = 0) => Number(value.toFixed(digits)).toLocaleString('en', {maximumFractionDigits: digits});
 
+// Turn seconds into m:ss, adding hours only for activities long enough to need them.
 function clock(seconds) {
     const total = Math.round(seconds);
     const h = Math.floor(total / 3600);
@@ -18,6 +22,7 @@ function clock(seconds) {
     return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// Return minutes per kilometre for foot-based sports, or no row if data is missing.
 function pace(activity) {
     const time = activity.movingTime ?? activity.duration;
     if(!['running', 'walking', 'hiking'].includes(activity.sport) || !num(activity.distance) ||
@@ -25,6 +30,7 @@ function pace(activity) {
     return `${clock(time / (activity.distance / 1000))} /km`;
 }
 
+// Accept either raw zone durations or named zones; omit zones with no recorded time.
 function zones(times) {
     if(!Array.isArray(times)) return null;
     const entries = times.map((item, index) => typeof item === 'number'
@@ -43,6 +49,7 @@ const feelLabels = {1: 'Strong', 2: 'Good', 3: 'Normal', 4: 'Poor', 5: 'Weak'};
  */
 export function activityDetailRows(activity = {}) {
     const d = activity.details || {};
+    // Prefer the first supplied number, including zero; missing fields are not zero.
     const pick = (...values) => values.find(num);
     const kj = value => num(value) ? `${round(value / 1000)} kJ` : null;
     const rows = [

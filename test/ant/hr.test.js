@@ -1,19 +1,8 @@
 /*
- * hr.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks the shared ANT+ heart-rate page layout, its page-change flag and the
+ * callbacks that add page-specific data. Concrete examples cover the default
+ * page, operating time in seconds and manufacturer/serial fields. All messages
+ * are built in memory; a physical heart-rate strap is not involved.
  */
 
 import { equals, dataviewToArray, nthBitToBool, xor } from '../../src/functions.js';
@@ -48,6 +37,7 @@ describe('HRDataPage', () => {
         });
 
         test('encode with specEncode', () => {
+            // Pretend a new page uses bytes 1–3, proving its callback preserves the common heart-rate fields.
             function encode(args = {}) {
                 args.view.setUint8(1, args.x, true);
                 args.view.setUint8(2, args.y, true);
@@ -102,6 +92,7 @@ describe('HRDataPage', () => {
         });
 
         test('decode with specDecode', () => {
+            // Add three recognizable values to the optional area for the paired custom decoder.
             function encode(args = {}) {
                 args.view.setUint8(1, args.x, true);
                 args.view.setUint8(2, args.y, true);
@@ -109,6 +100,7 @@ describe('HRDataPage', () => {
                 return args.view;
             }
 
+            // Return only page-specific fields; HRDataPage merges them with the shared readings.
             function decode(args) {
                 const x = args.dataview.getUint8(1, true);
                 const y = args.dataview.getUint8(2, true);

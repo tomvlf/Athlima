@@ -1,25 +1,15 @@
 /*
- * dis.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Legacy, unfinished Device Information Service reader for manufacturer, model
+ * and firmware text. It still references the older BLEService/UUID interfaces
+ * and placeholder characteristic IDs, rather than the active Service factory.
+ * This is not the device-information path used by current Connectable setup.
  */
 
 import { uuids } from '../uuids.js';
 import { BLEService } from '../service.js';
 import { existance, dataviewToString } from '../../functions.js';
 
+// Decode device-provided text bytes; the encoder is an empty placeholder.
 function StringCharacteristic() {
     function encode() {}
     function decode(dataview) {
@@ -34,9 +24,11 @@ function StringCharacteristic() {
 
 const stringCharacteristic = StringCharacteristic();
 
+// Retained older service design, with a blank default record and optional information callback.
 class DeviceInformationService extends BLEService {
     uuid = uuids.deviceInformation;
 
+    // Prepare the callback, default information and yet-to-be-discovered characteristic slots.
     postInit(args) {
         this.onInfo = existance(args.onInfo, ((x) => x));
         this.value  = this.defaultValue();
@@ -89,6 +81,7 @@ class DeviceInformationService extends BLEService {
             }
         };
     }
+    // Fresh fallback information prevents missing optional strings from leaving undefined fields.
     defaultValue() {
         return {
             manufacturer: 'Unknown',
@@ -96,6 +89,7 @@ class DeviceInformationService extends BLEService {
             firmware:     '',
         };
     }
+    // Discover values and pass readInfo's promise to onInfo; this legacy method does not await that read.
     async start() {
         const self = this;
 
@@ -106,6 +100,7 @@ class DeviceInformationService extends BLEService {
         const info = self.readInfo();
         self.onInfo(info);
     }
+    // Read only supported text characteristics, retaining defaults for fields the device lacks.
     async readInfo() {
         const self = this;
 

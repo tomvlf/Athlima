@@ -1,21 +1,13 @@
-/*
- * explanations.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Writes the explanatory sentences shown with Coach decisions. These functions describe decisions
+ * already made; they do not choose workouts, save data or ask a language model. Keeping wording
+ * together helps the screens explain the same rules consistently.
  */
 
+/**
+ * Describe why this phase exists and which capabilities it emphasizes, using riding/running wording
+ * for the coached sport.
+ */
 export function explainPhase(type, focus, sport = 'cycling') {
     const reasons = {
         assessment: 'Establish a conservative baseline without requiring a maximal test.',
@@ -30,6 +22,10 @@ export function explainPhase(type, focus, sport = 'cycling') {
     };
     return `${reasons[type]} Focus: ${focus.join(', ')}.`;
 }
+/**
+ * Describe a week's time and load ceilings, historical reference and uncertainty. A ceiling is not
+ * a physiological guarantee.
+ */
 export function explainWeek(week, state) {
     const points = state.sport === 'running' ? 'pace-load (rTSS-like)' : 'power-load';
     return `${week.phaseType}: ${week.targetMinutes} minutes, at most ${week.targetLoad} modelled ${points} points. ` +
@@ -47,6 +43,10 @@ const RUN_GUIDANCE = {
     sprint: 'Run the short repetitions fast but relaxed, with full easy-jog recoveries.',
     durability: 'Keep the long run easy; it builds endurance, not speed.',
 };
+/**
+ * Explain a session's purpose and progression level, adding running effort, walk-break and stride
+ * instructions when applicable.
+ */
 export function explainWorkout(family, phaseType, level, sport = 'cycling', runFormat = null) {
     const run = sport === 'running' ? [
         RUN_GUIDANCE[family],
@@ -56,6 +56,10 @@ export function explainWorkout(family, phaseType, level, sport = 'cycling', runF
     return `${family} supports ${phaseType} objectives; progression level ${level}. ${run}` +
         'Stop or reduce the session if it feels inappropriate; missed work is never stacked into later days.';
 }
+/**
+ * Summarize the review trigger and any reduction in upcoming training, including the rule against
+ * adding catch-up sessions.
+ */
 export function explainAdaptation(trigger, reduction) {
     return `${trigger}: future training ${reduction < 1 ? `reduced by ${Math.round((1 - reduction) * 100)}%` : 'reviewed without automatic escalation'}. ` +
         'Past workouts remain unchanged. No catch-up sessions are added; availability, spacing and load limits are revalidated.';

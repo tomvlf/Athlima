@@ -1,23 +1,15 @@
 /*
- * watch.js: front-end client module.
+ * Manages the ride timer's Start, Pause, Lap, Back, Stop, and Save buttons.
+ * Button handlers send ui: requests; db: status messages decide which buttons
+ * are visible. The timer and activity-saving work happens elsewhere.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * connectedCallback wires the buttons when <watch-control> enters the page.
+ * disconnectedCallback cancels its listeners, so a removed control stops reacting.
  */
 
 import { xf } from '../functions.js';
 
+// The render methods select the button set for each ride state, not the clock text.
 class Watch extends HTMLElement {
     constructor() {
         super();
@@ -53,6 +45,7 @@ class Watch extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Starting a ride also starts or resumes the selected structured workout.
     onStart(e) {
         xf.dispatch('ui:watchStart');
         xf.dispatch('ui:workoutStart');

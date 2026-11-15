@@ -1,19 +1,8 @@
 /*
- * cycling-power-feature.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Decodes a power meter's supported-feature list, not a live power reading.
+ * Four bytes contain flag bits: each bit is a yes/no switch for a capability.
+ * Most become booleans; the two-bit distributed-system field becomes a label
+ * describing whether the sensor belongs to a multi-part measuring system.
  */
 
 import { nthBit, nthBitToBool } from '../../functions.js';
@@ -25,6 +14,7 @@ const distributedSystemsValues = {
     3: 'RFU'
 };
 
+// Each predicate reads its assigned bit; the original numeric flags are never changed.
 const pedalPowerBalanceSupported           = (flags) => nthBitToBool(flags, 0);
 const accumulatedTorqueSupported           = (flags) => nthBitToBool(flags, 1);
 const wheelRevolutionDataSupported         = (flags) => nthBitToBool(flags, 2);
@@ -50,8 +40,10 @@ const distributeSystemSupported            = (flags) => {
     return distributedSystemsValues[value];
 };
 
+// Expose the feature decoder; the encoder is currently a placeholder with no return value.
 function CpsFeature() {
 
+    // Read the four-byte flag word with the lowest-value byte first and expand it into named fields.
     function decode(dataview) {
         // nRF Connect value 0x0C-07-08-00
         //               22 1111 1111 11

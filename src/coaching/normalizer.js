@@ -1,25 +1,18 @@
-/*
- * normalizer.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Converts recordings and imported activities into one consistent format for the Coach. "Normalize"
+ * here means standardize names, units and missing values, not judge an athlete. Measurements keep
+ * their source and warnings. Missing power is never silently invented, and average power is not
+ * treated as normalized power, a separate effort-weighted estimate.
  */
 
 import { VERSION, positive, mean, metric, localDay, date } from './domain.js';
 import { powerAccumulator } from './power.js';
 import { sports } from './activity-types.js';
 
+/**
+ * Accept a measurement only when it is finite and inside its allowed range. Missing input stays
+ * null; invalid supplied input also adds a warning explaining its exclusion.
+ */
 function optional(value, name, warnings, min = 0, max = Infinity) {
     if(value == null) return null;
     if(!Number.isFinite(value) || value < min || value > max) {
@@ -29,6 +22,11 @@ function optional(value, name, warnings, min = 0, max = Infinity) {
     return value;
 }
 
+/**
+ * Validate an activity's identity, timestamp and seconds of duration, then derive only the metrics
+ * supported by its data. Return a new record with source details, local calendar day, confidence
+ * and warnings. The input is not saved here.
+ */
 export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
     profile = profile || {timeZone: 'UTC'};
     if(!raw.id || !positive(raw.duration) || raw.duration > 604800 || typeof raw.start !== 'string' ||
@@ -125,6 +123,10 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
     const bestEfforts = (raw.bestEfforts || []).filter(e => positive(e.seconds) && positive(e.watts) &&
         e.watts <= 3000 && e.seconds <= raw.duration).map(e => ({...e}));
     if(bestEfforts.length !== (raw.bestEfforts || []).length) warnings.push('Invalid best-effort summaries excluded.');
+    /**
+     * Keep a small valid chart preview, not a full measurement stream. Reject malformed previews
+     * with a warning so they cannot masquerade as usable sensor data.
+     */
     const profileSamples = (values, name, max) => {
         if(values == null) return null;
         if(Array.isArray(values) && values.length >= 2 && values.length <= 500 &&
@@ -179,6 +181,11 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
     };
 }
 
+/**
+ * Prepare a finished in-app ride for normalization. Only contiguous one-second records with valid
+ * sensor flags become streams; gaps and disconnected sensors must not look like complete
+ * measurements.
+ */
 export function fromRecordedRide(db, id, timestamp) {
     const records = db.records || [];
     const start = db.events?.[0]?.timestamp ?? records[0]?.timestamp ?? timestamp - db.elapsed * 1000;

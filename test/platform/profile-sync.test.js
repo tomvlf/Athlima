@@ -1,4 +1,9 @@
 /** @jest-environment jsdom */
+/**
+ * Checks startup and profile ownership with the real integration client but a manually completed
+ * fake HTTP response. The screen must wait for provider values, keep both old/new controls locked
+ * while connected, reject invalid replacements and permit local edits only after disconnecting.
+ */
 jest.mock('../../src/index.js', () => {
     queueMicrotask(() => globalThis.window.dispatchEvent(new CustomEvent('app:ready')));
     return {};
@@ -27,6 +32,10 @@ test('startup waits for provider profile, locks all controls and rejects local e
     window.history.replaceState({}, '', '/#/settings');
     document.body.innerHTML = '<div id="platform"></div><div class="wrapper" hidden><input effect="ftp-set"><button effect="ftp-set">Set</button><input effect="weight-set"><button effect="weight-set">Set</button></div>';
     const root = document.querySelector('#platform');
+    /**
+     * Hold the profile request unresolved so the test can inspect the loading/locked state before
+     * deliberately delivering the response.
+     */
     let finishProfile;
     global.fetch = jest.fn(() => new Promise(resolve => { finishProfile = resolve; }));
     const launched = launchPlatform(root);

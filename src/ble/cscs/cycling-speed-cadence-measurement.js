@@ -1,19 +1,8 @@
 /*
- * cycling-speed-cadence-measurement.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads Bluetooth Cycling Speed and Cadence messages. Flag bits (individual
+ * yes/no switches in the first byte) tell which wheel/crank counters follow.
+ * Event times become seconds; successive crank readings also produce cadence
+ * in revolutions/minute. Wheel fields are exposed, but speed is not calculated here.
  */
 
 //
@@ -23,6 +12,7 @@
 import { toFixed } from '../../functions.js';
 import { RevsOverTime, RateAdjuster } from './revs-over-time.js';
 
+// Presence checks determine which fields occupy space in this particular message.
 const wheelRevolutionDataPresent        = (flags) => ((flags >> 0) & 1) === 1;
 const crankRevolutionDataPresent        = (flags) => ((flags >> 1) & 1) === 1;
 const cumulativeWheelRevolutionsPresent = (flags) => ((flags >> 2) & 1) === 1;
@@ -44,6 +34,7 @@ const order = [
 ];
 
 
+// Keep cadence and arrival-rate history for one stream; wheel circumference is currently unused.
 function CSCMeasurement(args = {}) {
     const defaults = {
         wheelCircumference: 2.105, // meters or 700x25
@@ -67,10 +58,12 @@ function CSCMeasurement(args = {}) {
         }
     });
 
+    // Read the field's numeric width from byte position i, then apply its measurement step size.
     function getField(field, dataview, i) {
         return dataview[`get${field.type}`](i, architecture) * field.resolution;
     }
 
+    // Walk only present fields that fit in the supplied bytes, updating cadence when crank time arrives.
     function decode(dataview) {
         const byteLength = dataview.byteLength;
 

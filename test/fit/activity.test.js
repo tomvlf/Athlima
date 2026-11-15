@@ -1,25 +1,15 @@
 /*
- * activity.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Tests the named record objects used before activity export becomes FIT bytes.
+ * File identity, timer-event codes, lap/session metadata and required inputs are
+ * checked separately. Example timestamps are milliseconds; elapsed and riding
+ * durations are seconds, with a pause making those two durations different.
  */
 
 import { FileId, Event, Lap, Session, Activity } from '../../src/fit/local-activity.js';
 import { EventType } from '../../src/activity/enums.js';
 
 describe('Local activity messages', () => {
+    // A nine-second interval with six riding seconds keeps pause handling visible in the summaries.
     const timestamp = 1630508409000;
     const start_time = 1630508400000;
 

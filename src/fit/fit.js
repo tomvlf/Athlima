@@ -1,19 +1,8 @@
 /*
- * fit.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Public collection of the FIT file helpers. FIT is a compact file format used
+ * by fitness devices to exchange recorded activities and courses. Low-level
+ * helpers handle numbered bytes and record layouts; FITjs handles record lists;
+ * localActivity and localCourse adapt those lists to Athlima's own data.
  */
 
 //
@@ -32,6 +21,7 @@ import { fitRecord, FITjs } from './fitjs.js';
 import { localActivity } from './local-activity.js';
 import { localCourse } from './local-course.js';
 
+// Return the shared helper instances; creating this collection does not read, write or save a file.
 function FIT(args = {}) {
 
     return {

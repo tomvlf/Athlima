@@ -1,19 +1,7 @@
-/*
- * fixtures.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Reusable fictional athlete, goal and activity examples for Coach tests. Fixed dates and numbers
+ * make the same inputs produce repeatable results, independent of today's date. Fixtures are sample
+ * data, not a real athlete record or a recommended training prescription.
  */
 
 import { addDays } from '../../src/coaching/domain.js';
@@ -33,13 +21,25 @@ export const goal = {
 };
 export const start = '2026-01-01';
 export const timestamp = '2026-01-01T10:00:00Z';
+/**
+ * Generate a one-hour example ride every other day across the chosen history window, normalized
+ * through the real activity parser.
+ */
 export function history(p = profile, days = 84) {
     return Array.from({length: days}, (_, i) => i).filter(i => i % 2 === 0).map(i => normalizeActivity({
         id: `ride-${i}`, start: `${addDays(start, -i)}T09:00:00Z`,
         duration: 3600, normalizedPower: 165, averagePower: 160, averageHeartRate: 130, rpe: 4,
     }, p));
 }
+/**
+ * Estimate a dated Coach state from the supplied examples so tests exercise the real calculations
+ * rather than a hand-written imitation.
+ */
 export const state = (p = profile, activities = history(p), asOf = start) => estimateState(activities, p, asOf);
+/**
+ * Create an isolated, in-memory key/value store for one test scenario. Reusing it simulates
+ * reopening saved Coach data; it never writes a browser profile.
+ */
 export function memoryStorage() {
     const values = new Map();
     return {getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value)};

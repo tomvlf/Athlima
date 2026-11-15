@@ -1,3 +1,10 @@
+/*
+ * Builds the small power chart shown on workout and activity cards.
+ * SVG is a picture described by lines and shapes. These helpers return its HTML
+ * text for a caller to place on the page; they do not change the page themselves.
+ */
+
+// Keep a workout name inside its quoted label, even if it contains quotes or "<".
 function escapeAttribute(value) {
     return String(value).replace(/[&<>"']/g, character => ({
         '&': '&amp;',
@@ -8,6 +15,11 @@ function escapeAttribute(value) {
     })[character]);
 }
 
+/**
+ * Prefer planned interval targets; otherwise draw recorded watt samples.
+ * FTP is the rider's reference power in watts. Targets use 200 W if it is absent.
+ * Return an empty string when neither usable intervals nor enough samples exist.
+ */
 function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power profile'} = {}) {
     const hasThreshold = Number.isFinite(ftp) && ftp > 0;
     const threshold = hasThreshold ? ftp : 200;
@@ -31,6 +43,7 @@ function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power p
     }
 
     if(segments.length) {
+        // Horizontal width represents time; height represents power, not duration.
         const totalDuration = segments.reduce((sum, segment) => sum + segment.duration, 0);
         let elapsed = 0;
         const maxWatts = Math.max(threshold, ...segments.map(segment => segment.watts));
@@ -59,6 +72,7 @@ function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power p
     const validSamples = samples.filter(value => Number.isFinite(value) && value >= 0);
     if(validSamples.length < 2) return '';
 
+    // Average groups of readings so a long ride still produces a small preview.
     const bucketCount = Math.min(64, validSamples.length);
     const points = Array.from({length: bucketCount}, (_, index) => {
         const start = Math.floor(index * validSamples.length / bucketCount);

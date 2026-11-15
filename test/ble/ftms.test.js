@@ -1,19 +1,8 @@
 /*
- * ftms.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * FTMS trainer-message examples for commands, replies, live readings, status
+ * notices and supported ranges. Constructed bytes exercise decoding without
+ * Bluetooth hardware. Several encoder examples are deliberately marked
+ * test.skip: they remain readable examples, not active checks in this suite.
  */
 
 import { uuids } from '../../src/ble/web-ble.js';
@@ -321,6 +310,7 @@ describe('IndoorBikeData', () => {
     });
 });
 
+// Status notices reuse command value layouts, but name what the trainer says changed.
 describe('FitnessMachineStatus', () => {
 
     describe('decode', () => {
@@ -371,6 +361,7 @@ describe('FitnessMachineStatus', () => {
     });
 });
 
+// Limits are minimum, maximum and increment; resistance expectations remain raw, unscaled numbers.
 describe('SupportedRanges', () => {
 
     describe('PowerRange', () => {

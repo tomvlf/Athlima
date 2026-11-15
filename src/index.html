@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Page structure and reusable custom elements. platform/start.js starts the app. -->
 <html lang="en">
     <head>
         <meta charset="UTF-8"/>
@@ -13,6 +14,7 @@
         <title>Athlima | Cycling training</title>
         <meta name="description" content="indoor cycling app for workouts with smart trainers and power meters over bluetooth">
 
+        <!-- Base component styles, then platform layout, then the visual theme. -->
         <link href="css/base.css" rel="stylesheet"/>
         <link href="css/platform.css" rel="stylesheet"/>
         <link href="css/cyberpunk.css" rel="stylesheet"/>
@@ -21,6 +23,8 @@
 
     <body id="theme" class="dark-theme">
         <div id="platform" role="status">Opening your training...</div>
+        <!-- The platform reuses these older device/calendar/editor components.
+             Hidden at startup does not mean unused; their IDs are integration hooks. -->
         <div class="wrapper" hidden>
             <modal-error>
                 <dialog id="dialog--error" class="dialog error">

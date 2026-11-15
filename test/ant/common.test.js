@@ -1,19 +1,8 @@
 /*
- * common.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks ANT+ field scaling, offsets and bounds using small invented fields,
+ * then checks request/status pages 70 and 71 against exact byte arrays.
+ * Bytes are the small numbered pieces a device sends; named decoded values
+ * make the same examples readable. These tests do not need an ANT adapter.
  */
 
 import { equals, dataviewToArray, nthBitToBool, xor } from '../../src/functions.js';
@@ -27,6 +16,7 @@ global.console = {
 };
 
 describe('DataPage', () => {
+    // Unitless test fields isolate whole-number, tenth-step and shifted tenth-step storage.
     const definitions = {
         value1: {
             resolution: 1, offset: 0, unit: '', min: 0, max: 10, invalid: 255, default: 0
@@ -34,8 +24,7 @@ describe('DataPage', () => {
         value2: {
             resolution: 0.1, offset: 0, unit: '', min: 0, max: 10, invalid: 255, default: 1
         },
-        // input value is between 1 and 20
-        // ouput value is between 100 and 200
+        // Shift by 10 before storing tenths: an input of 1 becomes 110.
         value3: {
             resolution: 0.1, offset: 10, unit: '', min: 0, max: 20, invalid: 255, default: 1
         },

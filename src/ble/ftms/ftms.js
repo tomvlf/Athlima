@@ -1,19 +1,8 @@
 /*
- * ftms.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Uses the standard Bluetooth Fitness Machine Service (FTMS) to read a trainer
+ * and control its load. Measurement updates become app data; control-point
+ * replies allow later simulation commands. The control point is the device's
+ * command channel, and setup first asks permission to control the trainer.
  */
 
 //
@@ -28,6 +17,7 @@ import { Characteristic } from '../characteristic.js';
 import { indoorBikeData as indoorBikeDataParser } from './indoor-bike-data.js';
 import { control as controlParser } from './control-point.js';
 
+// Wrap an existing trainer service and extend Service's setup/start/stop with load-control methods.
 function FTMS(args = {}) {
 
     // config
@@ -44,6 +34,7 @@ function FTMS(args = {}) {
     // end config
 
     // Service
+    // Any received command response releases the simulation write gate; result codes are not checked here.
     function onControlResponse(msg) {
         const control = service.characteristics.control;
         // it's important to release the control characteristic for writes
@@ -52,6 +43,7 @@ function FTMS(args = {}) {
         control.release();
     }
 
+    // Request control after notifications are listening, so the trainer's reply can be received.
     async function protocol() {
         const control = service.characteristics.control;
 
@@ -65,6 +57,7 @@ function FTMS(args = {}) {
         return false;
     }
 
+    // Send a reset and wait one second for the trainer to settle before returning write success.
     async function reset() {
         const control = service.characteristics.control;
 
@@ -93,7 +86,8 @@ function FTMS(args = {}) {
     // methods
     // this service has special write methods
 
-    // {WindSpeed: Float, Grade: Float, Crr: Float, WindResistance: Float} -> Bool
+    // Send road grade (%), wind (m/s), rolling resistance and drag settings.
+    // Ignore new simulation requests while the previous one is awaiting a reply/timeout.
     async function setSimulation(args = {}) {
         const control = service.characteristics.control;
 
@@ -108,7 +102,7 @@ function FTMS(args = {}) {
         return res;
     }
 
-    // {power: Int} -> Bool
+    // Send a watt target with retries; the boolean reports the write, not the trainer's acceptance.
     async function setPowerTarget(args = {}) {
         const control = service.characteristics.control;
 
@@ -121,7 +115,7 @@ function FTMS(args = {}) {
         return res;
     }
 
-    // {power: Int} -> Bool
+    // Send a resistance-level target with retries, using the encoder's tenth-level precision.
     async function setResistanceTarget(args = {}) {
         const control = service.characteristics.control;
 

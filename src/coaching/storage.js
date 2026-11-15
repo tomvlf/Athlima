@@ -1,22 +1,16 @@
-/*
- * storage.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Keeps the complete coaching record in its own IndexedDB database, separate from the limited
+ * recent-FIT-file cache. The returned adapter looks like a small key/value store to
+ * CoachingService. A write checks whether another tab changed the saved record, so one tab cannot
+ * silently overwrite the other.
  */
 
 // Separate from the seven-item FIT activity cache: coaching history must not be evicted with it.
+/**
+ * Open the database and read its saved JSON once. getItem returns this in-memory copy; setItem
+ * commits only if the stored copy still matches; close releases the connection. Read/write failures
+ * reach the caller.
+ */
 export async function openCoachingStorage(indexedDB) {
     const database = await new Promise((resolve, reject) => {
         const request = indexedDB.open('athlima-coaching', 1);
@@ -36,6 +30,10 @@ export async function openCoachingStorage(indexedDB) {
     let current = initial;
     return {
         getItem: () => current,
+        /**
+         * Compare and save inside one transaction. If another tab saved first, cancel this write
+         * and ask the user to reload instead of losing the other change.
+         */
         setItem: (key, value) => new Promise((resolve, reject) => {
             const transaction = database.transaction('state', 'readwrite');
             const store = transaction.objectStore('state');

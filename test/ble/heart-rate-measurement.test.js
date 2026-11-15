@@ -1,19 +1,8 @@
 /*
- * heart-rate-measurement.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks Bluetooth heart-rate layouts with one/two-byte heart rate, energy and
+ * multiple R–R intervals (seconds between heartbeats). Presence flags must move
+ * later fields to the correct byte positions. Separate cases distinguish a
+ * sensor that supports contact detection from one actually touching the rider.
  */
 
 import { uuids } from '../../src/ble/web-ble.js';
@@ -49,6 +38,7 @@ describe('HeartRateMeasurement', () => {
             expect(res).toEqual(expected);
         });
     });
+    // Stored intervals use 1/1024-second ticks, so expected values deliberately divide by that resolution.
     describe('RRInterval Field', () => {
         const resolution = heartRateMeasurement.rrIntervalResolution;
 

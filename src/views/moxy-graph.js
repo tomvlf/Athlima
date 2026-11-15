@@ -1,25 +1,18 @@
 /*
- * moxy-graph.js: front-end client module.
+ * Draws a scrolling live chart of muscle oxygen (SmO2), total haemoglobin (THb),
+ * heart rate, and power. Each line has its own scale so different units can share
+ * one picture. Sensor messages refresh values; timer ticks add points to the lines.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * SVG draws each line from an x/y point list rather than an image file.
+ * connectedCallback finds those lines and starts listening when the custom tag
+ * joins the page; disconnectedCallback cancels listeners when it leaves.
  */
 
 import { xf, exists, clamp, debounce } from '../functions.js';
 import { translate } from '../utils.js';
 import { models } from '../models/models.js';
 
+// Holds recent screen coordinates and the latest sensor value for each coloured line.
 class MoxyGraph extends HTMLElement {
     constructor() {
         super();
@@ -125,6 +118,7 @@ class MoxyGraph extends HTMLElement {
         // TODO: debounce
         this.width = this.calcWidth();
     }
+    // Start THb's scale around its first reading, then expand it for new extremes.
     adjustYMinMaxFor(key, value) {
         if(this[key].value === 0) {
             this[key].min = value - 1;
@@ -138,6 +132,7 @@ class MoxyGraph extends HTMLElement {
             this[key].max = value;
         }
     }
+    // Sample all four latest readings at the same timer tick before advancing time.
     onElapsed() {
         // first calculate
         for(let key in this.path) {
@@ -158,9 +153,11 @@ class MoxyGraph extends HTMLElement {
     // this.power =     {value: 0, x: 0, min:  0, max: 600};
     // this.xAxis =     {min: 0, max: 100};
     // this.yAxis =     {min: 0, max: 100};
+    // Map a number's position in one range to the same position in another range.
     translate(value, inMin, inMax, outMin, outMax) {
         return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
     }
+    // Limit readings to their scale and flip y: SVG's zero is at the top, not bottom.
     translateY(key, value) {
         return this.yAxis.max - this.translate(
             clamp(this[key].min, this[key].max, value),
@@ -170,6 +167,11 @@ class MoxyGraph extends HTMLElement {
             this.yAxis.max
         );
     }
+    /**
+     * Add the next point to a flat [x, y, x, y, ...] list.
+     * Once the visible width is full, shift old readings away; after a shrink,
+     * discard enough old points to fit and re-number their horizontal positions.
+     */
     calcStep(key) {
         const y = this.translateY(key, this[key].value);
         let length = this.path[key].length;
@@ -214,6 +216,7 @@ class MoxyGraph extends HTMLElement {
             this.path[key].push(y);
         }
     }
+    // Give the browser the updated coordinate list for one SVG line.
     renderStep(key) {
         const points = this.path[key].join(',');
         this.$path[key].setAttribute('points', points);

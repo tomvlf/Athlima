@@ -1,19 +1,8 @@
-/*
- * guest.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Walks through the mobile interface with local data and network access made unavailable. "Guest"
+ * is historical terminology: everyone can use this standalone app without an Athlima account.
+ * Checks local library, calendar, Coach, settings, recording actions and remembered expanded
+ * sections.
  */
 
 /** @jest-environment jsdom */
@@ -21,6 +10,11 @@ import { launchPlatform } from '../../src/platform/ui.js';
 import { coachingService } from '../../src/coaching/service.js';
 import { xf } from '../../src/functions.js';
 
+/**
+ * Replace engine startup with its ready announcement and provide controlled model/service data.
+ * This exercises real platform rendering without connecting hardware or restoring a real browser
+ * database.
+ */
 jest.mock('../../src/index.js', () => {
     queueMicrotask(() => globalThis.window.dispatchEvent(new CustomEvent('app:ready')));
     return {};
@@ -43,7 +37,15 @@ jest.mock('../../src/functions.js', () => {
     return {...actual, xf: {...actual.xf, dispatch: jest.fn(actual.xf.dispatch)}};
 });
 
+/**
+ * Drain a bounded number of queued promise callbacks after navigation/actions before checking their
+ * visible results.
+ */
 const settle = async () => { for(let i = 0; i < 15; i++) await Promise.resolve(); };
+/**
+ * Change the mobile hash route, announce the navigation event and wait for the page's asynchronous
+ * updates.
+ */
 const go = async route => {
     window.history.replaceState({}, '', `/mobile#/${route}`);
     window.dispatchEvent(new HashChangeEvent('hashchange'));

@@ -1,19 +1,8 @@
 /*
- * web-serial.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Connects an ANT+ USB adapter through the browser's serial interface, which
+ * delivers a stream of bytes (small numbered pieces of data). Incoming chunks
+ * may split or join messages, so MessageTransformer rebuilds complete ANT packets
+ * before passing them to onData. The same lifecycle supports the USB fallback.
  */
 
 //
@@ -33,6 +22,11 @@ const filters = {
     dynastream: { filters: [{ usbVendorId: values.dynastreamId }] },
 };
 
+/**
+ * Own one adapter, its reader and its writer. Callbacks receive complete packets
+ * and closure notices; isOpen/isReading expose the two lifecycle flags without
+ * opening anything. A custom request function can supply a USB-backed port.
+ */
 function SerialDriver(args = {}) {
     const defaults = {
         filter:   [{ usbVendorId: values.dynastreamId }],
@@ -42,7 +36,7 @@ function SerialDriver(args = {}) {
     };
 
     async function defaultRequest() {
-        // get known device or request a new one
+        // Ask the rider to choose an ANT adapter and grant this page access to it.
         const port = await navigator.serial.requestPort(filters.dynastream);
         return port;
     }
@@ -65,6 +59,7 @@ function SerialDriver(args = {}) {
     function setReading(value) { _reading = value; return _reading; }
 
 
+    // Acquire both streams, run the ready callback, then read until cancelled or disconnected.
     async function open(cb = () => {}) {
         if(isOpen()) return;
 
@@ -99,6 +94,7 @@ function SerialDriver(args = {}) {
         }
     }
 
+    // Cancel any pending read; read() releases stream locks and closes the actual port.
     async function close() {
         if(!port) return;
         setIsOpen(false);
@@ -107,6 +103,7 @@ function SerialDriver(args = {}) {
         await readTask;
     }
 
+    // Deliver complete messages and always release the port, including after a read failure.
     async function read() {
         try {
             reader = port.readable
@@ -139,10 +136,12 @@ function SerialDriver(args = {}) {
         }
     }
 
+    // With no application callback, make received packets visible in the browser console.
     function defaultOnData(data) {
         console.log(data);
     }
 
+    // Send only the bytes covered by this DataView, not unrelated bytes in its backing buffer.
     async function write(dataview) {
         if(!isOpen() || !writer) {
             throw new Error('ANT+ adapter is not open.');
@@ -166,10 +165,11 @@ function SerialDriver(args = {}) {
     };
 }
 
+// Reuse the serial lifecycle with a USB adapter wrapped to look like a serial port.
 function SerialPolyfillDriver(args = {}) {
 
     async function request() {
-        // get known device or request a new one
+        // Use the browser's USB permission dialog instead of its serial-port dialog.
         const device = await navigator.usb.requestDevice(filters.dynastream);
         const port = new SerialPort(device);
         return port;
@@ -182,12 +182,17 @@ function SerialPolyfillDriver(args = {}) {
 
 
 
-// refactor
+/**
+ * Reassemble packets across arbitrary stream chunks. The 0xA4 marker starts a
+ * packet; its length byte excludes the four framing bytes. Incomplete packets
+ * stay buffered, and stray bytes before a marker are discarded.
+ */
 class MessageTransformer {
     constructor() {
         this.buffer = [];
         this.sync = 0xA4;
     }
+    // Emit every complete packet in this chunk; leave the remaining fragment for the next call.
     transform(chunk, controller) {
         this.buffer.push(...chunk);
 
@@ -207,6 +212,5 @@ class MessageTransformer {
         }
     }
 }
-// end refactor
 
 export { SerialDriver, SerialPolyfillDriver, MessageTransformer };

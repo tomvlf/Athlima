@@ -1,19 +1,8 @@
 /*
- * ui-controls.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Exercises Open Bike Control navigation/dial reports independently of screens.
+ * Examples distinguish digital press/release from brake percentages, half-degree
+ * steering values and camera selection. Unknown button families, reserved dial
+ * states and unavailable steering must not become ordinary presses.
  */
 
 import { uiControls } from '../../src/ble/obc/ui-controls.js';
@@ -54,6 +43,7 @@ describe('UIControls', () => {
         expect(res).toEqual([]);
     });
 
+    // The special full-brake state and the continuous percentage scale can both mean 100%.
     describe('brake', () => {
         test('released', () => {
             expect(uiControls.decode([{id: 0x1A, state: 0x00}])).toEqual([

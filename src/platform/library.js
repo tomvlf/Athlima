@@ -1,3 +1,8 @@
+/**
+ * Filters and displays the workout library already loaded in the browser. The same results serve
+ * desktop and mobile; mobile receives a page-size limit from the platform. Rendering changes no
+ * workout data and makes no network request.
+ */
 import { cadenceSummary, escape, minutes, number, profileGraph, mobileDetails } from './format.js';
 
 export const initialLibraryFilters = () => ({
@@ -7,6 +12,10 @@ export const initialLibraryFilters = () => ({
 const workoutType = workout => Array.isArray(workout.points) ? 'course' : 'workout';
 const hasMetric = value => Number.isFinite(value) && value > 0;
 
+/**
+ * Sort by duration or distance while keeping entries without a usable measurement after those with
+ * known values, in either sort direction.
+ */
 function compareMetric(left, right, key, descending = false) {
     const a = left.meta[key], b = right.meta[key];
     if(!hasMetric(a)) return hasMetric(b) ? 1 : 0;
@@ -14,6 +23,10 @@ function compareMetric(left, right, key, descending = false) {
     return descending ? b - a : a - b;
 }
 
+/**
+ * Apply keyword, category, workout/course and duration filters, then sort the resulting copy. The
+ * original library order is left untouched.
+ */
 export function filterWorkouts(workouts, filters) {
     const query = filters.search.toLowerCase();
     const filtered = workouts.filter(workout => {
@@ -39,6 +52,10 @@ export function filterWorkouts(workouts, filters) {
 const option = (value, label, selected) =>
     `<option value="${escape(value)}"${value === selected ? ' selected' : ''}>${escape(label)}</option>`;
 
+/**
+ * Build one selectable workout/course preview, displaying only known metrics and escaping imported
+ * text.
+ */
 function workoutCard(workout) {
     const {name, category, duration, distance} = workout.meta;
     const type = workoutType(workout) === 'course' ? 'Course' : 'Workout';
@@ -61,6 +78,10 @@ function workoutCard(workout) {
     </article>`;
 }
 
+/**
+ * Build filters, result counts, cards and optional pagination. Clamp a stale page index after
+ * filtering so the user is not left on a nonexistent page.
+ */
 export function renderLibrary(workouts, filters, {page = 0, pageSize = Infinity} = {}) {
     const filtered = filterWorkouts(workouts, filters);
     const pages = Math.ceil(filtered.length / pageSize);

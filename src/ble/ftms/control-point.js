@@ -1,19 +1,9 @@
 /*
- * control-point.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Encodes FTMS trainer commands and reads their responses. A protocol is an
+ * agreed message format: here the first byte (a small whole-number storage unit)
+ * is an operation code identifying the command, followed by its settings.
+ * Command encode methods return ArrayBuffers ready to write; decode methods
+ * accept DataViews for reading those byte positions. No Bluetooth writes occur here.
  */
 
 //
@@ -23,6 +13,11 @@
 
 import { Spec, hex, dataviewToArray, print, } from '../../functions.js';
 
+/**
+ * Road simulation settings: wind in m/s, grade in percent, rolling resistance
+ * (crr, a unitless tyre/road factor) and wind resistance in kg/m.
+ * Encoding applies defaults/bounds and stores negative wind/grade as signed numbers.
+ */
 function SimulationParameters(args) {
     const opCode = 0x11;
     const length = 7;
@@ -80,6 +75,7 @@ function SimulationParameters(args) {
     });
 }
 
+// Resistance level stored in tenths, with this implementation allowing input from -100 to 100.
 function ResistanceTarget() {
     const opCode = 0x04;
     const length = 3; // 3
@@ -122,6 +118,7 @@ function ResistanceTarget() {
     });
 }
 
+// Requested load in whole watts; encode limits it using the field definition before packing two bytes.
 function PowerTarget() {
     const opCode = 0x05;
     const length = 3;
@@ -161,6 +158,7 @@ function PowerTarget() {
     });
 }
 
+// Wheel travel per revolution, supplied in millimetres and stored in tenths of a millimetre.
 function WheelCircumference(args) {
     const opCode = 0x12;
     const length = 3;
@@ -213,6 +211,7 @@ function WheelCircumference(args) {
     });
 }
 
+// One-byte request for permission to change trainer settings; no setting values follow it.
 function RequestControl() {
     const opCode = 0x00;
     const length = 1;
@@ -240,6 +239,7 @@ function RequestControl() {
     });
 }
 
+// One-byte reset command; resetting the trainer itself happens only after a caller sends these bytes.
 function Reset() {
     const opCode = 0x01;
     const length = 1;
@@ -267,6 +267,7 @@ function Reset() {
     });
 }
 
+// Decode a three-byte command outcome; response encoding deliberately throws because it is unsupported.
 function Response() {
     const opCode = 0x80;
 
@@ -303,6 +304,7 @@ function Response() {
         throw 'Not implemented!';
     }
 
+    // Return numeric request/result codes and log their known labels for diagnostics.
     function decode(dataview) {
         const opCode      = dataview.getUint8(0, true) ?? opCode;
         const requestCode = dataview.getUint8(1, true) ?? 0xFF;

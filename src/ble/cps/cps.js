@@ -1,19 +1,8 @@
 /*
- * cps.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Connects Bluetooth Cycling Power updates to the cycling-power decoder.
+ * onData receives watts and any optional measurements the sensor includes,
+ * such as crank counters and calculated cadence. This service is read-only;
+ * trainer resistance commands are handled by other service wrappers.
  */
 
 //
@@ -26,6 +15,7 @@ import { Service } from '../service.js';
 import { Characteristic } from '../characteristic.js';
 import { cyclingPowerMeasurement as cyclingPowerMeasurementParser } from './cycling-power-measurement.js';
 
+// Wrap the discovered power service; shared setup/start/stop methods manage its measurement updates.
 function CPS(args = {}) {
     // config
     // BluetoothRemoteGATTService{

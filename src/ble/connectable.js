@@ -1,19 +1,9 @@
 /*
- * connectable.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Owns one browser Bluetooth connection from device selection to disconnection.
+ * It discovers services (groups of device features), starts the matching sensor
+ * or trainer handlers, and attempts recovery after a dropped link. GATT is
+ * Bluetooth's system for accessing those services and their individual values.
+ * Decoded readings go to callbacks; app-event routing lives in ReactiveConnectable.
  */
 
 import { equals, exists, first, expect, compose2, time, print, } from '../functions.js';
@@ -69,6 +59,12 @@ import { Device, Status, } from './enums.js';
 // const powerMeter = Connectable({filter: powerMeterFilter});
 // await powerMeter.connect();
 //
+/**
+ * Accept either an already-chosen device or browser chooser filters. Callbacks
+ * report connection progress and decoded data. Accessors read cached identity,
+ * status and service information; they do not contact the device themselves.
+ * services holds the active protocol handlers after discovery.
+ */
 function Connectable(args = {}) {
     const defaults = {
         name: 'Unknown',
@@ -260,6 +256,7 @@ function Connectable(args = {}) {
     }
     // end accesor methods
 
+    // Log the discovered feature groups using readable names where known.
     function printServices() {
         _primaryServicesList.forEach((service) => {
             print.log(`ble: service: ${serviceToString(service)}`);
@@ -300,6 +297,7 @@ function Connectable(args = {}) {
     //   so we want to listen for when it becomes availbale again. This is used to
     //   recover devices that have droped.
     //
+    // Run selection/recovery, connect the radio link, discover services and attempt their setup.
     async function connect(args = {}) {
         if(equals(getStatus(), Status.connecting) ||
            equals(getStatus(), Status.connected)) return;
@@ -354,8 +352,7 @@ function Connectable(args = {}) {
 
             let resSetup = await setup();
 
-            // calling the connected callback last, because only at that point
-            // the device is usable.
+            // Notify after setup has returned; a false setup result is not checked here.
             onConnected();
 
         } catch(e) {
@@ -375,7 +372,7 @@ function Connectable(args = {}) {
         return device;
     }
 
-    // Int -> GATTDevice?
+    // Wait up to 60 seconds for a known device's advertisement (its "I am nearby" broadcast).
     async function watch(deviceId) {
         print.log(`ble: watching: advertisements: for: ${deviceId}`);
 
@@ -406,6 +403,7 @@ function Connectable(args = {}) {
             }
         );
 
+        // Resolve with the rediscovered device and remove both the listener and timeout.
         async function onAdvertisementReceived(e) {
             abortController.abort();
             clearTimeout(timeoutId);
@@ -419,6 +417,7 @@ function Connectable(args = {}) {
         return maybeDevice;
     }
 
+    // Deliberately disconnect: reset a trainer if supported, stop services and disable auto-reconnect.
     async function disconnect() {
         if(!_connected) { return; }
 
@@ -444,12 +443,14 @@ function Connectable(args = {}) {
         onDisconnect();
     }
 
+    // Unexpected link loss notifies callers and starts recovery unless deliberate closure disabled it.
     function _onDisconnect() {
         _status = Status.disconnected;
         onDisconnect();
         if(_autoReconnect) onDropout();
     }
 
+    // Prefer waiting for a fresh advertisement; otherwise reconnect using the retained device handle.
     async function onDropout() {
         print.warn(`ble: dropout: ${_device.name}`);
 
@@ -461,6 +462,7 @@ function Connectable(args = {}) {
         }
     }
 
+    // Advertisement watching is an optional browser feature, separate from basic Bluetooth support.
     function watchAdvertisementsSupported() {
         return exists(_device.watchAdvertisements);
     }
@@ -470,6 +472,7 @@ function Connectable(args = {}) {
     // - deviceType
     // - setup Services by linking them to data callbacks
     //   and the raw gattService object
+    // Start auxiliary readings first, then choose one main device role; trainer preference is FTMS, FE-C, Wahoo.
     async function defaultSetup() {
         const hasFTMS = hasService(uuids.fitnessMachine);
         const hasFEC = hasService(uuids.fec);
@@ -650,6 +653,7 @@ function Connectable(args = {}) {
         return false;
     }
 
+    // Optional helper to install a named service factory and return its setup result.
     async function setupService(args = {}) {
         const name   = expect(
             args.name,

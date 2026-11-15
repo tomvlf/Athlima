@@ -1,4 +1,10 @@
 /** @jest-environment node */
+/**
+ * Build-level check that a release label/revision is actually embedded in the produced JavaScript.
+ * It copies source into a disposable workspace, reuses installed dependencies, runs the real
+ * metadata generator and Parcel, then removes that workspace. It neither publishes a release nor
+ * changes this checkout's build label.
+ */
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,6 +23,10 @@ test('build metadata is embedded into the production frontend', () => {
 
         const infoPath = path.join(workspace, 'src/platform/build-info.json');
         const generator = path.join(root, 'scripts/write-build-info.mjs');
+        /**
+         * Clear inherited release values first to test the development fallback, then supply
+         * explicit fictional release values for the production-bundle check.
+         */
         const env = {...process.env, NODE_ENV: 'production', BABEL_ENV: 'production',
             ATHLIMA_BUILD_VERSION: '', ATHLIMA_BUILD_REVISION: ''};
         execFileSync(process.execPath, [generator, infoPath], {env});

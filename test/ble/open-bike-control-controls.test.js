@@ -1,19 +1,8 @@
 /*
- * open-bike-control-controls.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks how decoded bike buttons become app actions in power, resistance and
+ * slope modes. Cases cover duplicate arrows, ordering, timer-aware pause/resume
+ * and ignored release/dial messages. The final test uses the app event system
+ * to prove two equivalent presses in one report raise a target only once.
  */
 
 /**
@@ -23,9 +12,11 @@
 import { xf } from '../../src/functions.js';
 import { openBikeControl } from '../../src/ble/obc/controls.js';
 
+// Minimal decoded-button fixtures keep tests focused on actions, not Bluetooth byte parsing.
 const pressed = (action) => ({action, state: 'pressed'});
 const released = (action) => ({action, state: 'released'});
 
+// Format proposed event names and optional values for comparison without dispatching them.
 function eventsFor(messages, context) {
     return openBikeControl.controlsFor(messages, context).map((action) => {
         if('data' in action) return `${action.event}:${action.data}`;

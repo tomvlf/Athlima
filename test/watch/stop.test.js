@@ -1,5 +1,14 @@
+/**
+ * Checks the stop/save/discard decision with scripted confirmation answers, especially the exact
+ * one-minute boundary. A discarded short ride must clear its recovery checkpoint first;
+ * cancellation or a checkpoint-write failure must leave the ride unstopped.
+ */
 import { stopRide } from '../../src/activity/stop.js';
 
+/**
+ * Rows specify elapsed seconds, dialog answers, whether the ride is discarded and the expected
+ * number of prompts; every row runs the same behavior check.
+ */
 test.each([
     [0, [true, false], true, 2],
     [59, [true, false], true, 2],

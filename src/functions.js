@@ -1,19 +1,8 @@
-/*
- * functions.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Shared tools for working with values, lists, binary device data and app messages. The central xf
+ * object is an event bus: one part announces a named change and interested parts react. Its "db:"
+ * messages describe live browser state, not a remote database. The attributed Lodash-derived
+ * debounce block is retained; it combines rapid repeated calls into fewer updates.
  */
 
 //
@@ -49,6 +38,10 @@ function isDataView(x) {
     return x instanceof DataView;
 }
 
+/**
+ * This legacy check means a JavaScript object that is not an array. JavaScript also calls null an
+ * object, so callers must check existence separately when null is possible.
+ */
 function isObject(x) {
     return equals(typeof x, 'object') && !(isArray(x));
 }
@@ -61,31 +54,55 @@ function isString(x) {
     return equals(typeof x, 'string');
 }
 
+/**
+ * Accept actual numbers except NaN (the result of an invalid calculation); this is not a
+ * finite-number or range check.
+ */
 function isNumber(x) {
     if(isNaN(x)) return false;
     return equals(typeof x, 'number');
 }
 
+/**
+ * For this collection utility, an atomic value means a number or text, not every JavaScript
+ * primitive type.
+ */
 function isAtomic(x) {
     return isNumber(x) || isString(x);
 }
 
+/**
+ * Treat only null and undefined as missing. Zero, false and empty text still count as supplied
+ * values.
+ */
 function exists(x) {
     if(isNull(x) || isUndefined(x)) { return false; }
     return true;
 }
 
+/**
+ * Use the supplied value, otherwise a supplied fallback; throw if both are missing. The historical
+ * spelling is kept for existing callers.
+ */
 function existance(value, fallback) {
     if(exists(value))    return value;
     if(exists(fallback)) return fallback;
     throw new Error(`existance needs a fallback value `, value);
 }
 
+/**
+ * Require a present value and otherwise throw the caller's error message. This is an application
+ * helper, unrelated to Jest's expect in tests.
+ */
 function expect(x, msg = 'expected value here') {
     if(exists(x)) return x;
     throw new Error(msg);
 }
 
+/**
+ * Accept a value when every supplied check passes. Otherwise use a present fallback or throw rather
+ * than returning an unexplained missing result.
+ */
 function validate(predicates = [], value, fallback = undefined) {
     if(predicates.reduce((acc, p) => acc && p(value), true)) return value;
     if(exists(fallback)) return fallback;
@@ -93,6 +110,10 @@ function validate(predicates = [], value, fallback = undefined) {
 }
 
 // Collections
+/**
+ * Check supported collections for no entries. Undefined counts as empty; other unsupported values
+ * raise an error.
+ */
 function empty(x) {
     if(isUndefined(x)) return true;
     if(isObject(x)) return (Object.keys(x).length === 0);
@@ -102,6 +123,10 @@ function empty(x) {
     return x.length === 0;
 };
 
+/**
+ * Select a position from text or a list; negative offsets count from the end. curry2 also allows
+ * saving a position first and supplying the list later.
+ */
 const nth = curry2(function(offset, xs) {
     let i = (offset < 0) ? (xs.length + offset) : (offset);
     if(isString(xs)) {
@@ -110,6 +135,10 @@ const nth = curry2(function(offset, xs) {
     return xs[i];
 });
 
+/**
+ * The first/second/third/last helpers select common list positions and leave an absent list as
+ * undefined rather than inventing an entry.
+ */
 function first(xs) {
     if(isUndefined(xs)) return undefined;
     return xs.at(0);
@@ -130,11 +159,16 @@ function last(xs) {
     return xs.at(-1);
 }
 
+/** Read an object property or numeric list position, with optional two-stage calling through curry2. */
 const prop = curry2(function(p, x) {
     if(!exists(x)) return;
     return Number.isInteger(p) ? nth(p, x) : x[p];
 });
 
+/**
+ * Apply a transformation to each entry. Arrays/text return a new result, but object values are
+ * changed in place, so callers must account for that side effect.
+ */
 function map(coll, fn) {
     if(isArray(coll)) return coll.map(fn);
     if(isObject(coll)) {
@@ -150,8 +184,16 @@ function map(coll, fn) {
 }
 
 
+/**
+ * Visit nested object fields, passing each non-object value to an accumulator callback. Arrays are
+ * treated as values here rather than recursively traversed.
+ */
 function traverse(obj, fn = ((x) => x), acc = []) {
 
+    /**
+     * Walk the remaining keys, descend into nested objects and carry the accumulated result back to
+     * the next field.
+     */
     function recur(fn, obj, keys, acc) {
         if(empty(keys)) {
             return acc;
@@ -171,6 +213,10 @@ function traverse(obj, fn = ((x) => x), acc = []) {
     return recur(fn, obj, Object.keys(obj), acc);
 }
 
+/**
+ * Follow a list of keys to a nested value. Intermediate containers must exist; this is not an
+ * optional-chaining replacement.
+ */
 function getIn(...args) {
     let [collection, ...path] = args;
     return path.reduce((acc, key) => {
@@ -185,11 +231,19 @@ function set(coll, k, v) {
     return coll;
 }
 
+/**
+ * Create missing nested containers along a key path and write the final value, changing the
+ * passed-in collection.
+ */
 function setIn(coll={}, [k, ...keys], v) {
     return keys.length ? set(coll, k, setIn(coll[k], keys, v)) : set(coll, k, v);
 }
 
 
+/**
+ * Average numbers or one property from a list of records. This legacy helper returns zero for an
+ * empty list; coaching uses its own missing-aware mean.
+ */
 function avg(xs, prop = false) {
     if(prop !== false) {
         return xs.reduce( (acc,v,i) => acc+(v[prop]-acc)/(i+1), 0);
@@ -198,10 +252,18 @@ function avg(xs, prop = false) {
     }
 }
 
+/**
+ * Update an average from the new sample, previous average and sample counts without retaining the
+ * entire history.
+ */
 function mavg(value_c, value_p, count_c, count_p = count_c-1) {
     return (value_c + ((count_p) * value_p)) / count_c;
 }
 
+/**
+ * Find the largest number or record property. The property form starts at zero, so it is intended
+ * for nonnegative measurements.
+ */
 function max(xs, prop = false) {
     if(prop !== false) {
         return xs.reduce( (acc,v,i) => v[prop] > acc ? v[prop] : acc, 0);
@@ -210,6 +272,7 @@ function max(xs, prop = false) {
     }
 };
 
+/** Add either each number or the named property of each record, starting at zero for an empty list. */
 function sum(xs, path = false) {
     if(path !== false) {
         return xs.reduce( (acc,v,i) => acc + v[path], 0);
@@ -226,6 +289,10 @@ function capitalize(str) {
     return str.trim().replace(/^\w/, (c) => c.toUpperCase());
 }
 
+/**
+ * Keep a numeric value between a lower and upper bound. This limits a valid number but does not
+ * validate its type.
+ */
 function clamp(lower, upper, value) {
     if(value >= upper) {
         return upper;
@@ -237,20 +304,27 @@ function clamp(lower, upper, value) {
 }
 
 // Functions
+/** Make one function from two: send the input through g first, then send its result through f. */
 function compose2(f, g) {
     return function(...args) {
         return f(g(...args));
     };
 }
 
+/** Chain functions from right to left, allowing small transformations to be reused as one operation. */
 function compose(...fns) {
     return fns.reduce(compose2);
 }
 
+/** Chain functions from left to right, in the order a reader sees them. */
 function pipe(...fns) {
     return fns.reduceRight(compose2);
 }
 
+/**
+ * Build a function that applies another function n times, passing each result into the next
+ * application.
+ */
 function repeat(n) {
     return function(f) {
         return function(x) {
@@ -263,6 +337,10 @@ function repeat(n) {
     };
 };
 
+/**
+ * Allow a two-input function to receive both inputs now or receive the first now and return a
+ * function awaiting the second. A missing second input selects the latter form.
+ */
 function curry2(fn) {
     return function (arg1, arg2) {
         if(exists(arg2)) {
@@ -275,6 +353,7 @@ function curry2(fn) {
     };
 }
 
+/** Wrap a function so only its first call performs work; later calls reuse the first result. */
 function once(fn, context) {
     let result;
     return function() {
@@ -444,6 +523,7 @@ function debounce(func, wait, options = {}) {
 // end copied from lodash.js
 
 // Async
+/** Wait for a number of milliseconds without blocking the browser's other work. */
 async function delay(ms) {
     return await new Promise(res => setTimeout(res, ms));
 }
@@ -453,14 +533,27 @@ async function wait(ms) {
 }
 
 // XF (Events)
+/**
+ * Create a message bus and a shared state connection. reg handlers receive the full state and may
+ * change it; sub handlers receive the announced value. Save the returned listener when it must
+ * later be removed.
+ */
 function XF(args = {}) {
     let data = {};
     let name = args.name || 'db';
 
+    /**
+     * Attach the live state object. Top-level assignments through its Proxy, a wrapper that
+     * intercepts writes, announce db:<field> changes.
+     */
     function create(obj) {
         data = proxify(obj);
     }
 
+    /**
+     * Wrap top-level property writes to broadcast the updated state. Editing a nested object alone
+     * does not trigger this trap; its top-level property must be assigned again.
+     */
     function proxify(obj) {
         let handler = {
             set: (target, key, value) => {
@@ -472,10 +565,18 @@ function XF(args = {}) {
         return new Proxy(obj, handler);
     }
 
+    /**
+     * Broadcast an app message through the browser window, packaging its payload in
+     * event.detail.data.
+     */
     function dispatch(eventType, value) {
         window.dispatchEvent(evt(eventType)(value));
     }
 
+    /**
+     * Listen for messages. For db:<field>, pass just that field to the callback; for other
+     * messages, pass the full payload. Return the wrapper needed for unsubscribe.
+     */
     function sub(eventType, handler, options = {}) {
 
         function handlerWraper(e) {
@@ -493,6 +594,10 @@ function XF(args = {}) {
         return handlerWraper;
     }
 
+    /**
+     * Register a state-changing handler that receives both the message payload and the shared live
+     * state.
+     */
     function reg(eventType, handler, options = {}) {
 
         function handlerWraper(e) {
@@ -506,6 +611,10 @@ function XF(args = {}) {
         return handlerWraper;
     }
 
+    /**
+     * Remove the exact wrapper returned by sub or reg, with matching listener options, so a removed
+     * screen no longer reacts.
+     */
     function unsub(eventType, handler, options = {}) {
         // console.log(`unsub ${eventType}`, handler); // rmv
         window.removeEventListener(eventType, handler, Object.assign({capture: false}, options));
@@ -515,6 +624,10 @@ function XF(args = {}) {
         return equals(evtSource(eventType), name);
     }
 
+    /**
+     * Create the common browser event shape used by dispatch, with the app payload under
+     * detail.data.
+     */
     function evt(eventType) {
         return function(value) {
             return new CustomEvent(eventType, {detail: {data: value}});
@@ -553,16 +666,28 @@ function toBool(value) {
     return !!(value);
 };
 
+/**
+ * Round to a number of decimal places but return a number, not JavaScript toFixed's string.
+ * Non-number input uses the specified fallback.
+ */
 function toFixed(x, points = 2, fallback = 0) {
     if(!isNumber(x)) return fallback;
     const precision = 10**points;
     return Math.round(x * precision) / precision;
 }
 
+/**
+ * Copy the underlying buffer into a list of unsigned bytes. This reads the entire buffer, not just
+ * an offset DataView slice.
+ */
 function dataviewToArray(dataview) {
     return Array.from(new Uint8Array(dataview.buffer));
 }
 
+/**
+ * Decode the entire underlying buffer as UTF-8 text; binary measurement packets need numeric
+ * decoding instead.
+ */
 function dataviewToString(dataview) {
     let utf8decoder = new TextDecoder('utf-8');
     return utf8decoder.decode(dataview.buffer);
@@ -576,6 +701,10 @@ function stringToCharCodes(str) {
     return str.split('').map(c => c.charCodeAt(0));
 }
 
+/**
+ * Build a byte view from character codes for simple byte-oriented text, not a general UTF-8
+ * encoder.
+ */
 function stringToDataview(str) {
     let charCodes = stringToCharCodes(str);
     let uint8 = new Uint8Array(charCodes);
@@ -592,6 +721,10 @@ function time() {
     return `${mm}:${ss}:${mmmm}`;
 }
 
+/**
+ * Format a local calendar date for display, with a chosen separator and optional year; this is not
+ * a storage timestamp.
+ */
 function formatDate(args = {}) {
     const date = args.date ?? new Date();
     const s = args.separator ?? '/';
@@ -605,6 +738,10 @@ function formatDate(args = {}) {
 }
 
 // Bits
+/**
+ * Bit helpers read or set individual yes/no flags inside an integer. Numbering starts at the least
+ * significant bit, position 0.
+ */
 function nthBit(field, bit) {
     return (field >> bit) & 1;
 };
@@ -613,6 +750,10 @@ function setBit(i, n) {
     return n |= (1 << i);
 }
 
+/**
+ * Read a group of binary flags from start up to, but not including, end. Device formats pack
+ * several small values into one number.
+ */
 function getBits(start, end, value) {
     return (value >> start) & ((1 << (end - start)) - 1);
 }
@@ -621,6 +762,10 @@ function nthBitToBool(field, bit) {
     return toBool(nthBit(field, bit));
 }
 
+/**
+ * Combine bytes into an XOR check value for a message. end is exclusive; a negative end counts back
+ * from the end of the view.
+ */
 function xor(view, start = 0, end = view.byteLength) {
     let cs = 0;
     const length = (end < 0) ? (view.byteLength + end) : end;
@@ -630,6 +775,10 @@ function xor(view, start = 0, end = view.byteLength) {
     return cs;
 }
 
+/**
+ * Write a three-byte unsigned value with its least significant byte first (little-endian), a format
+ * DataView does not provide directly.
+ */
 function setUint24LE(dataview, index, value) {
     dataview.setUint8(index,    value        & 0xFF, true); // LSB
     dataview.setUint8(index+1, (value >> 8 ) & 0xFF, true);
@@ -637,6 +786,7 @@ function setUint24LE(dataview, index, value) {
     return dataview;
 }
 
+/** Read a three-byte little-endian unsigned value, reversing the packing performed by setUint24LE. */
 function getUint24LE(dataview, index = 0) {
     const LSB = dataview.getUint8(index,   true); // LSB
     const MB  = dataview.getUint8(index+1, true);
@@ -645,6 +795,10 @@ function getUint24LE(dataview, index = 0) {
     return (MSB << 16) + (MB << 8) + LSB;
 }
 
+/**
+ * Build binary-field conversion helpers from a definitions table. A resolution describes how much
+ * one stored integer step represents in real-world units.
+ */
 function Spec(args = {}) {
     const definitions = expect(args.definitions);
 
@@ -656,6 +810,10 @@ function Spec(args = {}) {
         return value * definitions[prop].resolution;
     });
 
+    /**
+     * Select the configured default when input is missing, apply the field transform and round down
+     * to an integer for a device message.
+     */
     function encodeField(prop, input, transform = applyResolution(prop)) {
         const fallback = definitions[prop].default;
         const min      = applyResolution(definitions[prop].min);
@@ -665,6 +823,7 @@ function Spec(args = {}) {
         return Math.floor(clamp(min, max, transform(value)));
     }
 
+    /** Convert a stored field value back through its resolution or a caller-supplied transform. */
     function decodeField(prop, input, transform = removeResolution) {
         return transform(prop, input);
     }
@@ -679,6 +838,10 @@ function Spec(args = {}) {
 }
 
 // print
+/**
+ * Create console logging helpers with a time prefix. The coffee/HR methods are developer-console
+ * jokes, not application features or external actions.
+ */
 function Print() {
     if(!exists(process)) {
         var process = {env: {NODE_ENV: "development"}};

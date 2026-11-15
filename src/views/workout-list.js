@@ -1,19 +1,13 @@
 /*
- * workout-list.js: front-end client module.
+ * Displays the workout library with expandable descriptions and graph previews.
+ * WorkoutList receives workouts and FTP (the rider's reference power); each
+ * WorkoutListItem sends selection/deletion requests and shows graph hover details.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Constructors prepare state, connectedCallback attaches listeners on page entry,
+ * and disconnectedCallback cancels them. render replaces the list's HTML.
+ * Imported names/descriptions are escaped so the browser displays them as text.
+ * Previews use HTML bars for intervals or SVG shapes for routes; SVG icons are
+ * also pictures described by shapes rather than image files.
  */
 
 import { xf, exists, empty, equals, debounce } from '../functions.js';
@@ -36,6 +30,7 @@ const options = `
             <use href="#icon--options">
         </svg>`;
 
+// Return one card's HTML using a prepared graph and selection flag; routes show km.
 function workoutTemplate(workout) {
     let duration = '';
     if(workout.meta.duration) {
@@ -67,6 +62,7 @@ function workoutTemplate(workout) {
             </workout-item>`;
 }
 
+// Keeps the library's displayed charts in step with workouts and reference power.
 class WorkoutList extends HTMLElement {
     constructor() {
         super();
@@ -107,6 +103,7 @@ class WorkoutList extends HTMLElement {
         this.state = value;
         this.render();
     }
+    // Size previews from the window width and eight lines of the page's text size.
     getViewPort() {
         const self = this;
 
@@ -125,6 +122,8 @@ class WorkoutList extends HTMLElement {
             aspectRatio,
         };
     }
+    // Build each interval/route graph, attach graph and selected fields to its workout,
+    // and join the resulting cards into a single HTML string.
     stateToHtml(state, ftp, selectedWorkout) {
         const self = this;
         const viewPort = this.getViewPort();
@@ -150,6 +149,10 @@ class WorkoutList extends HTMLElement {
 
 
 
+/**
+ * Handles one library row: expand/collapse details, show/hide its menu, and select it.
+ * These paired helpers only change display state; ui: requests ask the app to act.
+ */
 class WorkoutListItem extends HTMLElement {
     constructor() {
         super();
@@ -198,6 +201,7 @@ class WorkoutListItem extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Keep opening the options menu from also toggling the workout's details.
     toggleExpand(e) {
         if(e.target.classList.contains('workout--options')) {
             return;
@@ -216,6 +220,7 @@ class WorkoutListItem extends HTMLElement {
         this.description.style.display = 'none';
         this.isExpanded = false;
     }
+    // Reflect the app's chosen workout; selecting this row also reveals its details.
     toggleSelect(id) {
         if(equals(this.id, id)) {
             if(!this.isSelected) {
@@ -255,6 +260,7 @@ class WorkoutListItem extends HTMLElement {
         this.workout = workout;
         this.toggleSelect(workout.id);
     }
+    // Stop the tap reaching the summary, which would also expand/collapse the row.
     onRadio(e) {
         e.stopPropagation();
         xf.dispatch('ui:workout:select', this.id);
@@ -269,6 +275,7 @@ class WorkoutListItem extends HTMLElement {
             this.render();
         }
     }
+    // Read the hovered SVG bar's stored targets and position a tooltip inside the graph.
     onHover(e) {
         const self = this;
         const target = this.querySelector('.graph--bar:hover');
@@ -296,6 +303,7 @@ class WorkoutListItem extends HTMLElement {
     onMouseOut(e) {
         this.dom.info.style.display = 'none';
     }
+    // Measure the actual card graph, including its page offset for tooltip positioning.
     getViewPort() {
         const rect = this.dom.cont.getBoundingClientRect();
         return {

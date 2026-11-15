@@ -1,23 +1,16 @@
-/*
- * ride-sync.js: updates local coaching from persisted recordings.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Retries the hand-off from saved ride recordings to the local Coach. Here "sync" means between two
+ * databases in this browser, not an upload to an online account. A recording stays marked pending
+ * until the Coach has accepted it.
  */
 
 import { idb } from '../storage/idb.js';
 
+/**
+ * Import each pending recording into the Coach, then persist its completed hand-off marker. Return
+ * the number processed. If saving fails, leave the marker available for a later retry; stable ride
+ * IDs prevent duplicate coaching history.
+ */
 export async function syncRecordedRides(service) {
     const records = await idb.getAll('activity');
     let synced = 0;

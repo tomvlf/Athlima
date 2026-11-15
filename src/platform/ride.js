@@ -1,5 +1,14 @@
+/**
+ * Builds the timed power profile shown while riding. Convert workout-relative intensities to watts,
+ * then use actual interval position rather than elapsed ride time, because riders can skip
+ * intervals or free-ride. These helpers do not control the trainer.
+ */
 import { time } from './format.js';
 
+/**
+ * Flatten valid timed steps into cumulative starting seconds and absolute power targets. Return
+ * null when there is no usable timed profile; retain missing power as missing, not zero.
+ */
 export function rideTimeline(workout, ftp, toAbsolute) {
     let duration = 0;
     const intervals = [];
@@ -22,6 +31,10 @@ export function rideTimeline(workout, ftp, toAbsolute) {
     return {duration, intervals, ftp: threshold, maximumPower: Math.ceil(Math.max(threshold || 0, peak, 50) / 50) * 50};
 }
 
+/**
+ * Locate the profile marker from the current interval and its remaining time. Clamp within that
+ * interval, start at zero before playback and show the end when the workout is done.
+ */
 export function ridePosition(timeline, {intervalIndex = 0, lapTime, workoutStatus}) {
     if(!timeline) return 0;
     if(workoutStatus === 'done') return timeline.duration;
@@ -32,6 +45,10 @@ export function ridePosition(timeline, {intervalIndex = 0, lapTime, workoutStatu
     return interval.start + Math.max(0, Math.min(interval.duration, interval.duration - left));
 }
 
+/**
+ * Render duration-scaled power bars, axis labels and placeholders for the moving marker/current
+ * interval. The platform updates those placeholders during the ride.
+ */
 export function rideProfile(timeline) {
     if(!timeline) return '<p class="muted">No timed power profile for this ride. Ride at your own pace.</p>';
     const {duration, intervals, maximumPower} = timeline;

@@ -1,19 +1,8 @@
 /*
- * file-header.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads and writes the opening FIT file header: format versions, data length,
+ * the ".FIT" marker and an optional checksum. A header is 12 or 14 bytes here;
+ * a byte is one small storage unit. The data length excludes this header and
+ * the file's final checksum. Reading metadata does not validate the whole file.
  */
 
 import { exists, equals, } from '../functions.js';
@@ -26,10 +15,12 @@ import {
 
 import { CRC } from './crc.js';
 
+// Create header conversion helpers; true architecture means lowest-value byte first.
 function FileHeader(args = {}) {
     const _type = RecordType.header;
     const architecture = args.architecture ?? true;
 
+    // Convert the recognized protocol versions to their numeric header codes, defaulting to 1.0.
     const protocolVersion = ValueParser({
         encode: function(version) {
             if(equals(version, '2.0')) return 32;
@@ -43,6 +34,7 @@ function FileHeader(args = {}) {
         },
     });
 
+    // Profile revisions keep two decimal places by storing the version multiplied by 100.
     const profileVersion = ValueParser({
         encode: function(version) {
             if(!exists(version)) return 2140;
@@ -53,6 +45,7 @@ function FileHeader(args = {}) {
         },
     });
 
+    // Pack/unpack the four characters of the ".FIT" marker into a four-byte number.
     const dataType = ValueParser({
         encode: function(str) {
             let code = 0;
@@ -70,6 +63,7 @@ function FileHeader(args = {}) {
         },
     });
 
+    // The header checksum covers bytes 0–11 and is computed only after those bytes are written.
     const headerCRC = ValueParser({
         encode: (_, view) => CRC.calculateCRC(view, 0, 11),
     });
@@ -113,6 +107,7 @@ function FileHeader(args = {}) {
     // DataView,
     // Int,
     // -> DataView
+    // Mutate the supplied view from byte zero; this file-header encoder does not use the i argument.
     function encode(definition, view, i = 0) {
         return order.reduce(function(acc, fieldName) {
             const field = fields[fieldName];
@@ -137,6 +132,7 @@ function FileHeader(args = {}) {
     //  dataType: String,
     //  crc: Int
     // }
+    // Read named metadata at start, including the optional CRC only when the size says 14.
     function decode(view, start = 0) {
         return order.reduce(function(acc, fieldName) {
             const field = fields[fieldName];
@@ -150,10 +146,12 @@ function FileHeader(args = {}) {
         }, {i: start, data: {type: _type, length: 0}}).data;
     };
 
+    // Classify by file position only; this does not check the ".FIT" signature.
     function isFileHeader(view, start = 0) {
         return equals(start, 0);
     }
 
+    // Build a header object with export defaults; the activity builder fills in its final dataSize.
     function toFITjs(args = {}) {
         const headerSize = args.headerSize ?? 14;
         const length = headerSize;

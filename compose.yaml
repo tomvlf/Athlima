@@ -1,16 +1,21 @@
+# Run the published static website image; training data stays in each browser.
 services:
   athlima:
     image: ghcr.io/tomvlf/athlima:latest
+    # Left number: port on this computer. Right number: port inside the container.
     ports:
       - "8080:8080"
+    # Run without administrator privileges or permission to rewrite the app files.
     user: "101:101"
     read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # Nginx still needs a small, temporary place for runtime files.
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
     pids_limit: 64
     restart: unless-stopped
+    # Check the registry for the published image when starting through Compose.
     pull_policy: always

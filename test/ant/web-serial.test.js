@@ -1,27 +1,17 @@
 /*
- * web-serial.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Exercises the ANT stream splitter without a serial port. A stream chunk can
+ * end halfway through a packet (one complete message), contain several packets
+ * or begin with stray bytes. Tests check reassembly and ordering, not checksums.
  */
 
 import { MessageTransformer } from '../../src/ant/web-serial.js';
 
+// Build recognizable framing with a dummy checksum; this test layer only needs marker and length.
 function frame(payload = [0]) {
     return Uint8Array.from([0xA4, payload.length + 1, 0x4E, 0, ...payload, 0]);
 }
 
+// Feed chunks through one persistent parser and capture each complete packet instead of using browser streams.
 function transform(chunks) {
     const parser = new MessageTransformer();
     const messages = [];

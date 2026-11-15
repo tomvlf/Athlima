@@ -1,31 +1,22 @@
 /*
- * control-point.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Partial Cycling Power control-point helpers. A control point is the Bluetooth
+ * value used to exchange commands. Here a one-byte request can be built, while
+ * replies remain raw number arrays for inspection; full reply encoding is not
+ * implemented. Nothing in this file writes to a device.
  */
 
 import { existance, dataviewToArray }  from '../../functions.js';
 
 const logs = true;
 
+// Keep diagnostic output behind the module's logging switch.
 function log(msg) {
     if(logs) {
         console.log(msg);
     }
 }
 
+// encode returns the single operation-code byte as an ArrayBuffer; decode reads that code.
 function RequestControl() {
     const opCode = 0x00;
     const length = 1;
@@ -51,6 +42,7 @@ function RequestControl() {
     });
 }
 
+// Keep response bytes uninterpreted for now; encode is an intentionally empty placeholder.
 function Response() {
     // Format:
     // ?
@@ -70,6 +62,7 @@ function Response() {
         return dataviewToArray(dataview);
     }
 
+    // Turn a decoded byte array into a comma-separated diagnostic and log it.
     function toString(decoded = {}) {
         const str = decoded.join(', ');
 

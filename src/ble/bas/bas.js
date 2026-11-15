@@ -1,19 +1,7 @@
 /*
- * bas.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Connects a Bluetooth device's Battery Service to the app. Battery-level
+ * notifications (automatic updates) are decoded into percentages for onData;
+ * an explicit read is also available for callers needing the current raw value.
  */
 
 //
@@ -26,6 +14,7 @@ import { Service } from '../service.js';
 import { Characteristic } from '../characteristic.js';
 import { batteryLevel as batteryLevelParser } from './battery-level.js';
 
+// Require an already-discovered battery service; setup/start/stop come from the shared Service wrapper.
 function BAS(args = {}) {
 
     // config
@@ -54,6 +43,8 @@ function BAS(args = {}) {
     const service = Service({spec, service: gattService,});
     // end service
 
+    // Return the raw DataView after setup, or false if the measurement has not been prepared.
+    // Unlike notifications, this direct read does not decode or call onData.
     async function readBatteryLevel() {
         const measurement = service.characteristics.measurement;
 

@@ -1,19 +1,9 @@
 /*
- * product-message-definitions.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Athlima's chosen subset of FIT messages/fields for activity export.
+ * Each entry is [message name, ordered fields, local message number]. A field
+ * may instead be [name, byte size], as for the ten-byte array of beat intervals.
+ * The global profile supplies each field's type and units; this list chooses
+ * what the app actually writes and in which order.
  */
 
 //

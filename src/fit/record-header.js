@@ -1,19 +1,8 @@
 /*
- * record-header.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * The one-byte label before each FIT record. Its bits (individual yes/no slots)
+ * identify definition versus data records, extra developer fields and the local
+ * message number used to find a layout. Compressed timestamps are recognized
+ * by a flag, but their different header layout is not fully supported here.
  */
 
 import {
@@ -25,6 +14,7 @@ import {
     ValueParser, identityParser,
 } from './common.js';
 
+// Encode/decode ordinary record headers; classification helpers accept either a byte or a decoded object.
 function RecordHeader() {
     // NOTE: Supports only Normal Header Type
     // does not support Compressed Timestamp Header
@@ -71,6 +61,7 @@ function RecordHeader() {
     // {headerType: String, messageType: String, messageTypeSpecific: String, localMessageType: Int}
     // ->
     // Int,
+    // Combine the local message number with the selected record-type and developer-data flags.
     function encode(definition) {
         let byte = 0b00000000 + (definition.localMessageType ?? 0);
         if(equals(definition.headerType, HeaderType.timestamp)) {
@@ -88,6 +79,7 @@ function RecordHeader() {
     // Int,
     // ->
     // {headerType: String, messageType: String, messageTypeSpecific: String, localMessageType: Int}
+    // Split one byte into named flags and its four-bit local number.
     function decode(byte) {
         return {
             headerType:          headerType.decode(nthBit(byte, 7)),
@@ -97,6 +89,7 @@ function RecordHeader() {
         };
     }
 
+    // A definition announces the layout of later values; a data record contains those values.
     function isDefinition(header) {
         if(isNumber(header)) return equals(nthBit(header, 6), 1) ? true : false;
         if(isObject(header)) return equals(header.messageType, RecordType.definition) ? true : false;
@@ -109,6 +102,7 @@ function RecordHeader() {
         return false;
     }
 
+    // Extra developer fields are meaningful only on definition records, not ordinary data headers.
     function isDeveloper(header) {
         if(isNumber(header)) return (
             isDefinition(header) &&

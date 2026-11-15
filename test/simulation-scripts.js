@@ -1,24 +1,21 @@
-/*
- * simulation-scripts.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Historical manual trainer-simulation sketch, not an automatically run Jest test or an active app
+ * module. It emits invented sensor values without physical hardware; constructor startup is
+ * disabled. Review its legacy import path and event names before wiring it into a development page.
+ * Never treat the generated heart rate or power as an athlete measurement.
  */
 
 import { xf, equals, rand } from './functions.js';
 
+/**
+ * Hold pretend trainer/sensor readings and publish them through the event bus when explicitly
+ * initialized and started.
+ */
 class TrainerMock {
+    /**
+     * Set sample targets, readings and power-zone cutoffs without attaching listeners or starting a
+     * timer.
+     */
     constructor() {
         this.defaults = {
             powerTarget: 220,
@@ -41,6 +38,10 @@ class TrainerMock {
         };
         // this.init();
     }
+    /**
+     * Attach target and ride-control listeners, announce pretend device connections and print a
+     * prominent simulation warning.
+     */
     init() {
         const self = this;
 
@@ -69,20 +70,33 @@ class TrainerMock {
         console.warn('|Trainer Mock Data is ON!|');
         console.warn('|------------------------|');
     }
+    /**
+     * Start periodic sample publication; callers are responsible for not starting overlapping
+     * timers.
+     */
     run() {
         const self = this;
         self.interval = self.broadcast(self.indoorBikeData.bind(self));
     }
+    /** Stop the currently remembered publication timer without resetting the pretend readings. */
     stop() {
         const self = this;
         clearInterval(self.interval);
     }
+    /**
+     * Schedule the supplied sample handler every 250 milliseconds and return its timer ID for later
+     * cancellation.
+     */
     broadcast(handler) {
         // broadcast interval in ms
         const interval = setInterval(handler, 250);
         // const interval = setInterval(handler, 1000);
         return interval;
     }
+    /**
+     * Generate the next sample and announce power, heart rate, cadence and fixed speed as separate
+     * events.
+     */
     indoorBikeData() {
         const self = this;
         self.power = this.powerNext(self.power);
@@ -95,6 +109,10 @@ class TrainerMock {
         xf.dispatch('cadence', self.cadence);
         xf.dispatch('speed', self.speed);
     }
+    /**
+     * Update the pretend power and choose a rough heart-rate starting point from the new target;
+     * this is not a physiological model.
+     */
     onPowerTarget(powerTarget) {
         this.powerTarget = powerTarget;
         this.power = powerTarget > 0 ? powerTarget : this.defaults.powerTarget;
@@ -106,15 +124,28 @@ class TrainerMock {
     onFTP(ftp) {
         this.ftp = ftp;
     }
+    /**
+     * Return the target directly; the previous sample is deliberately not used to simulate
+     * acceleration or sensor noise.
+     */
     powerNext(prev) {
         return this.powerTarget;
     }
+    /**
+     * Add a small random change to the previous cadence so the development display does not stay
+     * perfectly still.
+     */
     cadenceNext(prev) {
         return prev + rand(-1, 1);
     }
+    /**
+     * Add a small random change to the pretend heart rate, without claiming a real response to
+     * exercise.
+     */
     heartRateNext(prev) {
         return prev + rand(-1, 1);
     }
+    /** Choose a made-up display heart rate for the power zone, solely for exercising the interface. */
     powerToHeartRate(power, ftp, zones) {
         let base = 90;
         if(equals(this.powerToZone(power, ftp, zones).name, 'one')) {
@@ -140,6 +171,7 @@ class TrainerMock {
         }
         return base;
     }
+    /** Place power into one of the sample FTP-relative ranges and return its name and position. */
     powerToZone(value, ftp, zones) {
         const self = this;
 

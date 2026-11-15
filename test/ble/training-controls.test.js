@@ -1,19 +1,8 @@
 /*
- * training-controls.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks Open Bike Control workout-button decoding, including press/release
+ * distinctions, rejected dial states on digital buttons and cruise targets in
+ * five-watt steps. Full-message cases mix shifting and workout buttons to ensure
+ * reports retain their arrival order. Decoding does not execute the actions.
  */
 
 import { trainingControls } from '../../src/ble/obc/training-controls.js';
@@ -65,6 +54,7 @@ describe('TrainingControls', () => {
         expect(trainingControls.decode([{id: 0x01, state: 0x01}])).toEqual([]);
     });
 
+    // Cruise has more than two states: reserved values mean no action, and larger values carry watts.
     describe('cruiseControl', () => {
         test('released', () => {
             expect(trainingControls.decode([{id: 0x3C, state: 0x00}])).toEqual([

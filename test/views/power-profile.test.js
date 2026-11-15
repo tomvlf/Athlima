@@ -1,3 +1,9 @@
+/*
+ * Checks small power-chart HTML for planned targets, recorded readings, and missing data.
+ * Tiny numeric samples are enough because the helper returns SVG text (drawn shapes)
+ * without mounting a page. Labels must be escaped and unknown FTP must not look measured.
+ */
+
 import {renderPowerProfile} from '../../src/views/power-profile.js';
 
 test('renders planned interval steps as a wattage profile', () => {

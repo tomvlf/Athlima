@@ -1,16 +1,13 @@
 /**
- * training-calendar.js: browser-side training calendar and planned workout view.
+ * Combines saved ride history, library workouts scheduled by the rider,
+ * Intervals.icu plans, and coached sessions in a week/month calendar.
+ * Only locally scheduled entries are saved here; provider and coaching data
+ * remain owned by their services. Buttons can also start a ride or export a file.
  *
- * Why this exists:
- * Riders need one place to see their captured ride history, imported Intervals.icu
- * calendar entries, and coaching plan items without bouncing between disconnected
- * screens. This module keeps that calendar logic in one ownership boundary so it is
- * easier to reason about data flow and persistence.
- *
- * What it does:
- * It loads saved calendar entries from local storage, listens for workout and service
- * updates from the rest of the app, merges imported plan sessions into the visible month,
- * and renders interactive date selection plus import/export actions.
+ * The constructor prepares state; connectedCallback reads storage and attaches
+ * listeners when the custom tag joins the page; disconnectedCallback cancels them.
+ * render replaces its HTML while preserving navigation position. Variable text
+ * is escaped so names and imported descriptions cannot become page instructions.
  */
 
 import { xf } from '../functions.js';
@@ -41,10 +38,12 @@ function escapeHTML(value = '') {
     })[character]);
 }
 
+// Produce a local YYYY-MM-DD calendar date; the month follows JavaScript's zero-based order.
 function localDate(year, month, day) {
     return isoDate(new Date(year, month, day));
 }
 
+// ISO week numbers use the week containing Thursday, including across New Year.
 function weekNumber(date) {
     const thursday = new Date(`${date}T00:00:00Z`);
     thursday.setUTCDate(thursday.getUTCDate() + 4 - (thursday.getUTCDay() || 7));
@@ -52,6 +51,8 @@ function weekNumber(date) {
     return Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
 }
 
+// Read saved JSON text into lightweight date/workout-ID references.
+// Accept older embedded-workout entries, but reject malformed data instead of overwriting it.
 function parseEntries(value) {
     const entries = value ? JSON.parse(value) : [];
     if(!Array.isArray(entries)) {
@@ -171,6 +172,7 @@ class TrainingCalendar extends HTMLElement {
         this.abortController.abort();
     }
 
+    // Restore browser-saved rides; a successful result does not redraw a removed calendar.
     async loadRecordedActivities() {
         try {
             this.localActivities = await models.activity.restore();
@@ -199,7 +201,7 @@ class TrainingCalendar extends HTMLElement {
     }
 
     /**
-     * Saves calendar changes to the account-local storage bucket.
+     * Saves calendar changes in this browser under the current account.
      *
      * @param {Array<object>} entries - Calendar event list for the rider's account.
      * @returns {boolean} True when the calendar persisted successfully.
@@ -217,6 +219,7 @@ class TrainingCalendar extends HTMLElement {
         }
     }
 
+    // Reflect another tab's changes only for this account's calendar (or a storage clear).
     onStorage(event) {
         if(event.key !== accountKey(storageKey) && event.key !== null) return;
         if(event.storageArea && event.storageArea !== window.localStorage) return;
@@ -231,6 +234,7 @@ class TrainingCalendar extends HTMLElement {
         this.render();
     }
 
+    // Include every displayed day, including adjacent-month cells in a full calendar week.
     plannedRange() {
         const dates = this.view === 'week' ? this.weekDates() : this.monthDates();
         return {oldest: dates[0], newest: dates[dates.length - 1]};
@@ -238,6 +242,8 @@ class TrainingCalendar extends HTMLElement {
 
     /**
      * Loads planned workouts for the visible week or month from the Intervals integration.
+     * Cache by date range. A late result may fill the cache, but must not replace the
+     * visible workouts after the rider has navigated to a different range.
      *
      * @returns {Promise<void>} Resolves after the visible range cache is updated or the request fails.
      */
@@ -280,6 +286,7 @@ class TrainingCalendar extends HTMLElement {
         }
     }
 
+    // Merge provider results from the shared list and range cache, deduplicating by date/ID.
     plannedEntries() {
         const workouts = [
             ...models.planned.list(),
@@ -304,6 +311,8 @@ class TrainingCalendar extends HTMLElement {
             });
     }
 
+    // Adapt coached sessions for the calendar; hide completed plans already represented
+    // by their matching recorded activity, and omit archived plans.
     coachingEntries() {
         try {
             const plan = coachingData()?.plan;
@@ -322,6 +331,8 @@ class TrainingCalendar extends HTMLElement {
         }
     }
 
+    // Give local schedules, provider plans, and coached workouts a common entry shape.
+    // A deleted library workout leaves its scheduled reference visible but not startable.
     calendarEntries() {
         return [
             ...this.entries.map((entry) => ({
@@ -334,6 +345,7 @@ class TrainingCalendar extends HTMLElement {
         ];
     }
 
+    // Gather both planned work and completed activities for one day.
     entriesForDate(date, calendarEntries = this.calendarEntries()) {
         return [
             ...calendarEntries.filter(entry => entry.date === date),
@@ -341,6 +353,7 @@ class TrainingCalendar extends HTMLElement {
         ];
     }
 
+    // Fill complete Monday-to-Sunday rows, including days just outside the selected month.
     monthDates() {
         const year = this.displayMonth.getFullYear();
         const month = this.displayMonth.getMonth();
@@ -352,6 +365,7 @@ class TrainingCalendar extends HTMLElement {
         );
     }
 
+    // Return the month heading/grid; phones use chronological weeks, desktops reverse them.
     renderMonth() {
         const dates = this.monthDates();
         const weeks = [];
@@ -381,6 +395,8 @@ class TrainingCalendar extends HTMLElement {
             </details>`;
     }
 
+    // Build labelled date buttons, session previews, and a completed-training summary per week.
+    // Cache entries per date during this render so repeated cells/summary work share them.
     renderCalendarTable(weeks, heading, displayMonth = null) {
         const today = isoDate();
         const calendarEntries = this.calendarEntries();
@@ -430,6 +446,7 @@ class TrainingCalendar extends HTMLElement {
             </div>`;
     }
 
+    // A compact grid card selects its day; its index lets render restore keyboard focus.
     renderCalendarPreview(entry, date, index) {
         const source = entry.source === 'activity' ? this.activityLabel(entry.activity)
             : entry.source === 'coaching' ? 'Coach'
@@ -452,6 +469,7 @@ class TrainingCalendar extends HTMLElement {
         return activityTypeLabel(activity?.activityType, activity?.sport || 'cycling');
     }
 
+    // Return short unit-labelled facts, distinguishing measured activity data from targets.
     workoutMetrics(entry) {
         if(entry.source === 'activity') {
             const activity = entry.activity;
@@ -482,6 +500,7 @@ class TrainingCalendar extends HTMLElement {
         return metrics.length ? metrics : ['Workout'];
     }
 
+    // Select a recorded-watt trace or a planned-interval chart for the same card space.
     renderEntryProfile(entry) {
         return entry.source === 'activity'
             ? renderPowerProfile({
@@ -496,6 +515,7 @@ class TrainingCalendar extends HTMLElement {
             });
     }
 
+    // Build a full day-detail card with only the actions appropriate to its source/status.
     renderEntry(entry) {
         const title = escapeHTML(entry.name || 'Workout');
         const metrics = this.workoutMetrics(entry);
@@ -542,6 +562,7 @@ class TrainingCalendar extends HTMLElement {
             </li>`;
     }
 
+    // Prefer coaching/imported activity details; add local rides only when their ID is absent.
     activityEntriesForDate(date) {
         const externalActivities = (coachingData()?.activities || [])
             .filter(activity => activity.day === date)
@@ -566,6 +587,7 @@ class TrainingCalendar extends HTMLElement {
         return [...externalActivities, ...localActivities];
     }
 
+    // Return the selected day's Monday-to-Sunday week as local date strings.
     weekDates() {
         const [year, month, day] = this.selectedDate.split('-').map(Number);
         const selected = new Date(year, month - 1, day);
@@ -575,6 +597,8 @@ class TrainingCalendar extends HTMLElement {
         );
     }
 
+    // Estimate training load through week end (or today), never for a future week.
+    // Reuse calculations until the coaching data changes; errors omit estimates, not rides.
     weeklyState(dates) {
         const data = coachingData();
         if(this.weekStateSource !== data) {
@@ -607,6 +631,8 @@ class TrainingCalendar extends HTMLElement {
         }
     }
 
+    // Total completed activities only. "Known load" warns when some rides lack load values;
+    // fitness/fatigue/form are model estimates, separate from time and distance totals.
     weekSummary(dates, entriesByDate) {
         const activities = dates.flatMap(date => (entriesByDate?.get(date) || this.activityEntriesForDate(date))
             .filter(entry => entry.source === 'activity')
@@ -636,6 +662,7 @@ class TrainingCalendar extends HTMLElement {
         </div>`;
     }
 
+    // Return one selected week with a date-range heading, reusing the month table renderer.
     renderWeek() {
         const dates = this.weekDates();
         const startDate = new Date(`${dates[0]}T12:00:00`);
@@ -660,6 +687,7 @@ class TrainingCalendar extends HTMLElement {
             ${this.renderCalendarTable([dates], heading)}`;
     }
 
+    // Show the selected day's full cards, any error messages, and the library scheduling form.
     renderSelectedDate() {
         const entries = this.entriesForDate(this.selectedDate);
         const heading = new Date(`${this.selectedDate}T00:00:00`).toLocaleDateString(undefined, {
@@ -704,6 +732,8 @@ class TrainingCalendar extends HTMLElement {
             </section>`;
     }
 
+    // Offer export/status/substitute controls only when the plan's safety/status checks allow.
+    // Substitute choices are same-day activities not already matched to another session.
     renderCoachingActions(entry) {
         const workout = entry.coaching;
         const data = coachingService().data;
@@ -724,6 +754,8 @@ class TrainingCalendar extends HTMLElement {
             ` : ''}`;
     }
 
+    // Only today's scheduled cycling session in an active, unpaused, adult-confirmed plan
+    // gets an indoor Start button; runs are followed outside this player.
     canStartCoaching(workout) {
         const data = coachingData();
         // Runs happen away from the indoor player: follow them on a watch or export the ZWO.
@@ -732,6 +764,7 @@ class TrainingCalendar extends HTMLElement {
             workout.date === localDay(new Date().toISOString(), data.profile.timeZone);
     }
 
+    // Describe pace ranges when threshold pace exists, otherwise retain effort-only guidance.
     runGuide(workout) {
         const profile = coachingData()?.profile;
         const paces = describeRunPaces(workout.steps, profile?.thresholdPace, profile?.unitSystem);
@@ -739,6 +772,8 @@ class TrainingCalendar extends HTMLElement {
             : 'Set a threshold pace to see pace targets; until then run by effort (RPE).';
     }
 
+    // Save scroll position, selection, and focus before replacing HTML, then find their
+    // replacement elements. This keeps keyboard navigation stable during data updates.
     render() {
         const activeElement = this.contains(document.activeElement)
             ? document.activeElement.closest('button, select, [tabindex], navigation-action')
@@ -781,6 +816,8 @@ class TrainingCalendar extends HTMLElement {
         nextFocus?.focus({preventScroll: true});
     }
 
+    // Route nested calendar buttons: navigate dates, resolve/export coaching sessions,
+    // remove saved schedules, or start workouts. A running/paused ride blocks replacement.
     async onClick(event) {
         const day = event.target.closest('[data-date]');
         if(day && this.contains(day)) {
@@ -904,6 +941,8 @@ class TrainingCalendar extends HTMLElement {
         this.render();
     }
 
+    // Schedule a library workout on the selected day. Re-read storage first so entries
+    // added in another tab are retained; save a reference rather than a duplicate workout.
     onSubmit(event) {
         if(!event.target.matches('.training-calendar--form')) return;
         event.preventDefault();

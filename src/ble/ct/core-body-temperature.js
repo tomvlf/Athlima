@@ -1,25 +1,15 @@
 /*
- * core-body-temperature.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads CORE temperature messages and builds simple temperature-only messages.
+ * Temperatures travel as whole numbers in hundredths of a degree. Flag bits
+ * (yes/no switches in the first byte) identify optional fields and whether the
+ * sender used Celsius or Fahrenheit; decoded temperatures are always Celsius.
  */
 
 //
 // Core Body Temperature characteristic
 //
 
+// Presence predicates keep byte positions aligned when optional readings are omitted.
 const skinTemperaturePresent = (flags) => ((flags >> 0) & 1) === 1;
 const coreReservedPresent    = (flags) => ((flags >> 1) & 1) === 1;
 const qualityAndStatePresent = (flags) => ((flags >> 2) & 1) === 1;
@@ -66,13 +56,16 @@ const order = [
 const QualityAndState = {
 };
 
+// Stateless conversion helpers for the temperature characteristic, a readable Bluetooth value.
 function CoreBodyTemperature(args = {}) {
     const architecture = true;
 
+    // Read the declared number width from byte position i and apply its decimal step size.
     function getField(field, dataview, i) {
         return dataview[`get${field.type}`](i, architecture) * field.resolution;
     }
 
+    // Both unit converters round to hundredths of a degree, matching the sensor's precision.
     function fahrenheitToCelsius(fahrenheit) {
         return Math.round((5/9 * (fahrenheit - 32)) * 100) / 100;
     }
@@ -81,7 +74,7 @@ function CoreBodyTemperature(args = {}) {
         return Math.round(((celsius * 9/5) + 32) * 100) / 100;
     }
 
-    // Int -> String
+    // The fourth bit selects the sender's temperature scale; it is not a presence flag.
     function readTemperatureUnit(flags) {
         return ((flags >> 3) & 1) === 0 ? 'C' : 'F';
     }
@@ -103,7 +96,7 @@ function CoreBodyTemperature(args = {}) {
     // [0b00010111, 228,   14,    7,   15,    0,    0, 0b00010011, 130]
     // [0x17,      0xE4, 0x0E, 0x07, 0x0F, 0x00, 0x00, 0x13,     , 0x82]
     //
-    // Dataview -> {'<field-name>': {value: Number, unit: String}}
+    // Return plain named values, omit the flag byte, and skip fields that do not fit the received data.
     function decode(dataview) {
         const byteLength = dataview.byteLength;
 
@@ -138,6 +131,8 @@ function CoreBodyTemperature(args = {}) {
         }, {i: 0, flags: 0, data: {}}).data;
     }
 
+    // Build body temperature plus optional skin temperature. With temperatureUnit "F",
+    // callers supply Fahrenheit themselves; this method sets the flag but does not convert.
     function encode(args = {}) {
         const coreBodyTemperature = Math.round(
             args.coreBodyTemperature /

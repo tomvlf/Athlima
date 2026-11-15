@@ -1,19 +1,9 @@
 /*
- * messages.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Byte-for-byte examples for ANT adapter configuration, control, data and reply
+ * messages. A packet is a complete message with marker, length, ID, content and
+ * checksum; these tests check both that outer layout and decoded named values.
+ * Optional fields, radio settings and capability flags are exercised without USB
+ * hardware. Tests describe current formats, not actual radio delivery.
  */
 
 import { equals, dataviewToArray, nthBitToBool, xor } from '../../src/functions.js';
@@ -62,6 +52,7 @@ describe('Message', () => {
             id: 'assignChannel',
         });
 
+        // Model the extra assignment byte so shared framing can be checked at both message sizes.
         function contentLength(isExtended) {
             if(isExtended) return 4;
             return 3;
@@ -706,6 +697,7 @@ describe('LibConfig', () => {
     });
 });
 
+// Sensor pages are payloads inside the adapter packet; sender/signal/time details may follow them.
 describe('AcknowledgedData', () => {
 
     describe('encode', () => {
@@ -796,6 +788,7 @@ describe('AcknowledgedData', () => {
     });
 });
 
+// Events and command replies share an ID but use different fields to identify their purpose.
 describe('ChannelEvent', () => {
 
     describe('encode', () => {
@@ -947,6 +940,7 @@ describe('Capabilities', () => {
         });
     });
 
+    // A known all-false feature set makes each packed flag and added capacity value easy to compare.
     const capabilities = {
         // Standart Options
         no_receive_channels:  false,

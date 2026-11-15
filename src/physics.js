@@ -1,21 +1,10 @@
-/*
- * physics.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Estimates virtual riding speed, distance and climbing from power or trainer speed. Inputs use
+ * watts, kilograms, seconds and metres; slope 0.01 means a 1% grade. Air drag, rolling resistance
+ * and gravity consume power; remaining power changes speed. This is a simulation, not measured
+ * outdoor travel. The attributed equation solver and reference formulas are kept intact; the
+ * app-facing interface is Model.
  */
-
 
 // Qubic
 // Source: https://stackoverflow.com/questions/27176423/function-to-solve-cubic-equation-analytically
@@ -176,6 +165,11 @@ function calcPower(velocity, slope, mass, crr = 0.004, cda = 0.4, rhoAir = 1, lo
 // var v = calcVel(200, 0.00, 75 + 10, 0.00330, 0.5, 1.225, 0.02, 0, 2105, 0, true, true, true, true, true) * 3.6;
 // p = calcPower(v/3.6, 0.00, 75 + 10, 0.00330, 0.5, 1.225, 0.02, 0, 2105, 0, true, true, true, true, true);
 
+/**
+ * Create a reusable cycling simulation with fixed wheel, drag and resistance options. Each returned
+ * calculation accepts the current riding conditions and returns the next values without storing a
+ * ride.
+ */
 function Model(args = { use: {}}) {
     const defaults = {
         mass: 85,
@@ -211,6 +205,10 @@ function Model(args = { use: {}}) {
 
     const use = Object.assign(defaults.use, args.use);
 
+    /**
+     * Resolve a fractional road grade into its horizontal component; SinBeta supplies the
+     * corresponding vertical component.
+     */
     function CosBeta(slope) {
         return 1 / Math.sqrt(slope * slope + 1);
     }
@@ -219,6 +217,10 @@ function Model(args = { use: {}}) {
         return slope * cosBeta;
     }
 
+    /**
+     * Optionally represent the energy needed to spin the wheels as extra effective mass, converting
+     * wheel circumference from millimetres.
+     */
     function calcWheelInertia(wheelCircumference, useWheelInertia = false) {
         if(useWheelInertia) {
             const r = wheelCircumference / (2000 * pi);
@@ -234,6 +236,10 @@ function Model(args = { use: {}}) {
     const c2bearingLoss = use.bearingLoss ? 0.0087 : 0;
     const crv           = use.dynamicCrr  ? 0.1    : 0;
 
+    /**
+     * Solve the resistance equation for speed in metres per second at the supplied power and
+     * conditions, selecting a usable positive solution when available.
+     */
     function powerToMaxSpeed(args = {}) {
         const power          = args.power;
         const slope          = args.slope ?? defaults.slope;
@@ -280,6 +286,10 @@ function Model(args = { use: {}}) {
         return velocity;
     }
 
+    /**
+     * Advance a simulation by dt seconds using the prior speed and energy balance. Return speed,
+     * acceleration, distance and altitude; unsupported negative-speed results are kept at zero.
+     */
     function virtualSpeed(args = {}) {
         const power          = args.power; // W
         const slope          = args.slope ?? defaults.slope; // 0.01 is 1%
@@ -325,6 +335,10 @@ function Model(args = { use: {}}) {
         return { acceleration, speed, distance, altitude };
     }
 
+    /**
+     * Advance the ride by solving the energy balance including its previous motion. Track total
+     * ascent separately, so descending does not erase earlier climbing.
+     */
     function virtualSpeedCF(args = {}) {
         const power          = args.power; // W
         const slope          = args.slope ?? defaults.slope; // 0.01 is 1%
@@ -399,6 +413,10 @@ function Model(args = { use: {}}) {
         };
     }
 
+    /**
+     * Use measured trainer speed rather than infer speed from power, then update distance,
+     * altitude, ascent and acceleration over dt seconds.
+     */
     function trainerSpeed(args = {}) {
         const slope          = args.slope ?? defaults.slope; // 0.01 is 1%
         const dt             = args.dt ?? 1; // s

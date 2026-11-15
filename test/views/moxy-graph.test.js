@@ -1,19 +1,11 @@
 /*
- * moxy-graph.test.js: test coverage module.
+ * Checks the live sensor chart's point history as it fills, scrolls, and changes width.
+ * jsdom provides SVG elements (drawn lines) but no layout, so each scenario supplies
+ * a tiny width and feeds made-up power readings instead of connecting a sensor.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Tests inside each scenario advance the same graph one tick at a time; they are
+ * checkpoints in a sequence, not independent rides. Expected arrays alternate
+ * horizontal position and power, with power converted to vertical screen position.
  */
 
 /**
@@ -23,6 +15,7 @@
 import { first, last, xf } from '../../src/functions.js';
 import { MoxyGraph } from '../../src/views/moxy-graph.js';
 
+// Supply all four required SVG lines before mounting, which runs the graph's setup hook.
 function mountGraph(graph) {
     graph.innerHTML = `<svg id="moxy-svg">
         <polyline id="moxy-path-smo2"></polyline>
@@ -38,6 +31,7 @@ afterAll(() => document.body.replaceChildren());
 describe('Moxy Graph View', () => {
 });
 
+// An eight-point window scrolls, grows to twelve, fills the new space, then scrolls again.
 describe('Fill - Shift - Enlarge - Fill - Shift', () => {
 
     global.console = {
@@ -253,6 +247,8 @@ describe('Fill - Shift - Enlarge - Fill - Shift', () => {
     });
 });
 
+// A full twelve-point window shrinks to eight; only recent readings should remain,
+// with horizontal positions restarted at zero rather than leaving a gap.
 describe('Fill - Shift - Shrink - Fill - Shift', () => {
 
     const moxy = new MoxyGraph();

@@ -1,19 +1,7 @@
-/*
- * sound.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Produces interval-countdown beeps in the browser using generated tones, not downloaded audio
+ * files. Frequency chooses a note and gain controls loudness. The audio context, the browser's
+ * sound engine, is created when the ride starts so it can follow browser playback restrictions.
  */
 
 import { equals, exists, xf } from './functions.js';
@@ -32,6 +20,10 @@ const notes = [
      'f#': 739.99, g: 783.99, 'g#': 830.61, a: 880.00, 'a#': 932.33, b: 987.77}, // 5
 ];
 
+/**
+ * Create the ride sound controller with a volume setting and event listeners that can be removed
+ * together.
+ */
 function Sound(args) {
     let vibrate = false;
     let volume  = args.volume ?? 0;
@@ -39,6 +31,10 @@ function Sound(args) {
     let oscillator;
     let abortController;
 
+    /**
+     * Follow volume and ride events, creating/resuming audio when appropriate and playing the
+     * countdown when the watch requests a beep.
+     */
     function start() {
         abortController = new AbortController();
         let signal = { signal: abortController.signal };
@@ -72,12 +68,20 @@ function Sound(args) {
         }, signal);
     }
 
+    /**
+     * Remove this controller's event subscriptions using their shared AbortController; it does not
+     * save or stop the ride.
+     */
     function stop() {
         abortController.abort();
     }
 
     // one standart triange wave,
     // gain is turned up and down to produce beeps,
+    /**
+     * Schedule four short pulses over about four seconds, raising the final note to mark the
+     * interval change, then stop the tone generator.
+     */
     function interval() {
         const options = {
             type: 'triangle',
@@ -110,6 +114,10 @@ function Sound(args) {
 
     // 2 canceling sine waves,
     // and gain is turned up and down on the first one to produce beeps
+    /**
+     * Retained alternative tone experiment using two opposing waves. It is not exported or used by
+     * the normal countdown path.
+     */
     function customWaveInterval() {
         const n     = 2;
         const waves = [

@@ -1,30 +1,28 @@
-/*
- * account.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * persists user and application data in the browser so settings and workouts survive reloads.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Names the browser storage used by Athlima. A scope is a prefix that keeps one set of saved data
+ * separate from another. The browser-only app normally uses an empty prefix; the older account
+ * prefixes remain supported here but are not automatically loaded or merged. This is naming, not a
+ * login system or access protection.
  */
 
 let scope = '';
 
+/** Choose the prefix for later storage operations; this does not move or erase any existing data. */
 export function setAccountScope(email) {
     scope = email ? `athlima:${encodeURIComponent(email)}:` : '';
 }
 
+/**
+ * The small helpers below apply the current prefix to settings and the ride database. With no
+ * prefix, the database is named "store".
+ */
 export const accountKey = key => `${scope}${key}`;
 export const accountDatabase = () => scope ? `${scope}store` : 'store';
 export const hasAccountScope = () => Boolean(scope);
+/**
+ * Use the same naming rule for reading, writing and removing browser settings. Values are stored as
+ * text, not encrypted.
+ */
 export const accountStorage = {
     getItem: key => window.localStorage.getItem(accountKey(key)),
     setItem: (key, value) => window.localStorage.setItem(accountKey(key), value),

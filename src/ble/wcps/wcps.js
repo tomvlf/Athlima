@@ -1,19 +1,8 @@
 /*
- * wcps.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Controls Wahoo trainers using their vendor-specific Bluetooth commands while
+ * reading standard Cycling Power measurements. Startup unlocks control and sends
+ * rider/bike settings. Changing from power mode to simulated road grade needs
+ * two commands in order, so the requested grade waits for a mode-change reply.
  */
 
 //
@@ -31,6 +20,7 @@ import { uuids,} from '../web-ble.js';
 import { ControlMode, } from '../enums.js';
 import { userData } from '../userData.js';
 
+// Extend Service's setup/start/stop lifecycle with Wahoo load controls and reply sequencing.
 function WCPS(args = {}) {
 
     // config
@@ -54,6 +44,8 @@ function WCPS(args = {}) {
     // end private state
 
     // service
+    // After simulation mode is accepted, send the waiting grade; retry mode setup on rejection.
+    // Other replies release the ordinary busy flag.
     function onControlResponse(msg) {
         let control = service.characteristics.control;
 
@@ -74,7 +66,8 @@ function WCPS(args = {}) {
         control.release();
     }
 
-    // Void -> Bool
+    // Unlock, send mass/road settings, zero wind and set wheel size, with one-second gaps.
+    // This sequence currently returns true without checking each individual write result.
     async function protocol() {
         const control = service.characteristics.control;
 
@@ -107,7 +100,7 @@ function WCPS(args = {}) {
 
     // methods
 
-    // {WindSpeed: Float, Grade: Float, Crr: Float, WindResistance: Float} -> Void
+    // Apply percent grade, entering simulation mode first if needed. Busy updates are ignored.
     function setSimulation(parameters = {}) {
         const control = service.characteristics.control;
         if(!exists(control) || !control.isReady() || msgSeqLock) return false;
@@ -126,7 +119,7 @@ function WCPS(args = {}) {
         }
     }
 
-    // {resistance: Int} -> Void
+    // Convert resistance percent to the encoder's 0–1 intensity and switch local mode tracking.
     function setResistanceTarget(args = {}) {
         const control = service.characteristics.control;
         control.write(controlParser.loadIntensity.encode({
@@ -136,7 +129,7 @@ function WCPS(args = {}) {
         // control.block();
     }
 
-    // {power: Int} -> Void
+    // Send watts for ERG mode (holding a requested power) and remember that mode locally.
     function setPowerTarget(args = {}) {
         const control = service.characteristics.control;
         control.write(controlParser.setERG.encode(args));
@@ -144,7 +137,7 @@ function WCPS(args = {}) {
         // control.block();
     }
 
-    // {weigth: Float, crr: Float, windResistance: Float} -> Void
+    // Enter road simulation with combined rider/bike kilograms and optional tyre/air-drag factors.
     function setSimMode(args = {}) {
         const control = service.characteristics.control;
         const weight = userData.userWeight() + userData.bikeWeight();
@@ -156,10 +149,12 @@ function WCPS(args = {}) {
         controlMode = ControlMode.sim;
     }
 
+    // Refresh the simulation settings using the current in-memory rider and bicycle weights.
     function setUser() {
         setSimMode();
     }
 
+    // Send Wahoo's fixed unlock command before changing trainer settings.
     async function requestControl() {
         const control = service.characteristics.control;
 
@@ -168,6 +163,7 @@ function WCPS(args = {}) {
         return res;
     }
 
+    // Despite the method name, this sends zero wind speed, not a drag-coefficient update.
     async function setWindResistance() {
         const control = service.characteristics.control;
 
@@ -176,6 +172,7 @@ function WCPS(args = {}) {
         return res;
     }
 
+    // Send the encoder's default wheel travel per turn, in millimetres.
     async function setWheelCircumference() {
         const control = service.characteristics.control;
 

@@ -1,19 +1,8 @@
 /*
- * definition-record.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * FIT definition records describe the layout of following data records: message
+ * identity, byte order, and each field's number, width and storage type. This
+ * saves repeating field names with every sample. Developer fields are optional
+ * extensions added by a device/app; their widths also count toward record length.
  */
 
 import { nth, isArray, } from '../functions.js';
@@ -26,6 +15,7 @@ import { profiles } from './profiles/profiles.js';
 import { recordHeader } from './record-header.js';
 import { fieldDefinition } from './field-definition.js';
 
+// Convert layout descriptions between byte buffers and FITjs objects; name lookups delegate to profiles.
 function DefinitionRecord(args = {}) {
     const _type               = RecordType.definition;
     const headerSize          = recordHeader.size;
@@ -42,6 +32,7 @@ function DefinitionRecord(args = {}) {
         return profiles.messageNameToNumber(messageName);
     }
 
+    // Count the fixed header and three-byte descriptors, including the optional developer-field section.
     function getDefinitionRecordLength(view, start = 0) {
         const numberOfFields    = readNumberOfFields(view, start);
         const numberOfDevFields = readNumberOfDevFields(view, start);
@@ -52,14 +43,17 @@ function DefinitionRecord(args = {}) {
             (numberOfDevFields * fieldLength);
     }
 
+    // A data record needs one header byte plus all declared value widths, including array slots.
     function getDataRecordLength(fields) {
         return headerSize + fields.reduce((acc, x) => acc + x.size, 0);
     }
 
+    // Ordinary-field count lives at a fixed position in the definition header.
     function readNumberOfFields(view, start = 0) {
         return view.getUint8(start + numberOfFieldsIndex, true);
     }
 
+    // Read the extra count only when the developer flag is set, after all ordinary descriptors.
     function readNumberOfDevFields(view, start = 0) {
         const header = recordHeader.decode(view.getUint8(start, true));
         if(recordHeader.isDeveloper(header)) {
@@ -82,6 +76,7 @@ function DefinitionRecord(args = {}) {
     //     dev_fields?: [{number: Int, size: Int, base_type: BaseType}]?
     // }
     // -> DataView
+    // Write the layout into the supplied view, adding developer descriptors when supplied.
     function encode(definition, view, i = 0) {
         const hasDeveloperFields = (definition.dev_fields?.length ?? 0) > 0;
         const header = recordHeader.encode({
@@ -135,6 +130,7 @@ function DefinitionRecord(args = {}) {
     //     fields:      [{number: Int, size: Int, base_type: BaseTypes}],
     //     dev_fields?: [{number: Int, size: Int, base_type: BaseTypes}]?
     // }
+    // Respect the file's declared byte order and calculate how far the next data record must advance.
     function decode(view, start = 0) {
         const header            = recordHeader.decode(view.getUint8(start, true));
         const local_number      = header.localMessageType;
@@ -191,6 +187,8 @@ function DefinitionRecord(args = {}) {
     //     data_record_length: Int,
     //     fields: [{number: Int, size: Int, base_type: base_type}]
     // }
+    // Expand [message, fields, local number] from the app's export list.
+    // A [field name, size] entry overrides the usual width for arrays or fixed-size text.
     function toFITjs(productMessageDefinition = ['', []]) {
         const messageName    = nth(0, productMessageDefinition);
         const fields         = nth(1, productMessageDefinition);

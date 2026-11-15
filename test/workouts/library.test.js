@@ -1,4 +1,9 @@
 /**
+ * Parses the real bundled workout recipes and checks descriptive metadata, unique names, advertised
+ * durations and selected work/recovery structures. These checks catch accidental recipe changes;
+ * they do not make every library workout eligible for Coach selection.
+ */
+/**
  * @jest-environment jsdom
  */
 
@@ -20,6 +25,10 @@ test('every built-in workout parses with a name, category, description and durat
 
 test('classic training sessions are in the library with their prescribed structure', () => {
     const find = name => parsed.find(w => w.meta.name === name);
+    /**
+     * Total the seconds spent at one exact prescribed power fraction across all parsed steps, so a
+     * named interval session is checked by its actual work rather than its title alone.
+     */
     const work = (w, power) => w.intervals.flatMap(i => i.steps).filter(s => s.power === power)
         .reduce((total, s) => total + s.duration, 0);
     expect(work(find('2x20 Threshold'), 0.96)).toBe(2 * 1200);

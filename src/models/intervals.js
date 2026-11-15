@@ -1,3 +1,9 @@
+/**
+ * The optional direct connection from this browser to Intervals.icu. It keeps the API key and
+ * import progress locally, fetches profiles/history/planned workouts and uploads FIT files.
+ * Requests go only to the fixed provider address, not an Athlima server. Full synchronization runs
+ * only while the page is open; completed batches provide restart points.
+ */
 import { xf } from '../functions.js';
 import { isoDate } from '../utils.js';
 import { addDays, date } from '../coaching/domain.js';
@@ -9,6 +15,10 @@ const KEY = 'athlima-intervals-v1';
 const validAthleteId = id => /^(?:i)?\d{1,20}$/.test(String(id));
 let syncing = false;
 
+/**
+ * Read and validate the saved connection. Return null only when disconnected; malformed stored
+ * settings produce an actionable error instead of pretending the user is disconnected.
+ */
 function saved() {
     const value = window.localStorage.getItem(KEY);
     if(!value) return null;
@@ -20,6 +30,10 @@ function saved() {
     return result;
 }
 
+/**
+ * Expose connection/progress information for screens without returning the API key. configured
+ * means the integration is available, not that an account is connected.
+ */
 function status() {
     const connection = saved();
     return {configured: true, connected: Boolean(connection),
@@ -29,6 +43,11 @@ function status() {
         through: connection?.through, error: connection?.error, skipped: connection?.skipped || []};
 }
 
+/**
+ * Send one provider request with the API key in the Authorization header, never the URL. Omit
+ * cookies, reject redirects, time out stalled requests and translate provider/network/JSON failures
+ * into user-facing errors.
+ */
 async function request(path, {query, body, method = 'GET', connection = saved()} = {}) {
     if(!connection) throw new Error('Connect Intervals.icu in Settings first.');
     let response;
@@ -54,11 +73,20 @@ async function request(path, {query, body, method = 'GET', connection = saved()}
     catch { throw new Error('Intervals.icu returned an unreadable response. Please retry.'); }
 }
 
+/**
+ * Use the verified athlete ID from the saved connection for subsequent requests, refusing calls
+ * made before connecting.
+ */
 const athletePath = (connection = saved()) => {
     if(!connection) throw new Error('Connect Intervals.icu in Settings first.');
     return `/athlete/${connection.athleteId}`;
 };
 
+/**
+ * Validate the key and import date, test them by resolving /athlete/0, then save the real athlete
+ * ID. With no key argument, open Settings instead. Do not overwrite a connection changed by another
+ * tab during the test.
+ */
 async function connect({apiKey, oldest} = {}) {
     if(apiKey === undefined) {
         window.location.hash = '/settings';
@@ -85,6 +113,10 @@ async function connect({apiKey, oldest} = {}) {
     return status();
 }
 
+/**
+ * Remove saved credentials and connection progress, not imported training history. Refuse while
+ * this page's import is running.
+ */
 function disconnect() {
     if(syncing) throw new Error('Wait for the current import before disconnecting.');
     window.localStorage.removeItem(KEY);
@@ -92,10 +124,18 @@ function disconnect() {
     return status();
 }
 
+/**
+ * Fetch the profile of the athlete resolved during connection, rather than assuming the athlete/0
+ * alias for later calls.
+ */
 async function athlete() {
     return request(athletePath());
 }
 
+/**
+ * Fetch dated workout events for up to 63 days and keep those containing a ZWO file. Announce
+ * success/failure for the calendar and surface errors to the rider.
+ */
 async function wod(oldest = isoDate(), newest = isoDate()) {
     try {
         date(oldest);
@@ -114,6 +154,11 @@ async function wod(oldest = isoDate(), newest = isoDate()) {
     }
 }
 
+/**
+ * Upload a saved FIT file with a stable athlima:<record-id> label so importing it later can
+ * recognize the original recording. Return the existing success/fail status string and show upload
+ * errors.
+ */
 async function uploadWorkout(record) {
     try {
         if(!record?.blob || !/^[\w-]{1,100}$/.test(record.id)) throw new Error('Choose a valid FIT recording.');
@@ -128,6 +173,10 @@ async function uploadWorkout(record) {
     }
 }
 
+/**
+ * Extract body mass and cycling FTP, preferring indoor/VirtualRide settings when supplied. This
+ * mapping does not yet validate the profile.
+ */
 function athleteToSettings(athlete = {}, defaults = {weight: 0, ftp: 0}) {
     const settings = athlete.sportSettings || [];
     const selected = settings.find(setting => setting.types?.includes('VirtualRide')) ||
@@ -136,6 +185,7 @@ function athleteToSettings(athlete = {}, defaults = {weight: 0, ftp: 0}) {
         ftp: selected?.indoor_ftp ?? selected?.ftp ?? defaults.ftp};
 }
 
+/** Fetch and map the provider profile while announcing a result to the existing settings listeners. */
 async function getAthlete() {
     try {
         const result = athleteToSettings(await athlete());
@@ -148,6 +198,10 @@ async function getAthlete() {
     }
 }
 
+/**
+ * Validate both FTP and body mass, confirm the connection did not change mid-request, then announce
+ * them together. Invalid responses must not partly replace the cached profile.
+ */
 async function syncProfile() {
     const connection = saved();
     if(!connection) throw new Error('Connect Intervals.icu in Settings first.');
@@ -164,16 +218,29 @@ async function syncProfile() {
     return profile;
 }
 
+/**
+ * Import history in 31-day batches, validating activities and reporting skipped records. Save
+ * progress after each batch; on later syncs recheck a recent overlap. Review overdue sessions after
+ * the final batch so imported completions can match first.
+ */
 async function sync(service, onProgress = () => {}) {
     if(syncing) throw new Error('An Intervals.icu import is already running.');
     const connection = saved();
     if(!connection) throw new Error('Connect Intervals.icu first.');
     let persisted = window.localStorage.getItem(KEY);
+    /**
+     * Detect another tab changing connection settings before importing or recording progress under
+     * the wrong account.
+     */
     const checkConnection = () => {
         if(window.localStorage.getItem(KEY) !== persisted) {
             throw new Error('The Intervals.icu connection changed in another tab. Retry with the current settings.');
         }
     };
+    /**
+     * Persist the batch checkpoint only while the saved connection still matches the one this
+     * import started with.
+     */
     const saveProgress = () => {
         checkConnection();
         const next = JSON.stringify(connection);
@@ -253,8 +320,16 @@ async function sync(service, onProgress = () => {}) {
     return status();
 }
 
+/**
+ * Fetch detailed measurements and an optional route on demand. Validate their shapes and bounds; an
+ * invalid route can be omitted with an explanation while valid measurements remain usable.
+ */
 async function activityData(activityId) {
     if(typeof activityId !== 'string' || !/^[\w-]{1,100}$/.test(activityId)) throw new Error('Invalid Intervals.icu activity ID.');
+    /**
+     * Treat provider 400/404 responses as an unavailable optional resource, while propagating
+     * authentication, rate-limit and network failures.
+     */
     const optional = async path => {
         try { return await request(path); }
         catch(error) {

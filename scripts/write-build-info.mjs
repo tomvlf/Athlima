@@ -1,3 +1,8 @@
+/**
+ * Run during an image build to write the version label displayed in the app. The first command-line
+ * argument is the output JSON path. Build environment variables supply the release label and Git
+ * revision; without them this is a development build. No training data is included.
+ */
 import { writeFileSync } from 'node:fs';
 
 const destination = process.argv[2];

@@ -1,23 +1,13 @@
 /*
- * field-definition.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * reads, writes, and validates FIT files so training data can be stored and exchanged reliably.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * A FIT field definition describes one later value in three bytes: field number,
+ * value size in bytes and storage-type code. It contains no measurement itself.
+ * The profile dictionary translates storage names such as uint16 into the
+ * numeric code saved in the file.
  */
 
 import { profiles } from './profiles/profiles.js';
 
+// Position helpers locate the three entries relative to a caller-supplied byte offset.
 function FieldDefinition(args = {}) {
     const architecture = args.architecture ?? true;
 
@@ -30,6 +20,7 @@ function FieldDefinition(args = {}) {
     // DataView,
     // Int,
     // -> DataView
+    // Write the descriptor into an existing view; size may cover several values of the same type.
     function encode(definition, view, i = 0) {
         const base_type_number = profiles.BaseType[definition.base_type];
         view.setUint8(numberIndex(i),   definition.number, architecture);
@@ -43,6 +34,7 @@ function FieldDefinition(args = {}) {
     // Int,
     // ->
     // {number: Int, size: Int, base_type: BaseType}
+    // Read the raw descriptor and translate its type code; message-specific field naming happens later.
     function decode(messageName, view, i = 0) {
         const number           = view.getUint8(numberIndex(i),   architecture);
         const size             = view.getUint8(sizeIndex(i),     architecture);

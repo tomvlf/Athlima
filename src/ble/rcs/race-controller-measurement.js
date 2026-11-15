@@ -1,25 +1,15 @@
 /*
- * race-controller-measurement.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Incomplete reader for encrypted Race Controller button messages. Encryption
+ * hides the raw contents until a matching key can decode them. The intended
+ * result identifies idle/button messages and plus/minus presses, but the current
+ * decryption and operation-code handling are unfinished.
  */
 
 //
 // Race Controller Measurement Characteristic
 //
 
+// Accept an external crypto helper; the fallback returns empty text, not decoded button data.
 function RaceControllerMeasurement(args = {}) {
     const architecture = true;
 
@@ -31,7 +21,7 @@ function RaceControllerMeasurement(args = {}) {
 
     const crypto = args.crypto ?? { decrypt: (x) => '' };
 
-    // Dataview -> String
+    // Unfinished handoff: this currently references decrypt.buffer rather than the incoming view.
     function decrypt(dataview) {
         return crypto.decrypt(decrypt.buffer);
     }
@@ -40,7 +30,7 @@ function RaceControllerMeasurement(args = {}) {
     // normal button: not pressed 1, pressed 0
     // numeric button: not pressed 0, pressed: Int > 0
 
-    // Dataview -> { type: String, plus: Bool, minus: Bool }
+    // Inspect the tentative decoded text; unrecognized content returns {type: 'unknown'}.
     function decode(dataview) {
         const str = decrypt(dataview) ?? '0xFF';
         const opCode = str.substring(0, 1);

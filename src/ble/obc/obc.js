@@ -1,19 +1,8 @@
 /*
- * obc.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads Open Bike Control button messages from Bluetooth. Each packet (one
+ * complete received message) starts with a message type, then pairs of bytes:
+ * button ID and state. The three button-family decoders turn recognized pairs
+ * into named actions; controls.js separately decides what those actions do.
  */
 
 //
@@ -29,7 +18,8 @@ import { trainingControls } from './training-controls.js';
 
 const buttonStateMessageType = 0x01;
 
-// DataView -> [Message]
+// Decode complete ID/state pairs only. Unknown message types, unknown buttons
+// and an unmatched final byte are ignored rather than treated as button presses.
 function decodeButtonState(dataview) {
     if(!dataview || dataview.byteLength < 1) return [];
     if(!equals(dataview.getUint8(0, true), buttonStateMessageType)) return [];
@@ -50,6 +40,7 @@ function decodeButtonState(dataview) {
     return messages;
 }
 
+// Subscribe to button-state updates through Service's shared setup/start/stop lifecycle.
 function OBC(args = {}) {
 
     // config

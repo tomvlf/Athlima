@@ -1,19 +1,8 @@
 /*
- * rcs.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Unfinished Bluetooth Race Controller integration for devices such as Zwift
+ * buttons. It declares measurement, command and reply channels, but the key
+ * exchange/decryption pieces are placeholders. Unlike Open Bike Control,
+ * this should not be read as a complete, working button connection.
  */
 
 //
@@ -27,6 +16,7 @@ import { Characteristic } from '../characteristic.js';
 import { RaceControllerMeasurement } from './race-controller-measurement.js';
 // import { Crypto } from './crypto.js';
 
+// Placeholder key helpers: they return nothing and do not yet provide handshake or decryption methods.
 function Crypto() {
     function createPublicKey() {
     }
@@ -42,6 +32,7 @@ function Crypto() {
     };
 }
 
+// Set up the shared service wiring; exported protocol is not passed into Service's setup sequence.
 function RCS(args = {}) {
 
     // config
@@ -61,6 +52,7 @@ function RCS(args = {}) {
     const crypto = Crypto();
     const raceControllerMeasurementParser = RaceControllerMeasurement({crypto,});
 
+    // Intended key-exchange handshake (an initial agreement with the device); crypto.handshake is missing.
     async function protocol() {
         const control = service.characteristics.control;
 
@@ -71,12 +63,14 @@ function RCS(args = {}) {
         await control.write(crypto.handshake());
     }
 
+    // Forward a decoded reply to the unfinished shared-key step.
     function onResponse(msg) {
         console.log(`ble: rcs: on-response: `, msg);
         // Step 3: create shared key
         crypto.createSharedKey(msg);
     }
 
+    // Unwired diagnostic callback retained for future control-channel handling.
     function onControl(msg) {
         console.log(`ble: rcs: on-control: `, msg);
     }

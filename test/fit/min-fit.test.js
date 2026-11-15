@@ -1,25 +1,15 @@
 /*
- * min-fit.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Tests FIT building blocks: old/new file headers, ordinary/developer record
+ * headers, field layouts and their data records. Small independent byte examples
+ * check layout details, while the minimal saved file supplies round-trip cases.
+ * A round trip means decoding and encoding without changing the represented data.
  */
 
 import { dataviewToArray } from '../../src/functions.js';
 import { fit } from '../../src/fit/fit.js';
 import { data } from './min-data.js';
 
+// Give explicit byte lists the same readable-buffer shape used by the FIT parser.
 function view(bytes) {
     return new DataView(Uint8Array.from(bytes).buffer);
 }
@@ -89,6 +79,7 @@ describe('FIT record headers', () => {
     });
 });
 
+// Definitions must accompany data because FIT sample bytes do not repeat their field names.
 describe('FIT definition and data records', () => {
     const records = fit.FITjs.decode(view(data.minimal));
     const definitions = records.filter(record => record.type === 'definition');

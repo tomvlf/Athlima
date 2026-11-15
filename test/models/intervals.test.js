@@ -1,11 +1,25 @@
+/**
+ * Exercises the direct Intervals.icu client with fake fetch responses and fictional credentials; no
+ * provider account is contacted. Covers connection identity, profile locking/validation, upload
+ * requests, resumable all-sport history imports, optional chart data and competing-tab connection
+ * changes.
+ */
 import intervals from '../../src/models/intervals.js';
 import { CoachingService } from '../../src/coaching/service.js';
 import { xf } from '../../src/functions.js';
 
 const KEY = 'athlima-intervals-v1';
+/**
+ * Make the minimal HTTP-response shape these client tests need, with an explicit status and
+ * asynchronously readable JSON body.
+ */
 const response = (data, status = 200) => ({ok: status === 200, status,
     headers: {get: () => null}, json: async () => data});
 const stored = () => JSON.parse(localStorage.getItem(KEY));
+/**
+ * Store a fictional existing connection so a scenario can start at the request/import stage without
+ * repeating connection setup.
+ */
 const seed = oldest => localStorage.setItem(KEY, JSON.stringify({
     apiKey: 'test-key', athleteId: '123', oldest: oldest || '2026-01-01',
 }));

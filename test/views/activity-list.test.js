@@ -1,7 +1,8 @@
 /*
- * activity-list.test.js: test coverage module.
- *
- * This file verifies activity restoration and the metrics shown in the activity list.
+ * Checks saved-ride restoration, metric labels, power previews, and safe activity cards.
+ * jsdom supplies a simulated browser page. Storage/coaching functions are replaced
+ * with controlled answers so these checks need no rider account or saved history.
+ * Missing training estimates must stay absent, and imported text must stay literal.
  */
 
 /** @jest-environment jsdom */
@@ -29,6 +30,7 @@ afterEach(() => {
     jest.clearAllMocks();
 });
 
+// Attaching the tag runs its browser lifecycle hook and registers the restore listener.
 test('restores persisted activities when the activity:restore event fires', async () => {
     models.activity.restore.mockResolvedValue([{
         id: 'ride-1',
@@ -80,6 +82,7 @@ test('renders a recorded wattage profile on an activity card', () => {
     expect(markup).toContain('class="power-profile--recorded"');
 });
 
+// Parse the returned HTML to prove hostile-looking text does not become tags or handlers.
 test('renders untrusted activity names, IDs, and statuses as inert content', () => {
     const list = new ActivityList();
     const attack = '<img src=x onerror=alert(1)>';

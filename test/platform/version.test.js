@@ -1,3 +1,8 @@
+/**
+ * Checks the version label against fixed bundled build metadata, with and without a visible
+ * revision. The test forbids a backend fetch: this label describes the loaded frontend and local
+ * storage, not a server version.
+ */
 import { mountVersions, versionMarkup } from '../../src/platform/version.js';
 
 jest.mock('../../src/platform/build-info.json', () => ({

@@ -1,19 +1,8 @@
 /*
- * supported-ranges.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Six-byte minimum/maximum/step-size descriptions advertised by FTMS trainers.
+ * Each number occupies two bytes. encode returns an ArrayBuffer; decode returns
+ * {min, max, inc}, where inc is the smallest supported step. Values remain raw:
+ * power is in watts, while resistance scaling is left to the caller.
  */
 
 //
@@ -23,6 +12,7 @@
 
 import { existance }  from '../../functions.js';
 
+// Older, unexported direct reader for the same three raw resistance-range numbers.
 function supportedResistanceLevelRange(dataview) {
     // (0x) 00-00-E8-03-01-00
     let min = dataview.getUint16(0, dataview, true);
@@ -32,6 +22,7 @@ function supportedResistanceLevelRange(dataview) {
     return { min, max, inc };
 }
 
+// Pack/read the trainer's power limits and increment without enforcing them on later commands.
 function PowerRange() {
     const length = 6;
 
@@ -68,6 +59,7 @@ function PowerRange() {
     });
 }
 
+// Pack/read raw resistance limits; unlike the target encoder, this does not divide by ten.
 function ResistanceRange() {
     const length = 6;
 

@@ -1,19 +1,8 @@
-/*
- * mobile.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Checks the compact ride-first interface using a recovered paused ride and controlled model data.
+ * Exercises More-menu keyboard focus, the exact 700/701-pixel layout boundary, preservation of
+ * active controls on resize and the saved-ride summary. It checks DOM behavior, not screenshots or
+ * real Bluetooth connectivity.
  */
 
 /** @jest-environment jsdom */
@@ -21,6 +10,10 @@ import { launchPlatform } from '../../src/platform/ui.js';
 import { xf } from '../../src/functions.js';
 import { db } from '../../src/db.js';
 
+/**
+ * Announce engine readiness from a test double, then feed the platform fixed ride state instead of
+ * starting a real ride engine.
+ */
 jest.mock('../../src/index.js', () => {
     queueMicrotask(() => globalThis.window.dispatchEvent(new CustomEvent('app:ready')));
     return {};

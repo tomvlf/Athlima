@@ -1,19 +1,9 @@
-/*
- * state.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Summarizes the training information available at a particular date. It calculates trends and
+ * marks weak or missing evidence rather than diagnosing fitness or readiness. Each snapshot uses
+ * one load scale: mixing power points, heart-rate estimates and perceived-effort scores would
+ * produce a meaningless total. Other-sport feedback can inform caution, but its training time is
+ * kept separate.
  */
 
 import { DEFAULTS, VERSION, addDays, daysBetween, sum, mean, metric, positive, round, sportOf,
@@ -21,11 +11,20 @@ import { DEFAULTS, VERSION, addDays, daysBetween, sum, mean, metric, positive, r
 
 export const POWER_DURATIONS = [5, 15, 30, 60, 180, 300, 720, 1200, 1800, 2400, 3600];
 
+/**
+ * Fit a simple power-versus-duration model to explicitly maximal efforts. Return estimated critical
+ * power (watts), W-prime (joules) and fit quality only when evidence and plausibility checks pass;
+ * otherwise explain why they are unavailable. This does not set FTP.
+ */
 export function estimateCriticalPower(efforts, rules = DEFAULTS) {
     const config = validateCoachingConfig(rules);
     const valid = efforts.filter(e => e.maximal === true && e.seconds >= config.cpMinimumDuration &&
         e.seconds <= config.cpMaximumDuration &&
         positive(e.watts));
+    /**
+     * Represent a rejected or under-supported estimate with missing values and a reason, not a
+     * fabricated performance score.
+     */
     const unavailable = reason => ({cp: null, wPrime: null, fitQuality: null, version: VERSION, reason});
     if(new Set(valid.map(e => e.seconds)).size < config.cpMinimumEfforts ||
        Math.max(...valid.map(e => e.seconds)) / Math.min(...valid.map(e => e.seconds)) < config.cpMinimumDurationRatio) {
@@ -49,6 +48,10 @@ export function estimateCriticalPower(efforts, rules = DEFAULTS) {
         reason: 'Two-parameter power = CP + W-prime / seconds least-squares fit; FTP remains separate.'};
 }
 
+/**
+ * Find the best observed average power for several effort lengths using supplied summaries or
+ * sliding windows of one-second samples. Observed bests are not automatically maximal tests.
+ */
 export function powerDuration(activities, weight) {
     return POWER_DURATIONS.map(seconds => {
         let best = null;
@@ -75,7 +78,16 @@ export function powerDuration(activities, weight) {
     });
 }
 
+/**
+ * Count observed seconds in power and heart-rate zones separately. A zone is an intensity band
+ * relative to FTP or maximum heart rate; the result reports missing evidence when no usable samples
+ * exist.
+ */
 export function intensityDistribution(activities, profile, config = DEFAULTS) {
+    /**
+     * Place each valid sample into both detailed intensity bands and easy/moderate/hard bands,
+     * without estimating time for unrecorded samples.
+     */
     function distribution(key, reference, thresholds, threeCuts) {
         const zones = Array(thresholds.length + 1).fill(0);
         const three = [0, 0, 0];
@@ -97,6 +109,11 @@ export function intensityDistribution(activities, profile, config = DEFAULTS) {
     };
 }
 
+/**
+ * Compare the early and late parts of sufficiently long, steady rides with paired power/heart-rate
+ * samples. Return low-confidence observations of fade and drift, not an explanation of their
+ * biological cause.
+ */
 export function estimateDurability(activities, rules = DEFAULTS) {
     const config = validateCoachingConfig(rules);
     const observations = [];
@@ -121,6 +138,11 @@ export function estimateDurability(activities, rules = DEFAULTS) {
         'Only >=60 min paired streams, after 10 min warm-up, 50-75% FTP and power CV <=10%; no diagnosis.');
 }
 
+/**
+ * Build the dated planning summary from history, the athlete profile and resolved workout outcomes.
+ * Use only information on or before asOf, retain calculation confidence, and count successful
+ * evidence-backed sessions for progression.
+ */
 export function estimateState(activities, profile, asOf, options = {}, outcomes = []) {
     validateProfile(profile);
     const config = validateCoachingConfig(options);
@@ -136,6 +158,10 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
     // One scale for the entire snapshot, never add TSS to RPE or HR units.
     const loadSource = [sport === 'running' ? 'pace' : 'power', 'sessionRpe', 'heartRate']
         .find(key => recent.length && recent.every(a => a.loadMetrics[key]?.value != null)) ?? 'duration';
+    /**
+     * Read a ride on the one scale selected for this snapshot. A missing value on that scale stays
+     * missing rather than switching units for just that ride.
+     */
     const loadOf = a => loadSource === 'duration' ? a.duration / 60 : a.loadMetrics[loadSource]?.value;
     const longestWindow = history.filter(a => a.day > addDays(asOf, -config.runLongestSessionReferenceDays));
     const daily = [];
@@ -159,6 +185,10 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
     const completed = recentOutcomes.filter(o => ['completed', 'substituted'].includes(o.status));
     const feedback = allHistory.filter(a => a.day > addDays(asOf, -config.readinessWindowDays));
     // A planned hard session is meant to feel hard: judge its RPE against the planned effort.
+    /**
+     * Compare reported effort with the matched workout's expected effort when available; an
+     * intentionally hard session should not be judged as if it were an easy ride.
+     */
     const rpeLimit = activity => {
         const expected = outcomes.find(o => o.activityId === activity.id)?.expectedRpe;
         return Number.isFinite(expected)

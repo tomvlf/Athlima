@@ -1,24 +1,18 @@
 /*
- * characteristic.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Wraps one Bluetooth characteristic: a named place on a device where the app
+ * can read a value, write a command or receive automatic updates (notifications).
+ * Values arrive as bytes, small numbered pieces of data; a service-specific
+ * decoder turns them into measurements. This layer manages browser calls only.
  */
 
 import { exists, arrayBufferToArray, wait, time, print, } from '../functions.js';
 import { webBle } from './web-ble.js';
 
+/**
+ * Add retries and a ready flag to a browser characteristic. block/release are a
+ * caller-managed pause while awaiting a command reply; isReady only reads it.
+ * responseTimeout and retry delays are milliseconds.
+ */
 function Characteristic(args = {}) {
     //
     // config
@@ -71,7 +65,7 @@ function Characteristic(args = {}) {
     // methods
     //
 
-    // Function -> Bool;
+    // Subscribe to device updates and pass their DataView to handler; return false on browser errors.
     async function startNotifications(handler) {
         try {
             abortController = new AbortController();
@@ -90,7 +84,7 @@ function Characteristic(args = {}) {
         }
     }
 
-    // Function, Int, Int -> Bool;
+    // Try once plus the requested retries; failed attempts wait before trying again.
     async function startNotificationsWithRetry(handler, attempts = 10, txRate = 250) {
         const success = await startNotifications(handler);
         if(success) {
@@ -107,7 +101,7 @@ function Characteristic(args = {}) {
         }
     }
 
-    // Function -> Bool;
+    // Stop device updates and remove the listener installed by startNotifications.
     async function stopNotifications(handler) {
         try {
             await _characteristic.stopNotifications();
@@ -121,7 +115,7 @@ function Characteristic(args = {}) {
         }
     }
 
-    // {} -> Any
+    // Read the current raw value, returning the caller's fallback if the device read fails.
     async function read(args = {}) {
         const fallback = args.fallback;
 
@@ -134,7 +128,7 @@ function Characteristic(args = {}) {
         }
     }
 
-    // DataView -> Bool
+    // Send prepared bytes using the supported browser write method; report success as true/false.
     async function write(value) {
         let res;
         try{
@@ -146,7 +140,7 @@ function Characteristic(args = {}) {
         }
     }
 
-    // Any, Int, Int -> Bool
+    // Retry a failed byte write; this confirms browser delivery, not the trainer's command result.
     async function writeWithRetry(value, attempts = 10, txRate = 250) {
         let success = await write(value);
         if(success) {
@@ -164,13 +158,13 @@ function Characteristic(args = {}) {
         }
     }
 
-    // Void -> Void
+    // Mark the characteristic busy, with a timeout so a missing reply cannot block it forever.
     function block() {
         _responseTimeoutId = setTimeout(release, responseTimeout);
         _ready = false;
     }
 
-    // Void -> Void
+    // A reply or timeout makes the characteristic available for another command.
     function release() {
         clearTimeout(_responseTimeoutId);
         _ready = true;

@@ -1,23 +1,18 @@
 /*
- * revs-over-time.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Calculates rotation speed from a sensor's running revolution and time counters.
+ * Counters eventually wrap to zero, and sensors can repeat the same reading while
+ * a rider slows down. These helpers account for both and learn how many repeated
+ * messages to tolerate before displaying zero.
  */
 
 import { equals, expect, clamp, } from '../../functions.js';
 
+/**
+ * Keep the previous reading for one sensor. resolution converts supplied time
+ * units to seconds; maxTime/maxRevs are each counter's wrap range. format converts
+ * revolutions/second to the caller's output unit. Small accessors manage only
+ * this remembered state; rate uses the same time unit as calculate's input.
+ */
 function RevsOverTime(args = {}) {
     const defaults = {
         revs: -1,
@@ -57,12 +52,14 @@ function RevsOverTime(args = {}) {
     // multiple transmissions of the same time
     const stillTime = (time) => equals(getTime(), time);
 
+    // Change how many unchanged/too-close samples may retain the previous reading.
     function setMaxRateCount(maxCount) {
         maxRateCount = maxCount ?? defaults.maxRateCount;
         console.log(`maxRateCount: ${maxRateCount}`);
         return maxRateCount;
     }
 
+    // Clear both counters and the displayed value for a new measurement session.
     function reset() {
         setRevs(defaults.revs);
         setTime(defaults.time);
@@ -71,6 +68,7 @@ function RevsOverTime(args = {}) {
         return { revs: revs_1, time: time_1 };
     }
 
+    // Delay recalculation for repeated or too-close timestamps, but never indefinitely.
     function underRate(time) {
         if(equals(rateCount, maxRateCount)) {
             rateCount = 0;
@@ -88,6 +86,7 @@ function RevsOverTime(args = {}) {
         return false;
     }
 
+    // Compare counters, repair wraparound differences and convert rotations per second for display.
     function calculate(revs_2, time_2) {
         if(getRevs() < 0) setRevs(revs_2); // set initial revs
         if(getTime() < 0) setTime(time_2); // set initial time
@@ -126,6 +125,11 @@ function RevsOverTime(args = {}) {
     };
 }
 
+/**
+ * Estimate a repeat limit from notification arrival times ({ts} in milliseconds).
+ * Learning ends after twenty samples and calls onDone once; reset restarts it.
+ * Private accessors hold sample counts, status and the tolerated still time.
+ */
 function RateAdjuster(args = {}) {
     const Status = {
         reading: 'reading',
@@ -170,6 +174,7 @@ function RateAdjuster(args = {}) {
         _status = Status.reading;
     }
 
+    // Average arrival gaps, assuming 1000 ms for the first sample's unknown preceding gap.
     function timestampAvgDiff(sample) {
         return sample.reduce(function(acc, x, i, xs) {
             let tsd = 1000;
@@ -181,6 +186,7 @@ function RateAdjuster(args = {}) {
         }, 0);
     }
 
+    // Allow roughly three seconds of repeated data, bounded to 2–15 messages.
     function calculate(sample) {
         const tsAvgDiff = timestampAvgDiff(sample);
 
@@ -191,6 +197,7 @@ function RateAdjuster(args = {}) {
         return maxRateCount;
     }
 
+    // Collect a timestamp until learning is complete, then leave the chosen rate unchanged.
     function update(value) {
         if(isDone()) return;
 

@@ -1,26 +1,17 @@
 /**
- * @jest-environment node
- *
- * sw.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Tests offline-worker event handlers with controlled cache/network objects in a fresh Node
+ * context. Checks page fallback, eligible asset caching, exclusion of external/API traffic and
+ * visible cache failures without losing valid responses. This is a simulation, not a service-worker
+ * registration in a real browser.
  */
 
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
+/**
+ * Load the actual worker source into a fresh context, capture its event handlers and return the
+ * fake cache/network methods so each scenario can control success or failure.
+ */
 function worker() {
     const handlers = {};
     const cache = {addAll: jest.fn().mockResolvedValue(), match: jest.fn().mockResolvedValue(null),

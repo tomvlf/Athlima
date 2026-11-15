@@ -1,19 +1,8 @@
-/*
- * idb.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * persists user and application data in the browser so settings and workouts survive reloads.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Wraps IndexedDB, the browser's on-device filing cabinet for larger records such as workouts and
+ * FIT files. A store is one collection, and a transaction is a group of reads or writes. Older
+ * convenience methods log failures and return an empty result; methods ending in Checked instead
+ * report failure to their caller.
  */
 
 //
@@ -23,6 +12,10 @@
 import { exists, existance, empty, } from '../functions.js';
 import { uuid } from './uuid.js';
 
+/**
+ * Turn a browser request with success/error callbacks into a Promise, so callers can wait for its
+ * result with await.
+ */
 function promisify(request) {
     return new Promise((resolve, reject) => {
         request.onsuccess = function(event) {
@@ -34,6 +27,10 @@ function promisify(request) {
     });
 }
 
+/**
+ * Create a database helper with its own open connection. The returned methods share that
+ * connection; start must run before reading or writing.
+ */
 function IDB(args = {}) {
     let db;
 
@@ -41,6 +38,10 @@ function IDB(args = {}) {
         db = idb;
     }
 
+    /**
+     * Check that a database name was supplied, then open it and create or update its collections
+     * when required.
+     */
     async function start(database = '', version = 1, stores = []) {
         if(!exists(database)) {
             throw new Error(`:idb idb.start() needs database name!`);
@@ -51,6 +52,10 @@ function IDB(args = {}) {
         await open(database, version, stores);
     }
 
+    /**
+     * Open the requested database version. The upgrade switch intentionally continues through
+     * successive cases so an older database receives every intervening update.
+     */
     function open(name, version, storeNames) {
         console.log(`:idb :open :db '${name}' :store-name '${storeNames}' ...`);
         let openReq = window.indexedDB.open(name, version);
@@ -92,6 +97,10 @@ function IDB(args = {}) {
         });
     }
 
+    /**
+     * Create a collection if absent. keyPath identifies the field, usually id, used to distinguish
+     * records.
+     */
     function createStore(name, keyPath = 'id') {
         if (!db.objectStoreNames.contains(name)) {
             db.createObjectStore(name, {keyPath: keyPath});
@@ -101,12 +110,17 @@ function IDB(args = {}) {
         }
     }
 
+    /**
+     * Create each requested collection, using "id" when no alternative record-key field is
+     * supplied.
+     */
     function createStores(storeNames, keyPaths = []) {
         storeNames.forEach((storeName, i) => {
             createStore(storeName, existance(keyPaths[i], 'id'));
         });
     }
 
+    /** During a version upgrade, add any requested collections that the older database did not have. */
     async function update(storeNames) {
         console.log(`:idb :update :stores ${storeNames}`);
         // create IndexedDB > db > session, workouts
@@ -117,6 +131,11 @@ function IDB(args = {}) {
         console.log(`:idb :latest :stores ${storeNames}`);
     }
 
+    /**
+     * Run one named database operation. A missing collection returns undefined; a request failure
+     * is logged and returns an empty array. Use the Checked write/delete methods when callers must
+     * distinguish failure from success.
+     */
     function transaction(storeName, method, param = undefined, type = 'readonly') {
         if(!db.objectStoreNames.contains(storeName)) return undefined;
 
@@ -139,6 +158,10 @@ function IDB(args = {}) {
         });
     }
 
+    /**
+     * The basic add/put/get/getAll/remove/clear helpers select the operation and read/write mode
+     * for transaction. add requires a new key; put also replaces an existing key.
+     */
     function add(storeName, item) {
         return transaction(storeName, 'add', item, 'readwrite');
     }
@@ -147,10 +170,18 @@ function IDB(args = {}) {
         return transaction(storeName, 'put', item, 'readwrite');
     }
 
+    /**
+     * Save one record and resolve with that record only after the whole database write has
+     * committed.
+     */
     function putChecked(storeName, item) {
         return putManyChecked([[storeName, item]]).then(() => item);
     }
 
+    /**
+     * Save related records in one transaction: either every write commits or the transaction is
+     * cancelled. Reject on failure so the UI can report that data was not saved.
+     */
     function putManyChecked(entries) {
         return new Promise((resolve, reject) => {
             const write = db.transaction([...new Set(entries.map(([name]) => name))], 'readwrite');
@@ -178,6 +209,10 @@ function IDB(args = {}) {
         return transaction(storeName, 'delete', id, 'readwrite');
     }
 
+    /**
+     * Delete one record and report success only after the deletion commits; reject if the write
+     * fails.
+     */
     function removeChecked(storeName, id) {
         return new Promise((resolve, reject) => {
             const write = db.transaction(storeName, 'readwrite');
@@ -197,6 +232,10 @@ function IDB(args = {}) {
         return transaction(storeName, 'clear', undefined, 'readwrite');
     }
 
+    /**
+     * Keep an existing record ID, otherwise attach the supplied ID or generate a new one. This
+     * changes the passed-in record.
+     */
     function setId(item, id = undefined) {
         if(!exists(item.id)) {
             if(!exists(id)) {

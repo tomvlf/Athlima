@@ -1,19 +1,7 @@
 /*
- * smo2.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Connects a Moxy Bluetooth muscle-oxygen service to the sample decoder.
+ * Its automatic updates become oxygen percentages, haemoglobin concentration
+ * and sample metadata delivered through onData; no recording commands are sent here.
  */
 
 //
@@ -26,6 +14,7 @@ import { Service } from '../service.js';
 import { Characteristic } from '../characteristic.js';
 import { sensorData as smo2MeasurementParser } from './moxy.js';
 
+// Use Service's shared setup/start/stop methods for the discovered Moxy measurement channel.
 function SMO2(args = {}) {
 
     // config

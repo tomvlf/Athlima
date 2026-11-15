@@ -1,19 +1,12 @@
 /*
- * editor.js: front-end client module.
+ * A table-style workout editor: rows describe duration, power, ramp, slope,
+ * and cadence. Row/Editor hold numbers in memory; RowView/WorkoutEditor connect
+ * those numbers to the form. Download produces a ZWO workout file for later use.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Field helpers encode numbers as readable text and decode typed text back to
+ * numbers. The custom tag's constructor prepares the editor; connectedCallback
+ * attaches form listeners when it joins the page, and disconnectedCallback cancels
+ * its listeners. Rendering only changes the page, not a saved workout library.
  */
 
 import { xf, equals, exists, empty, first, second, last, toFixed } from '../functions.js';
@@ -23,15 +16,18 @@ import { zwo } from '../workouts/zwo.js';
 import { fileHandler } from '../file.js';
 import { uuid } from '../storage/uuid.js';
 
+// Read the editor's minutes:seconds input as a total number of seconds.
 function stringToSeconds(str) {
     const values = str.split(':').map(Number);
     return first(values) * 60 + second(values);
 }
 
+// Remove display units such as "%" while retaining digits, minus signs, and decimals.
 function toNumericString(str) {
     return str.replace(/[^\d.-]/g, '');
 }
 
+// Time field conversions; valid reports whether decoded seconds are greater than zero.
 function Duration() {
     function encode(num) {
         return formatTime({value: num, format: 'mm:ss'});
@@ -49,6 +45,8 @@ function Duration() {
     });
 }
 
+// Convert between a fraction of FTP (0.8) and displayed percentage (80%).
+// FTP is the rider's reference power; missing values use the configured placeholder.
 function Power(args = {}) {
     const _defaults = {
         encode: '-',
@@ -71,6 +69,7 @@ function Power(args = {}) {
     });
 }
 
+// Road gradient stays in percent; display missing values as "-" and decode them as absent.
 function Slope(args = {}) {
     function encode(num) {
         let value = parseFloat(num);
@@ -90,6 +89,7 @@ function Slope(args = {}) {
     });
 }
 
+// Pedalling rate is a whole-number target; a blank/non-number means no cadence target.
 function Cadence(args = {}) {
     function encode(num) {
         let value = parseInt(num);
@@ -116,6 +116,12 @@ const fields = {
     cadence: Cadence(),
 };
 
+/**
+ * One editable interval's in-memory numbers and selection flag.
+ * Field setters decode input; getters expose values, get returns a copy, and set
+ * merges already-decoded data. toView formats the values and toInterval prepares
+ * them for the workout player/exporter. None of these helpers writes to storage.
+ */
 function Row(args = {}) {
     const id = args.id ?? genId();
 
@@ -143,6 +149,7 @@ function Row(args = {}) {
         state.duration = fields.duration.decode(value);
     }
 
+    // Ignore non-numeric power edits; valid edits also choose the intensity-zone colour.
     function setPower(value) {
         const percentage = fields.power.decode(value);
         if(isNaN(percentage)) return;
@@ -150,6 +157,7 @@ function Row(args = {}) {
         state.powerZone = models.ftp.percentageToZone(state.power);
     }
 
+    // A missing ramp end clears the ramp, turning the row back into a steady interval.
     function setRamp(value) {
         const percentage = fields.power.decode(value);
         if(isNaN(percentage)) {
@@ -215,6 +223,7 @@ function Row(args = {}) {
         state.select = !state.select;
     }
 
+    // Produce display strings for fields with formatters; leave other entries undefined.
     function toView(data) {
         return Object.keys(data).reduce((acc, key) => {
             acc[key] = fields[key]?.encode(data[key]);
@@ -222,6 +231,7 @@ function Row(args = {}) {
         }, {});
     }
 
+    // Choose a steady step or a sequence approaching the row's ramp-end power.
     function toInterval(row = state) {
         if(exists(row.ramp)) {
             return { duration: row.duration, steps: toRamp(row), };
@@ -230,6 +240,8 @@ function Row(args = {}) {
         }
     }
 
+    // Approximate a ramp with whole ten-second steps, carrying optional slope/cadence
+    // into each step and rounding relative power to avoid floating-point display noise.
     function toRamp(row) {
         const timeStep = 10;
         const duration = row.duration;
@@ -255,6 +267,7 @@ function Row(args = {}) {
         return steps;
     }
 
+    // Build the player's step record, omitting targets the rider did not supply.
     function toStep(row) {
         const step = {
             duration: row.duration,
@@ -287,6 +300,7 @@ function Row(args = {}) {
     });
 }
 
+// Small row registry keyed by ID; its helpers update and return the same Map.
 function Selection(args = {}) {
     const state = new Map();
 
@@ -319,6 +333,7 @@ function Selection(args = {}) {
     });
 }
 
+// Holds workout metadata and ordered rows; saving assembles a workout in memory.
 function Editor() {
     const rows = [];
 
@@ -357,6 +372,8 @@ function Editor() {
     function getDescription(value) {
         return workout.meta.description;
     }
+    // Duplicate selected rows (unselected copies), or add one default row if none is selected.
+    // Return only the new rows so the view can append them without rebuilding the table.
     function add() {
 
         const addition = [];
@@ -384,6 +401,7 @@ function Editor() {
         rows.pop();
         return rows;
     }
+    // Gather current rows into intervals and total duration; this does not persist a file.
     function save() {
         const meta = rows.reduce((acc, row) => {
             acc.duration += row.get().duration;
@@ -403,6 +421,7 @@ function Editor() {
     function format(args = {}) {
         return toZwo(workout);
     }
+    // Convert the assembled workout to ZWO, an XML text format used for cycling workouts.
     function toZwo(data) {
         return zwo.write(zwo.fromInterval(data));
     }
@@ -424,6 +443,12 @@ function Editor() {
     });
 }
 
+/**
+ * Binds a Row model to one table row. Input handlers update its numbers;
+ * selection and zone renderers change only the matching icons/colours.
+ * build returns initial HTML, connect wires an inserted row, and disconnect
+ * cancels its listeners before removal.
+ */
 function RowView(args = {}) {
     const model = args.model;
 
@@ -499,6 +524,7 @@ function RowView(args = {}) {
         $on.classList.remove('selected');
         $off.classList.add('selected');
     }
+    // Replace the zone part of each target's styling class after its value changes.
     function renderPowerZone() {
         const zoneClass = model.get().powerZone;
         $power.className = $power.className
@@ -526,6 +552,7 @@ function RowView(args = {}) {
     function onCadence(e) {
         model.setCadence(e.target.value);
     }
+    // Build inputs from the field helpers' numeric display strings, not raw descriptions.
     function template(data) {
         return `<div class="editor--row">
             <div class="editor--td select">
@@ -564,6 +591,7 @@ function RowView(args = {}) {
     });
 }
 
+// Coordinates the overall form, row views, start-time labels, and file download.
 class WorkoutEditor extends HTMLElement {
     constructor() {
         super();
@@ -623,6 +651,7 @@ class WorkoutEditor extends HTMLElement {
         this.$durationInputs = this.$body.querySelectorAll('.editor--td.duration');
         this.$timeOutputs = this.$body.querySelectorAll('.editor--td.time');
     }
+    // Each row starts after the durations above it; recompute all start-time labels.
     setTime(e) {
         const self = this;
         let acc = 0;
@@ -643,6 +672,7 @@ class WorkoutEditor extends HTMLElement {
     onDescription(e) {
         this.editor.setDescription(e.target.value);
     }
+    // Append views for the model's new/copied rows, then refresh cumulative times.
     onAdd(e) {
         // const rowModel = this.editor.add();
         // const rowView = RowView({model: rowModel});
@@ -668,6 +698,7 @@ class WorkoutEditor extends HTMLElement {
         });
 
     }
+    // Remove the last row from the model and page, cancelling that row's input listeners.
     onRemove(e) {
         if(this.rows.size > 0) {
             this.editor.remove();
@@ -680,6 +711,7 @@ class WorkoutEditor extends HTMLElement {
             this.setTime();
         }
     }
+    // Validation is not implemented here yet; the requested save/download runs directly.
     validate(fn) {
         // const { isValid, errors } = this.editor.validate();
         // if(isValid) {
@@ -701,6 +733,7 @@ class WorkoutEditor extends HTMLElement {
     save() {
         this.editor.save();
     }
+    // Assemble current edits and ask the browser to download a named .zwo text file.
     download() {
         this.editor.save();
         const file = this.editor.format({format: 'zwo'});

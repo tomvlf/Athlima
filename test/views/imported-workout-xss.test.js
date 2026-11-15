@@ -1,3 +1,10 @@
+/*
+ * Imported workout names, categories, descriptions, and IDs must remain literal text.
+ * These examples contain HTML-like text and quotes to catch accidental page-code
+ * injection (XSS). A simulated page parses the result so checks inspect real elements,
+ * not just whether the returned string looks escaped.
+ */
+
 import '../../src/views/workout-list.js';
 import '../../src/views/planned-list.js';
 import { workoutTemplate } from '../../src/views/workout-list.js';
@@ -26,6 +33,7 @@ test('renders planned workout metadata and IDs as inert content', () => {
     const attack = '<img src=x onerror=alert(1)>';
     const id = 'workout-1" onmouseover="alert(1)';
     const list = new PlannedList();
+    // Graph drawing is unrelated here; isolate the planned-row text and attribute handling.
     list.viewModel = {toSVG: () => ''};
 
     const container = document.createElement('div');

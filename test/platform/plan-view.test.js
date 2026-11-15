@@ -1,7 +1,16 @@
+/**
+ * Checks that plan presentation explains the goal, current phase and next session before technical
+ * detail. A fixed seven-week example exercises folding older/future weeks, elapsed-plan progress,
+ * archived plans and sport-appropriate running labels.
+ */
 import { renderPlan } from '../../src/platform/plan-view.js';
 
 const workout = (id, date, family, status = 'scheduled', weekId = 'week-1') =>
     ({id, date, family, status, weekId, title: `${family} 60 min`, duration: 3600, expectedRpe: 3});
+/**
+ * Use fixed November/December calendar dates so the tests choose a known current week rather than
+ * depending on today.
+ */
 const weeks = Array.from({length: 7}, (_, i) => {
     const start = new Date(Date.UTC(2026, 10, 2 + i * 7));
     const end = new Date(start.getTime() + 6 * 86400000);

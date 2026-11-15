@@ -1,19 +1,8 @@
-/*
- * planner.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Builds a training timetable from a profile, goal and dated summary of training history. The flow
+ * is phases -> weekly time/load budgets -> individual sessions -> final checks. A budget is a
+ * ceiling, not an instruction to fill every minute. These are repeatable software heuristics, not
+ * promises of improvement or injury prevention; calculations do not save data or contact a service.
  */
 
 import { VERSION, addDays, daysBetween, weekday, sum, round, sportOf, goalRegistry,
@@ -54,6 +43,10 @@ function sessionReference(day, workouts, initial, initialDate, referenceDays, fa
     return Math.max(0, ...planned, ...history) || fallback;
 }
 
+/**
+ * Find the running-duration reference used to limit a later session. The caller chooses which
+ * earlier workouts count, so completed exposure and future projections are not confused.
+ */
 export function longestReference(day, workouts, initial, startDate, config,
     counted = w => !['missed', 'failed'].includes(w.status), initialDate = startDate) {
     return sessionReference(day, workouts, initial, initialDate, config.runLongestSessionReferenceDays,
@@ -101,6 +94,10 @@ function limitRunDays(days, longDay, maximum) {
     return chosen.sort();
 }
 
+/**
+ * Describe the planned share of easy, moderate and hard work from step durations. Running uses
+ * fractions of threshold speed; cycling uses fractions of FTP.
+ */
 function intensityDistributionFor(workouts, config, sport) {
     // Running steps are fractions of threshold speed: easy up to the top of pace zone 2, hard above threshold.
     const cuts = sport === 'running' ? [config.runPaceZones[1], config.runPaceZones[3]] : config.powerThreeZoneThresholds;
@@ -259,6 +256,10 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
     const candidates = gaps.priorities.filter(p => FAMILIES[p.capability]?.hard).slice(0, config.hardFocusCandidates);
     const focusCounts = Object.fromEntries(candidates.map(p => [p.capability, 0]));
     const totalScore = sum(candidates.map(p => p.score)) || 1;
+    /**
+     * Choose the next hard-work capability by how far its share falls behind the goal priorities,
+     * rather than always selecting the same family.
+     */
     const nextFocus = () => {
         const n = sum(Object.values(focusCounts));
         return candidates.reduce((best, p) => {
@@ -270,6 +271,10 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
         ? Math.max(config.minimumSessionMinutes, state.longestRecentSessionMinutes)
         : running ? config.runInitialLongestSessionMinutes : config.cyclingInitialSessionMinutes;
     const initialLongestDate = state.longestRecentSessionDate || startDate;
+    /**
+     * Limit one planned session using history and earlier weeks, not another planned session in the
+     * same week. Scheduled future weeks are projections, not proof of completed training.
+     */
     const spikeCap = (day, weekStart) => {
         const completedWeeks = workouts.filter(w => w.date < weekStart &&
             !['missed', 'failed'].includes(w.status));
@@ -555,6 +560,11 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig, asOf = 
     return [...new Set(warnings)];
 }
 
+/**
+ * Run the whole planning pipeline, attach the exact inputs/rules and explanations, and validate the
+ * result before returning it. Keep original generation warnings so later revisions cannot silently
+ * drop them.
+ */
 export function generatePlan({profile, goal, state, startDate, generatedAt, registry = goalRegistry(sportOf(profile))}) {
     validateProfile(profile);
     const sport = sportOf(profile);

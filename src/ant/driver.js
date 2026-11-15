@@ -1,19 +1,8 @@
 /*
- * driver.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Owns the browser's connection to the shared ANT+ adapter. It chooses native
+ * serial access or the USB fallback, sends outgoing messages, and routes incoming
+ * packets (complete groups of transmitted bytes) to radio-channel listeners.
+ * App events announce connection progress and errors to the rest of Athlima.
  */
 
 import { xf } from '../functions.js';
@@ -25,6 +14,7 @@ let _opening;
 let _operation = Promise.resolve();
 let _started = false;
 
+// Prefer Web Serial; otherwise use the USB compatibility layer, without opening a device yet.
 function setup() {
     if(navigator.serial?.requestPort) {
         _driver = SerialDriver({
@@ -44,6 +34,7 @@ function setup() {
     return {available: false};
 }
 
+// Attach the UI and transmit listeners once; the abort controller removes them together.
 function start() {
     if(_started) return;
     _abortController = new AbortController();
@@ -53,18 +44,22 @@ function start() {
     _started = true;
 }
 
+// Stop listening for app commands and return the adapter's asynchronous close operation.
 function stop() {
     _abortController?.abort();
     _started = false;
     return close();
 }
 
+// Queue whole command sequences so two sensors cannot reconfigure the adapter at once.
+// A failed sequence is reported to its caller but must not block later sequences.
 function runExclusive(operation) {
     const result = _operation.then(operation);
     _operation = result.catch(() => {});
     return result;
 }
 
+// Mark unsupported connection panels and publish which browser connection method is available.
 function init() {
     const result = setup();
     const antControllable = document.querySelector('#ant-controllable-settings');
@@ -83,6 +78,7 @@ function init() {
     return result;
 }
 
+// Share an in-progress device-opening request rather than showing multiple chooser dialogs.
 async function open() {
     if(!_driver) {
         const result = setup();
@@ -104,11 +100,13 @@ async function open() {
     return _opening;
 }
 
+// Announce closure even when no adapter was open, so device state can be cleared.
 async function close() {
     if(_driver?.isOpen()) await _driver.close();
     else xf.dispatch('ant:driver:closed');
 }
 
+// Translate the rider's adapter switch into open/close, keeping failures in the event flow.
 async function onSwitch() {
     try {
         if(_driver?.isOpen()) await close();
@@ -118,11 +116,13 @@ async function onSwitch() {
     }
 }
 
+// Tell device handlers they may begin configuration and tell the UI the adapter is connected.
 function onOpen() {
     xf.dispatch('ant:driver:ready');
     xf.dispatch('ant:driver:connected');
 }
 
+// Reject incomplete packets before using their channel number; checksum checks happen later.
 function onRx(data) {
     if(!data || data.length < 4 || data[0] !== 0xA4 ||
        data.length !== data[1] + 4) {
@@ -133,6 +133,7 @@ function onRx(data) {
     channelDispatch(channel, data);
 }
 
+// Channel zero is shared here: give each channel its own copy so listeners cannot alter others' data.
 function channelDispatch(channel, data) {
     const bytes = Uint8Array.from(data);
     if(channel === 0) {
@@ -144,6 +145,7 @@ function channelDispatch(channel, data) {
     }
 }
 
+// Write one prepared packet and publish failures for devices waiting on its reply.
 async function onTx(dataview) {
     try {
         if(!_driver?.isOpen()) throw new Error('ANT+ adapter is not open.');

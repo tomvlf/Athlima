@@ -1,35 +1,43 @@
-/*
- * format.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Shared presentation helpers for platform pages. They return text or HTML without saving data.
+ * Missing measurements use visible placeholders rather than zero; text escaping keeps imported
+ * names/descriptions from being interpreted as page instructions.
  */
 
 import { addDays, localDay } from '../coaching/domain.js';
 
+/**
+ * Encode HTML-sensitive characters in plain text; null/undefined become empty text. This is for
+ * content insertion, not a URL validator.
+ */
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, c =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+/**
+ * Wrap already-built body HTML in an expandable section. Escape its ID/title; the platform
+ * separately controls whether it is open on mobile or desktop.
+ */
 export const mobileDetails = (id, title, body) => `<details class="mobile-details" data-mobile-details="${escape(id)}" open>
     <summary>${escape(title)}</summary><div class="mobile-details-body">${body}</div></details>`;
 export const minutes = seconds => `${Math.round(seconds / 60)} min`;
+/**
+ * Format a finite number using the reader's locale and requested precision, or show -- for
+ * unavailable data.
+ */
 export const number = (value, digits = 0) => Number.isFinite(value)
     ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '--';
+/**
+ * Show nonnegative total minutes and seconds, not a clock time. Invalid input stays --:-- rather
+ * than appearing as a zero-length session.
+ */
 export const time = seconds => {
     if(!Number.isFinite(seconds)) return '--:--';
     const value = Math.max(0, Math.floor(seconds));
     return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 };
+/**
+ * Summarize positive cadence targets as one value or a range. Mention self-selected cadence for
+ * steps without a prescribed target.
+ */
 export function cadenceSummary(steps) {
     const targets = steps.map(step => step.cadence).filter(value => Number.isFinite(value) && value > 0);
     if(!targets.length) return 'Self-selected';
@@ -37,9 +45,18 @@ export function cadenceSummary(steps) {
     const range = min === max ? `${number(min)} rpm` : `${number(min)}–${number(max)} rpm`;
     return targets.length < steps.length ? `${range} / self-selected` : range;
 }
+/**
+ * Find today in the configured athlete time zone, falling back to the browser's zone before a
+ * profile exists.
+ */
 export const today = data => localDay(new Date().toISOString(),
     data?.profile?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+/**
+ * Collect cycling duration for the last seven days and completion of plan sessions due through
+ * today. Future scheduled sessions do not reduce completion percentage; archived plans are
+ * excluded.
+ */
 export function trainingSummary(data, day = today(data)) {
     const rides = (data?.activities || []).filter(a => a.sport === 'cycling' && a.day <= day);
     const week = rides.filter(a => a.day > addDays(day, -7));
@@ -58,6 +75,10 @@ export function trainingSummary(data, day = today(data)) {
     };
 }
 
+/**
+ * Draw a workout-intensity preview, or an elevation preview for a course without timed steps. These
+ * are prescribed/course data, not a graph of measured ride power.
+ */
 export function profileGraph(workout) {
     const steps = (workout.intervals || []).flatMap(interval => interval.steps || []);
     if(!steps.length) {

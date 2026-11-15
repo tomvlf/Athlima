@@ -1,4 +1,9 @@
 /** @jest-environment jsdom */
+/**
+ * Checks the engine's response after a rider discards a stopped recording: clear live session data
+ * and announce discard without creating or handing off an activity. A spy records calls to the real
+ * activity model without replacing its implementation.
+ */
 import { db } from '../../src/db.js';
 import { xf } from '../../src/functions.js';
 import { models } from '../../src/models/models.js';

@@ -25,9 +25,17 @@ const total = steps => steps.reduce((sum, s) => sum + s.duration, 0);
 const hardSeconds = (steps, rules) => total(steps.filter(s => s.power > rules.libraryHardPowerThreshold));
 const efforts = (steps, rules) => steps.filter(s => s.power >= rules.libraryEffortPowerThreshold).length;
 const round2 = value => Math.round(value * 100) / 100;
+/**
+ * These small readers handle the known built-in ZWO text: attributes are quoted tag settings, and
+ * text extracts one named tag. They are not general-purpose XML readers for arbitrary documents.
+ */
 const attributes = source => Object.fromEntries([...source.matchAll(/(\w+)="([^"]*)"/g)].map(([, k, v]) => [k, v]));
 const text = (zwo, tag) => zwo.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1]?.trim() ?? '';
 
+/**
+ * Approximate a gradual intensity change with short steady steps. Use midpoint targets and put
+ * rounding leftovers in the last step so total seconds are preserved.
+ */
 function ramp(duration, from, to) {
     const count = Math.max(1, Math.round(duration / 120));
     const base = Math.floor(duration / count);
@@ -97,6 +105,10 @@ export function zwoTemplate(zwo, rules = DEFAULTS) {
     return {steps: valid ? steps : null, reason: valid ? null : 'Invalid or out-of-range workout step.'};
 }
 
+/**
+ * Return only duration and intensity from a usable ZWO template, or null when it cannot be used by
+ * the Coach. Template fitting retains richer protection/cadence metadata elsewhere.
+ */
 export function zwoSteps(zwo, rules = DEFAULTS) {
     return zwoTemplate(zwo, rules).steps?.map(({duration, power}) => ({duration, power})) ?? null;
 }
@@ -137,6 +149,10 @@ export function coachCatalogue(source = builtIn, rules = DEFAULTS, templateRules
     });
 }
 
+/**
+ * Remove one complete final work/recovery repetition where it has a shared repetition ID. For
+ * standalone efforts, remove only the associated unprotected lead-in recovery.
+ */
 function dropLastEffort(steps, rules) {
     const index = steps.findLastIndex(s => s.power >= rules.libraryEffortPowerThreshold);
     const repetitionId = steps[index]?.repetitionId;
@@ -146,6 +162,11 @@ function dropLastEffort(steps, rules) {
     return [...steps.slice(0, start), ...steps.slice(index + 1)];
 }
 
+/**
+ * Try to reach a shorter duration by cutting only flexible easy riding outside the interval set.
+ * Leave protected steps and interval recoveries intact; return null if there is not enough
+ * removable time.
+ */
 function shrinkEasy(steps, seconds, rules) {
     const excess = total(steps) - seconds;
     if(excess <= 0) return steps;
@@ -171,6 +192,10 @@ function shrinkEasy(steps, seconds, rules) {
     return result;
 }
 
+/**
+ * Fill spare time with easy riding before cool-down. A remainder under two minutes extends the last
+ * step instead of creating a tiny extra block.
+ */
 function pad(steps, seconds, family) {
     const missing = seconds - total(steps);
     if(missing <= 0) return steps;
@@ -276,6 +301,10 @@ export function chooseLibraryWorkout(slot, {history = [], prefer = null,
 }
 
 const catalogues = new Map();
+/**
+ * Reuse the parsed built-in workout catalogue for the same rules, avoiding repeated parsing while
+ * keeping differently configured catalogues separate.
+ */
 function defaultCatalogue(rules = DEFAULTS) {
     const key = JSON.stringify(rules);
     if(!catalogues.has(key)) catalogues.set(key, coachCatalogue(builtIn, rules, TEMPLATE_RULES));

@@ -1,19 +1,8 @@
 /*
- * ui-controls.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Converts Open Bike Control navigation buttons and dials into named messages.
+ * Button ID/state pairs are raw byte values (0–255); dial results use brake
+ * percent, steering degrees or camera numbers. Decoding only describes input:
+ * it does not navigate screens or change the simulated bike.
  */
 
 //
@@ -69,9 +58,10 @@ const steeringStepDegrees = 0.5;
 const brakeFullPercent = 100;
 const brakeMaxPercent = 200;
 
+// Stateless family decoder; decodePair handles one pair and decode keeps recognized messages in order.
 function UIControls() {
 
-    // Int -> Message?
+    // Accept only released/pressed for ordinary navigation buttons; other states are ignored.
     function decodeDigital(id, state) {
         const action = digitalActions[id];
         if(equals(state, 0x00)) {
@@ -84,7 +74,7 @@ function UIControls() {
         return;
     }
 
-    // Int -> Message?
+    // Turn the brake dial into a percentage, capped at 200 for two levers together.
     // 0x01 is a full pull of one brake (100%).
     // 0x02 is 1%, and the scale continues up to 200% for two levers together.
     function decodeBrake(state) {
@@ -110,7 +100,7 @@ function UIControls() {
         };
     }
 
-    // Int -> Message?
+    // Convert the steering dial to degrees; preserve unavailable/reserved states without inventing an angle.
     // 0x80 is straight ahead. Each step away from it is half a degree.
     function decodeSteeringAngle(state) {
         if(equals(state, 0x00)) {
@@ -138,7 +128,7 @@ function UIControls() {
         };
     }
 
-    // Int -> Message?
+    // Camera reports can be a press/release or a numbered camera from 2 through 31.
     function decodeCamera(state) {
         if(equals(state, 0x00)) {
             return {id: cameraId, action: 'camera', kind: 'camera', state: 'released'};
@@ -153,7 +143,7 @@ function UIControls() {
         return;
     }
 
-    // {id, state} -> Message?
+    // Route only IDs owned by this family; unrecognized buttons return no message.
     function decodePair(pair) {
         const id = pair.id;
         const state = pair.state;
@@ -166,7 +156,7 @@ function UIControls() {
         return;
     }
 
-    // [{id, state}] -> [Message]
+    // Decode each pair in order, omitting only reports for which no decoder produced a message.
     function decode(pairs = []) {
         const messages = [];
 

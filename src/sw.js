@@ -1,25 +1,22 @@
-/*
- * sw.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Browser service worker for offline app files, not a storage server. Cache navigation pages and an
+ * allowed set of same-site assets; ignore provider traffic, /api/ paths and writes. Navigation
+ * tries the network first; named assets try the cache first. Updates wait for existing app windows
+ * to close so an active ride is not switched to new code mid-session.
  */
 
 const cacheName = 'athlima-shell-v1';
+/**
+ * Allow only same-origin JavaScript, CSS, PNG, SVG and web-manifest files outside /api/. Not every
+ * resource, such as a photograph or external response, is eligible for this cache.
+ */
 const isAsset = url => url.origin === self.location.origin &&
     !url.pathname.startsWith('/api/') && /\.(?:js|css|png|svg|webmanifest)$/.test(url.pathname);
 
+/**
+ * Try to cache a successful response while returning the network response even if browser caching
+ * fails. Cache failures are logged, not treated as successful offline storage.
+ */
 async function cacheResponse(request, response) {
     if(response.ok) {
         try {
@@ -41,6 +38,10 @@ self.addEventListener('activate', event => {
     event.waitUntil(self.clients.claim());
 });
 
+/**
+ * Accept the page's loaded-asset list, filter it through the same-origin allowlist and report a
+ * cache failure back to that page.
+ */
 self.addEventListener('message', event => {
     if(event.data?.type !== 'CACHE_ASSETS' || !Array.isArray(event.data.urls)) return;
     const urls = event.data.urls.filter(value => {
@@ -56,6 +57,10 @@ self.addEventListener('message', event => {
     }));
 });
 
+/**
+ * For page navigation, fall back to a saved page only when the network fails. For eligible assets,
+ * reuse a cached response before fetching and saving a new one.
+ */
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     if(event.request.method !== 'GET' || url.origin !== self.location.origin ||

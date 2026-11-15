@@ -1,19 +1,9 @@
 /*
- * web-ble.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Bluetooth feature addresses and browser device-picker rules. A UUID is a long,
+ * unique name identifying a service (a group of features) or characteristic
+ * (one value/command). Filters choose which advertised features make a device
+ * appear in the picker; optionalServices grants access to extra features after
+ * selection without requiring devices to advertise them.
  */
 
 import { empty, } from '../functions.js';
@@ -97,8 +87,13 @@ const characteristics = {
 
 const uuids = { ...services, ...characteristics };
 
+/**
+ * Device-category presets return browser requestDevice options, not connections.
+ * Each sensor preset requires its measurement service and permits relevant extras.
+ */
 function Filters() {
 
+    // Offer the supported trainer protocols, including power-service devices with vendor controls.
     function controllable() {
         return {
             filters: [
@@ -156,10 +151,12 @@ function Filters() {
         };
     }
 
+    // Unrestricted chooser; it does not itself grant access to additional optional services.
     function all() {
         return {acceptAllDevices: true};
     }
 
+    // Offer known categories while hiding names of devices already connected in this browser.
     async function generic(args = {}) {
         const devices = await navigator.bluetooth.getDevices();
 
@@ -202,9 +199,11 @@ function Filters() {
     });
 }
 
+// Bundle the address dictionary helpers and device-picker presets used by connection handlers.
 function WebBLE() {
     const filters = Filters();
 
+    // Check for the browser API, not for an enabled radio or a nearby compatible sensor.
     function isAvailable() {
         // TODO: comment when not working on the iOS connect functionality.
         // This allows the iOS connection to show up in Chrome not just Safari
@@ -218,6 +217,7 @@ function WebBLE() {
             typeof navigator.bluetooth?.requestDevice === 'function';
     }
 
+    // Look up a known UUID's short name; callers must supply an entry from this dictionary.
     function uuidToName(uuid) {
         return Object.entries(uuids).find(kv => kv[1] === uuid)[0];
     }

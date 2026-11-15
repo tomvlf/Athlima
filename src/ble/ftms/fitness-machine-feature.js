@@ -1,23 +1,13 @@
 /*
- * fitness-machine-feature.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Reads a trainer's Fitness Machine capability flags. The first four bytes
+ * describe measurements; the next four describe adjustable targets. Individual
+ * flag bits are yes/no switches. The returned readings/targets lists expose a
+ * selected subset of those capabilities, not the trainer's current readings.
  */
 
 import { nthBitToBool }  from '../../functions.js';
 
+// Predicates name the bit assigned to each measurement capability.
 const reading =  {
     avgSpeed:            (flags) => nthBitToBool(flags,  0),
     cadence:             (flags) => nthBitToBool(flags,  1),
@@ -38,6 +28,7 @@ const reading =  {
     userDataRetention:   (flags) => nthBitToBool(flags, 16)
 };
 
+// Target predicates describe settings that a trainer may accept from an app.
 const target =  {
     speed:                (flags) => nthBitToBool(flags,  0),
     inclination:          (flags) => nthBitToBool(flags,  1),
@@ -58,8 +49,10 @@ const target =  {
     cadence:              (flags) => nthBitToBool(flags, 16)
 };
 
+// Provide the feature decoder; encode is an empty placeholder rather than a supported operation.
 function FitnessMachineFeature() {
 
+    // Expand the two flag groups into short, readable lists used by callers.
     function decode(dataview) {
         const featureFlags = dataview.getUint32(0, true); // 0-31 flags
         const targetFlags  = dataview.getUint32(4, true); // 0-31 flags

@@ -1,19 +1,8 @@
 /*
- * indoor-bike-data.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Decodes standard FTMS indoor-bike readings. The first two bytes hold flags
+ * indicating which measurements follow; missing fields occupy no space.
+ * Results include speed in km/h, cadence in revolutions/minute, distance in
+ * metres, power in watts and heart rate in beats/minute when those fields exist.
  */
 
 //
@@ -23,6 +12,7 @@
 
 import { equals, getUint24LE, } from '../../functions.js';
 
+// Speed is unusual: a clear first bit means present. Other measurements use a set bit.
 const speedPresent               = (flags) => ((flags >>  0) & 1) === 0;
 const avgSpeedPresent            = (flags) => ((flags >>  1) & 1) === 1;
 const cadencePresent             = (flags) => ((flags >>  2) & 1) === 1;
@@ -75,9 +65,11 @@ const order = [
     'RemainingTime',
 ];
 
+// A stateless reader: field order and widths, not fixed offsets, locate optional measurements.
 function IndoorBikeData(args = {}) {
     const architecture = true;
 
+    // Read at byte position i and apply the field's step size; distance needs a three-byte reader.
     function getField(field, dataview, i) {
         if(equals(field.type, 'Uint24')) {
             return getUint24LE(dataview, i) * field.resolution;
@@ -85,6 +77,7 @@ function IndoorBikeData(args = {}) {
         return dataview[`get${field.type}`](i, architecture) * field.resolution;
     }
 
+    // Read fields in protocol order and omit the flags from the result.
     // Truncated fields raise RangeError rather than shifting subsequent measurements.
     function decode(dataview) {
         return order.reduce(function(acc, fieldName) {

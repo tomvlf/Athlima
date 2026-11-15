@@ -1,23 +1,16 @@
-/*
- * utils.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Shared display, date, unit and binary-file helpers. Display dates use the browser's local time
+ * unless a function says otherwise. FIT files use their own start date for timestamps and scaled
+ * integers for measurements, so those conversions are kept separate from ordinary screen
+ * formatting. None of these helpers stores training data.
  */
 
 import { exists, existance, first, last, equals, isObject, isFunction, isArray } from './functions.js';
 
+/**
+ * Turn text characters that have a special meaning in HTML into harmless character references. Use
+ * this before inserting names or imported descriptions into an HTML template.
+ */
 function escapeHTML(value) {
     return String(value).replace(/[&<>"']/g, character => ({
         '&': '&amp;',
@@ -29,6 +22,10 @@ function escapeHTML(value) {
 }
 
 // format
+/**
+ * Turn seconds into a clock-style duration. Even the mm:ss option includes hours for values of an
+ * hour or more; other input units are returned unchanged.
+ */
 function formatTime(args = {}) {
     const defaults = {
         unit:   'seconds',
@@ -66,6 +63,10 @@ function formatTime(args = {}) {
     return value;
 }
 
+/**
+ * Create a local date/time label suitable for a downloaded file name, rather than an unambiguous
+ * timestamp for data exchange.
+ */
 function dateToDashString(date) {
     const day    = (date.getDate()).toString().padStart(2, '0');
     const month  = (date.getMonth()+1).toString().padStart(2, '0');
@@ -84,6 +85,10 @@ function time() {
     return `${hours}:${minutes}:${seconds}:${milliseconds}`;
 }
 
+/**
+ * Return YYYY-MM-DD using local calendar fields by default. Setting local to false selects the UTC
+ * date, which can differ near midnight.
+ */
 function isoDate(date = new Date(), local = true) {
     if(local) {
         const day   = (date.getDate()).toString().padStart(2, '0');
@@ -96,6 +101,10 @@ function isoDate(date = new Date(), local = true) {
     }
 }
 
+/**
+ * Build the numeric day and short weekday label used by the calendar from a date string and the
+ * browser's date handling.
+ */
 function isoDateToWeekDay(isoDateString = isoDate()) {
     let date = new Date(isoDateString);
     let day = date.getDate();
@@ -103,6 +112,10 @@ function isoDateToWeekDay(isoDateString = isoDate()) {
     return { day, weekDay };
 }
 
+/**
+ * Find the local Monday and Sunday surrounding a date. Work on a copy so the caller's Date is not
+ * modified; optionally return YYYY-MM-DD strings.
+ */
 function getStartEndOfWeek(fromDate = new Date(), iso = false) {
     const date = new Date(fromDate);
     const dayOfWeek = date.getDay();
@@ -126,6 +139,10 @@ function getStartEndOfWeek(fromDate = new Date(), iso = false) {
 
 }
 
+/**
+ * Compare year, month and day in the browser's local time rather than requiring identical times of
+ * day.
+ */
 function isToday(dateString) {
     const date = new Date(dateString);
     const today = new Date();
@@ -153,6 +170,11 @@ function mpsToKph(mps) {
 
 // var res = await backoff({max: 4, wait: 1000, fn: maybeFailOp, msg: 'debug'});
 // needs a way to be canceled
+/**
+ * Attempt an asynchronous operation and retry failures after a delay. max counts retries after the
+ * first attempt; rate changes the next delay, and success/fail callbacks decide the returned
+ * result.
+ */
 async function backoff(args = {}) {
     const defaults = {
         max:     1,
@@ -170,6 +192,7 @@ async function backoff(args = {}) {
     const rate    = existance(args.rate, defaults.rate);
     const msg     = args.msg;
 
+    /** Carry the remaining attempts and delay through retries, invoking fail when no retries remain. */
     async function recur(max, wait, fn, success, fail, msg) {
         try {
             const result = await fn(max);
@@ -189,10 +212,15 @@ async function backoff(args = {}) {
 const bod = Math.pow(2, 31) / 180;
 const dob = 180 / Math.pow(2, 31);
 
+/**
+ * Convert map degrees into the scaled angular units used by FIT: half a circle corresponds to 2^31
+ * units.
+ */
 function degToSemicircles(degrees) {
     return degrees * bod;
 }
 
+/** Convert a FIT latitude/longitude value back into ordinary degrees for maps. */
 function semicirclesToDeg(semicircles) {
     return semicircles * dob;
 }
@@ -210,10 +238,18 @@ function lte(a, b) { return a <= b; }
 function gt(a, b) { return a > b; }
 function lt(a, b) { return a < b; }
 
+/**
+ * Check both bounds. They are inclusive by default, but callers may supply different comparison
+ * functions.
+ */
 function inRange(min, max, value, lb=gte, ub=lte) {
     return (lb(value, min) && ub(value, max));
 }
 
+/**
+ * Return 1 plus divisors found below half the supplied number; this helper is not a complete
+ * prime-factorization routine.
+ */
 function divisors(number) {
     let divisors = [1];
     for(let i=2; i < number/2; i++) {
@@ -224,6 +260,10 @@ function divisors(number) {
 // end Math
 
 // Graphs
+/**
+ * Move a value from one numeric range to another, for example watts into a chart height. Values
+ * outside the source range are extrapolated, not clamped.
+ */
 function translate(value, leftMin, leftMax, rightMin, rightMax) {
     const leftSpan = leftMax - leftMin;
     const rightSpan = rightMax - rightMin;
@@ -233,6 +273,10 @@ function translate(value, leftMin, leftMax, rightMin, rightMax) {
     return rightMin + (valueScaled * rightSpan);
 }
 
+/**
+ * These two helpers translate between hexadecimal colour text and numeric red/green/blue channel
+ * lists for chart colour calculations.
+ */
 function hexColorToArray(hex) {
     return hex.replace('#','').match(/.{1,2}/g).map(x => parseInt(x, 16));
 }
@@ -241,6 +285,7 @@ function arrayToHexColor(arr) {
     return '#' + arr.map(x => x.toString(16).toUpperCase()).join('');
 }
 
+/** Blend two hexadecimal colours by averaging their red, green and blue channels separately. */
 function avgColor(hex1, hex2) {
     const color1 = hexColorToArray(hex1);
     const color2 = hexColorToArray(hex2);
@@ -262,10 +307,12 @@ function hex(n) {
 // ANT+ and .FIT
 const garmin_epoch = Date.parse('31 Dec 1989 00:00:00 GMT');
 
+/** Convert JavaScript milliseconds since 1970 into FIT seconds since 31 December 1989. */
 function toFitTimestamp(timestamp) {
     return Math.round((timestamp - garmin_epoch) / 1000);
 }
 
+/** Convert FIT seconds since its own starting date back to JavaScript milliseconds. */
 function toJsTimestamp(fitTimestamp) {
     return (fitTimestamp * 1000) + garmin_epoch;
 }
@@ -274,11 +321,16 @@ function now() {
     return toFitTimestamp(Date.now());
 }
 
+/** Return the absolute difference between two millisecond timestamps, rounded to seconds. */
 function timeDiff(timestamp1, timestamp2) {
     let difference = (timestamp1 / 1000) - (timestamp2 / 1000);
     return Math.round(Math.abs(difference));
 };
 
+/**
+ * Convert kilometres per hour into FIT's integer thousandths of a metre per second. Other unit
+ * labels leave the supplied value unchanged.
+ */
 function toFitSpeed(speed, unit = 'kph') {
     const scale = 1000;
 
@@ -288,6 +340,10 @@ function toFitSpeed(speed, unit = 'kph') {
     return speed;
 }
 
+/**
+ * Convert kilometres into FIT's integer hundredths of a metre. Other unit labels leave the supplied
+ * value unchanged.
+ */
 function toFitDistance(distance, unit = 'km') {
     const scale = 100;
 
@@ -297,6 +353,10 @@ function toFitDistance(distance, unit = 'km') {
     return distance;
 }
 
+/**
+ * Split a list whenever the marker value occurs. Keep each marker as the first item of its new
+ * group.
+ */
 function splitAt(xs, at) {
     if(!isArray(xs)) throw new Error(`splitAt takes an array: ${xs}`);
     let i = -1;
@@ -310,6 +370,10 @@ function splitAt(xs, at) {
     },[]);
 }
 
+/**
+ * Append filler values to the original array using the existing extra-slot convention: a shorter
+ * array finishes at length + 1, not length. Return the same array.
+ */
 function pad(xs = [], length = 0, value = 0) {
     for(let i = xs.length-1; i < length; i += 1) {
         xs.push(value);
@@ -317,6 +381,10 @@ function pad(xs = [], length = 0, value = 0) {
     return xs;
 }
 
+/**
+ * Compute a FIT error-detection checksum over bytes from start to end (exclusive). It detects
+ * accidental file damage; it does not encrypt or authenticate the file.
+ */
 function calculateCRC(uint8array, start, end) {
     const crcTable = [
         0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401,
@@ -337,6 +405,10 @@ function calculateCRC(uint8array, start, end) {
     return crc;
 }
 
+/**
+ * Map a FIT numeric type to a DataView method name, such as getUint16. Unknown types use one
+ * unsigned byte; this selects a reader/writer, not field validation.
+ */
 function typeToAccessor(basetype, method = 'set') {
     const uint8   = [0, 2, 7, 10, 13, 'enum', 'uint8', 'string', 'byte'];
     const uint16  = [132, 139, 'uint16', 'uint16z'];

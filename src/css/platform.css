@@ -1,3 +1,8 @@
+/*
+ * Main page layout and shared controls. Variables beginning with -- name reusable
+ * colours; #platform rules scope the newer interface, and #legacy-slot hosts reused
+ * components. The theme stylesheet loads afterward and can override these values.
+ */
 :root {
     --platform-bg: #0e151d;
     --platform-panel: #17212d;
@@ -367,7 +372,11 @@ body[data-route="player"] #graph-workout { margin-top: 24px; }
 .mobile-details-body { min-width: 0; }
 .activity-periods > .mobile-details { min-width: 0; flex: 1; }
 
-/* Mobile is a ride-first experience, with its own navigation and information density. */
+/* Mobile is a ride-first experience, with its own navigation and information density.
+ * ui.js sets body.mobile-app at widths <=700px, including after resizing.
+ * For shared buttons, keep .mobile-app #platform in overrides: the earlier
+ * #platform .button rule (including font: inherit) beats less-specific selectors.
+ */
 .mobile-app { --tab-bar-height: calc(59px + max(6px, env(safe-area-inset-bottom))); }
 /* The mobile shell is dark-only, so the legacy light palettes would put dark ink on dark panels; its Theme option is hidden. */
 body.mobile-app.white-theme, body.mobile-app.auto-theme { --background-color: var(--dark); --background-color-2: var(--chrome); --foreground-color: var(--white); --foreground-color-inactive: var(--gray); --border-color: var(--white-opacity-01); --progress: #fff4; --input-color: var(--white); --toogle-inactive-color: var(--gray); --toogle-active-color: var(--white); }

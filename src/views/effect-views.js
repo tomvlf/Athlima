@@ -1,24 +1,18 @@
 /*
- * effect-views.js: front-end client module.
+ * Gives ordinary form inputs and buttons app-specific behavior.
+ * The prop attribute names data to display; effect names the ui: request to send
+ * after an edit or tap. The app, rather than these controls, handles persistence.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * These classes extend built-in HTML controls, used with is="int-input", etc.
+ * Constructors read settings, connectedCallback listens when a control joins
+ * the page, and disconnectedCallback is its cleanup hook. render writes the
+ * displayed value; onChange parses a user's text before sending an action.
  */
 
 import { xf, exists, equals } from '../functions.js';
 import { models } from '../models/models.js';
 
+// Whole-number input synchronized with app data; subclasses customize parsing/display.
 class IntInput extends HTMLInputElement {
     constructor() {
         super();
@@ -51,6 +45,7 @@ class IntInput extends HTMLInputElement {
     }
 }
 
+// Decimal input; points controls how many decimal places are shown.
 class FloatInput extends IntInput {
     postInit() {
         this.points = this.getAttribute('points') || 2;
@@ -64,6 +59,7 @@ class FloatInput extends IntInput {
     }
 }
 
+// Store weight in kilograms while allowing the rider to view and enter pounds.
 class WeightInput extends IntInput {
     postInit() {
         this.measurement = models.measurement.default;
@@ -76,12 +72,14 @@ class WeightInput extends IntInput {
     kgToLbs(kg) {
         return Math.round(2.20462 * kg);
     };
+    // Convert the entered unit back to whole kilograms before notifying the app.
     parseKg(weight) {
         if(this.measurement === 'imperial') {
             return Math.round(0.453592 * weight);
         }
         return Math.round(weight);
     }
+    // Convert stored kilograms for display only; changing units does not change weight.
     formatWeight(value, measurement) {
         if(measurement === 'imperial') {
             value = `${this.kgToLbs(value)}`;
@@ -103,6 +101,7 @@ customElements.define('int-input', IntInput, {extends: 'input'});
 customElements.define('float-input', FloatInput, {extends: 'input'});
 customElements.define('weight-input', WeightInput, {extends: 'input'});
 
+// A tap requests a named action with no extra value.
 class EffectButton extends HTMLButtonElement {
     constructor() {
         super();
@@ -121,6 +120,7 @@ class EffectButton extends HTMLButtonElement {
 
 customElements.define('effect-button', EffectButton, {extends: 'button'});
 
+// A tap submits the latest value of another app setting as a whole number.
 class SetButton extends HTMLButtonElement {
     constructor() {
         super();
@@ -145,6 +145,7 @@ class SetButton extends HTMLButtonElement {
 
 customElements.define('set-button', SetButton, {extends: 'button'});
 
+// Pass the browser's selected files to the workout importer without reading them here.
 class Upload extends HTMLInputElement {
     constructor() {
         super();

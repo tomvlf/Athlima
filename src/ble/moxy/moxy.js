@@ -1,19 +1,8 @@
 /*
- * moxy.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Moxy muscle-oxygen message formats. Sensor data contains current/previous
+ * oxygen saturation percentages and total haemoglobin in grams per decilitre.
+ * The decoder scales nine received bytes (small numeric storage units) into
+ * these measurements. Device-control support is partial and separate from reading.
  */
 
 //
@@ -22,6 +11,7 @@
 
 import { Spec } from '../common.js';
 
+// Read one nine-byte sample; generating sensor samples with encode is explicitly unsupported.
 function SensorData(args = {}) {
 
     const definitions = {
@@ -65,6 +55,7 @@ function SensorData(args = {}) {
     // (0x) CF-06- 14-02- 13-02- C1-04 -00
     //      1743   532    531    1217   0
     //
+    // Apply tenths-of-percent and hundredths-of-g/dl scaling while retaining the sample counter/time flag.
     function decode(dataview) {
         const sensorCount                 = dataview.getUint16(0, true);
         const currentSaturatedHemoglobin  = spec.decodeField(
@@ -96,6 +87,7 @@ function SensorData(args = {}) {
     });
 }
 
+// Partial three-byte command builder for recording actions and update settings; decode throws.
 function DeviceControl(args = {}) {
     const length = 3;
 
@@ -147,6 +139,8 @@ function DeviceControl(args = {}) {
         antBleSelector: values.antBleSelector.doNotChange,
     };
 
+    // Build the command buffer. The retained legacy radio-setting write currently
+    // overwrites updateType's byte, so this does not preserve a requested update rate.
     function encode(args = {}) {
         const dataControl = args.dataControl ?? defaults.dataControl;
         const updateType  = args.updateType ?? defaults.updateType;

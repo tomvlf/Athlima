@@ -1,19 +1,8 @@
-/*
- * service.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * models training load, planning logic, and adaptation rules used to generate and explain workouts.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Coordinates the local Coach: saved history -> a dated summary of the athlete -> a plan ->
+ * revisions after new information. "State" is the full saved set of data; a "snapshot" records what
+ * was known at a date; a "revision" preserves an earlier plan. This service uses browser storage,
+ * not a remote AI. Methods that save return Promises and must be awaited before reporting success.
  */
 
 import { VERSION, DEFAULTS, addDays, localDay, sportOf, validateProfile, validateCoachingConfig, date } from './domain.js';
@@ -141,6 +130,11 @@ export class CoachingService {
         next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
         return this.commit(next);
     }
+    /**
+     * Persist a pain/illness report or clear it. An active plan is adjusted and marked paused while
+     * a report is present. Clearing a report is not medical clearance and does not prove the
+     * athlete is ready.
+     */
     async setSafetyStatus(status, asOf) {
         if(status !== null && !['pain', 'illness'].includes(status)) {
             throw new Error('Safety status must be pain, illness, or null.');
@@ -269,6 +263,10 @@ export class CoachingService {
         await this.commit(next);
         return next.plan;
     }
+    /**
+     * Remove an Athlima recording from local coaching history only. The caller handles the FIT
+     * file; previous plan decisions and external uploads are not undone.
+     */
     async deleteRide(id) {
         const activity = this.data.activities.find(item => item.id === id);
         if(!activity) throw new Error('Activity not found.');
@@ -277,6 +275,10 @@ export class CoachingService {
         next.activities = next.activities.filter(item => item.id !== id);
         return this.commit(next);
     }
+    /**
+     * Apply a rider-confirmed outcome, such as missed or substituted, to the active plan. Check the
+     * date, sport, evidence and duplicate matches before storing an adapted plan and its revision.
+     */
     async resolve({workoutId = null, trigger, activityId = null, feedback = null, asOf}) {
         const next = JSON.parse(JSON.stringify(this.data));
         if(!next.plan || next.plan.status !== 'active') throw new Error('No active plan to adapt.');
@@ -316,6 +318,10 @@ export class CoachingService {
         next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
         return (await this.commit(next)).plan;
     }
+    /**
+     * Save effort and recovery ratings on an existing activity, then review upcoming training
+     * without marking the same workout complete again.
+     */
     async updateFeedback(activityId, feedback, asOf) {
         const next = JSON.parse(JSON.stringify(this.data));
         const activity = next.activities.find(a => a.id === activityId);
@@ -338,6 +344,10 @@ export class CoachingService {
         }
         return this.commit(next);
     }
+    /**
+     * Review unresolved sessions before today as missed, preserving a revision per outcome but
+     * saving once. A paused plan is left alone; a plan at its end date is marked finished.
+     */
     async advance(asOf) {
         if(this.data.plan?.status !== 'active') return this.data.plan;
         if(this.data.plan.trainingPaused || this.data.safetyStatus) return this.data.plan;
@@ -361,6 +371,10 @@ export class CoachingService {
 
 let instance;
 let initializing;
+/**
+ * Load one shared Coach instance for the page. Concurrent callers wait for the same database
+ * opening rather than creating competing instances.
+ */
 export async function initializeCoaching(indexedDB = window.indexedDB) {
     if(!instance && !initializing) {
         initializing = openCoachingStorage(indexedDB)
@@ -370,8 +384,16 @@ export async function initializeCoaching(indexedDB = window.indexedDB) {
     if(initializing) await initializing;
     return instance;
 }
+/**
+ * Return the loaded Coach, or throw a useful error if an action was attempted before initialization
+ * finished.
+ */
 export function coachingService() {
     if(!instance) throw new Error('Coaching history is not loaded yet. Reload if this message persists.');
     return instance;
 }
+/**
+ * Screens may use null to show a loading state. Actions that change data use coachingService
+ * instead, so unavailable storage cannot look like an empty successful Coach.
+ */
 export const coachingData = () => instance?.data ?? null;

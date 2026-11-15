@@ -1,19 +1,12 @@
 /*
- * planned-list.js: front-end client module.
+ * Shows workouts downloaded from training providers, with dates and selectable
+ * graph previews. Provider downloads go through models.planned; this file handles
+ * their display and the loading/success/failure lights beside provider controls.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Constructors prepare these custom tags; connectedCallback listens on page entry
+ * and disconnectedCallback cancels listeners on removal. render rebuilds the list.
+ * Imported text is escaped before entering HTML, while graph helpers produce SVG
+ * (pictures made from shapes) that the browser can safely resize.
  */
 
 import { xf, empty, } from '../functions.js';
@@ -27,6 +20,7 @@ import { WorkoutGraphViewModel, } from './workout-graph-svg.js';
 //   and potentially share it
 // - use directly the Model to that view, not just the data through sub
 // - maybe no need to have list data in db, just the shared session data
+// Builds dated workout rows from the provider model and the rider's reference power.
 class PlannedList extends HTMLElement {
     constructor() {
         super();
@@ -60,6 +54,8 @@ class PlannedList extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Handle provider requests and results; "wod" means workout of the day.
+    // Loading/success/fail helpers update indicator styling rather than provider data.
     onAction(action) {
         // TODO: handle this directly in db
         if(action === ':data') {
@@ -97,6 +93,7 @@ class PlannedList extends HTMLElement {
             this.onFail(this.$indicatorTrainingPeaks);
         }
     }
+    // Use the list width and eight text-line heights to size each preview.
     getSize() {
         const self = this;
         const parent = document.querySelector('#workouts-page');
@@ -113,6 +110,7 @@ class PlannedList extends HTMLElement {
     }
     onWindowResize() {
     }
+    // Turn one planned workout into a dated row with a power/route graph and details.
     toListItem(workout, ftp, size) {
         const self = this;
 
@@ -165,6 +163,7 @@ class PlannedList extends HTMLElement {
                     <p>You have no planned workouts for today.</p>
                 </div>`;
     }
+    // Re-measure only a visible list, then choose workout rows or the empty-state message.
     render() {
         const self = this;
 
@@ -201,7 +200,8 @@ class PlannedList extends HTMLElement {
 customElements.define('planned-list', PlannedList);
 
 
-// List Item that is expandable, selectable and has optional actions
+// One expandable/selectable row. Action messages are addressed by workout ID;
+// the paired display helpers toggle details and options without saving a workout.
 class PlannedListItem extends HTMLElement {
     constructor() {
         super();
@@ -255,6 +255,7 @@ class PlannedListItem extends HTMLElement {
             this.deselect();
         }
     }
+    // Immediately highlight a new choice and ask the app to load that planned workout.
     onSelect() {
         if(this.selected) return;
         this.select();
@@ -300,6 +301,11 @@ class PlannedListItem extends HTMLElement {
 customElements.define('planned-list-item', PlannedListItem);
 
 
+/**
+ * Wrap prepared summary/detail HTML in a row with addressed action buttons.
+ * IDs and message topics are escaped; summary, details, and the tag name must be
+ * supplied by the app's own renderers, not used as raw imported text.
+ */
 function listItemTemplate(
     id = 0,
     summary = '',

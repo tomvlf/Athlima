@@ -13,6 +13,11 @@ import { STRIDE, RUN_WALK_STAGES, thresholdPaceFromRace, predictedRaceSeconds, p
 import { exportZwo, FAMILIES } from '../../src/coaching/workouts.js';
 import { profile, goal as rideGoal, start, timestamp, state as rideState } from './fixtures.js';
 
+/**
+ * Running examples use thresholdPace in seconds per kilometre, not watts. These scenarios check
+ * running-specific rules and conversions; they are not evidence that progression caps prevent
+ * injury.
+ */
 const runner = {...profile, sport: 'running', ftp: null, thresholdPace: 300, powerMeter: false, smartTrainer: false,
     availableDays: [1, 3, 5, 6], maxSessionMinutes: {1: 60, 3: 60, 5: 60, 6: 120}, longRideDay: 6,
     typicalWeeklyHours: 5, maxWeeklyHours: 6};
@@ -25,6 +30,10 @@ const runHistory = (p = runner) => Array.from({length: 84}, (_, i) => i).filter(
         duration, distance: Math.round(duration * 1000 / p.thresholdPace * 0.8), averageHeartRate: 140, rpe: 3}, p);
 });
 const runGoal = {id: 'run-goal', name: 'Spring 10 km', type: 'run_10k', date: '2026-04-01', priority: 'A', active: true, distanceKm: 10};
+/**
+ * Generate a repeatable running plan from a chosen fictional runner, goal and history using the
+ * real state estimator.
+ */
 const runPlan = ({p = runner, goal = runGoal, history = runHistory(p)} = {}) =>
     generatePlan({profile: p, goal, state: estimateState(history, p, start), startDate: start, generatedAt: timestamp});
 const weekRuns = (plan, week) => plan.workouts.filter(w => w.weekId === week.id);

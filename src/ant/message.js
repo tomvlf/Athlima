@@ -1,25 +1,20 @@
 /*
- * message.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Builds and reads the messages exchanged with an ANT adapter. A packet is one
+ * complete message: start marker, content length, message ID, content and checksum.
+ * Bytes are numbered storage units; the checksum combines them to detect damage.
+ * Each format's encode takes named settings and returns a DataView of bytes.
+ * decode reads those bytes and reports checksum validity; it does not throw just
+ * because the checksum is wrong. These helpers prepare data, not radio connections.
  */
 
 import { equals, exists, existance, isUndefined,
          dataviewToArray, nthBitToBool, xor } from '../functions.js';
 import { ids, events, channelTypes, values, keys } from './constants.js';
 
+/**
+ * Shared packet framing. Length helpers track content plus four framing bytes;
+ * the getters expose those counts. Message IDs come from the protocol dictionary.
+ */
 function Message(args = {}) {
     const sync        = values.sync;
     const id          = ids[existance(args.id)];
@@ -49,6 +44,7 @@ function Message(args = {}) {
         return fixedLength + contentLength;
     }
 
+    // Update both sizes together when optional fields change a message's length.
     function setLengths(contentLength) {
         const length = calcLength(contentLength);
         setContentLength(contentLength);
@@ -56,6 +52,7 @@ function Message(args = {}) {
         return { length, contentLength };
     }
 
+    // XOR combines all bytes except the final checksum, then compares with that checksum.
     function validate(dataview, check) {
         return equals(xor(dataview, 0, -1), check);
     }
@@ -76,6 +73,7 @@ function Message(args = {}) {
 }
 
 // Config messages
+// Reserve a radio channel, its send/receive mode and network; optionally add scanning flags.
 function AssignChannel() {
     const extendedAssignment = {
         backgroundScanningEnable:       0x01,
@@ -95,6 +93,7 @@ function AssignChannel() {
         id: 'assignChannel', // 66, 0x42
     });
 
+    // Extended assignment contributes one more byte than the ordinary three-field form.
     function contentLength(isExtended) {
         if(isExtended) return 4;
         return 3;
@@ -161,6 +160,7 @@ function AssignChannel() {
     });
 }
 
+// Release a channel's configuration so it can be assigned again.
 function UnassignChannel() {
     const defaults = {
         channelNumber: 0,
@@ -205,6 +205,7 @@ function UnassignChannel() {
     });
 }
 
+// Address a particular sensor by number/type/transmission type; zero values permit wildcard searches.
 function SetChannelId() {
     const defaults = {
         channelNumber:    0,
@@ -264,6 +265,7 @@ function SetChannelId() {
     });
 }
 
+// Set the interval between radio messages in 1/32768-second ticks (8192 means four per second).
 function SetChannelPeriod() {
     const defaults = {
         channelNumber: 0,
@@ -316,6 +318,7 @@ function SetChannelPeriod() {
     });
 }
 
+// Select the radio frequency by its offset in MHz above 2400 MHz, not by the full frequency.
 function SetChannelFrequency() {
     const defaults = {
         channelNumber: 0,
@@ -368,6 +371,7 @@ function SetChannelFrequency() {
     });
 }
 
+// Associate a network slot with its standard eight-byte network identifier.
 function SetNetworkKey() {
     const defaults = {
         networkKey:    keys.public,
@@ -427,6 +431,7 @@ function SetNetworkKey() {
 }
 
 // Control Messages
+// Prepare the adapter reset command; sending it is the caller's responsibility.
 function ResetSystem() {
     const msg = Message({
         contentLength: 1,
@@ -463,6 +468,7 @@ function ResetSystem() {
     });
 }
 
+// Start radio activity on a channel that the caller has already configured.
 function OpenChannel() {
     const defaults = {
         channelNumber: 0,
@@ -507,6 +513,7 @@ function OpenChannel() {
     });
 }
 
+// Ask the adapter to stop one channel; its later close event confirms completion.
 function CloseChannel() {
     const defaults = {
         channelNumber: 0,
@@ -551,6 +558,7 @@ function CloseChannel() {
     });
 }
 
+// Ask for adapter/channel information by message ID; some system-wide requests use a sub-ID.
 function RequestMessage(args = {}) {
     const defaults = {
         channelNumber:      0,
@@ -614,11 +622,13 @@ function RequestMessage(args = {}) {
     });
 }
 
+// Enter receive scanning on channel zero, optionally restricted to regularly timed packets.
 function OpenRxScanMode() {
     const msg = Message({
         id: 'openRxScanMode', // 91, 0x5B
     });
 
+    // Presence matters: an explicitly supplied zero still adds the optional byte.
     function contentLength(args) {
         if(exists(args.syncPackets)) return  2;
         return 1;
@@ -677,6 +687,7 @@ function OpenRxScanMode() {
     });
 }
 
+// Prepare the adapter's low-power sleep command, which has no user settings.
 function Sleep() {
     const msg = Message({
         contentLength: 1,
@@ -713,6 +724,7 @@ function Sleep() {
     });
 }
 
+// Set high-priority search duration in 2.5-second units; values are not milliseconds.
 function SearchTimeout() {
     const defaults = {
         channelNumber: 0,
@@ -762,6 +774,7 @@ function SearchTimeout() {
     });
 }
 
+// Set background-search duration in 2.5-second units; 255 requests no time limit.
 function LowPrioritySearchTimeout() {
     const defaults = {
         channelNumber:    0,
@@ -812,6 +825,7 @@ function LowPrioritySearchTimeout() {
     });
 }
 
+// Ask the adapter to include sensor identity details alongside received measurements.
 function EnableExtRxMessages() {
     const defaults = {
         enable: 1, // 0 disable, 1 enable
@@ -859,6 +873,7 @@ function EnableExtRxMessages() {
     });
 }
 
+// Choose which extra receive details to include, such as sensor ID, signal strength or time.
 function LibConfig() {
     const defaults = {
         config: values.libConfig.disabled
@@ -905,6 +920,12 @@ function LibConfig() {
     });
 }
 
+/**
+ * Wrap sensor pages in broadcast or confirmed-delivery messages. The normal
+ * content is a channel byte plus eight payload bytes (the sensor's actual data).
+ * Optional trailing data identifies the sender. The is... helpers inspect the
+ * packet type/size only; they do not establish checksum validity.
+ */
 function Data(args = {}) {
     const defaults = {
         channelNumber: 0,
@@ -919,6 +940,7 @@ function Data(args = {}) {
 
     const typeId = existance(args.typeId, defaults.typeId);
 
+    // The base content is nine bytes; any supplied extension follows the sensor page.
     function contentLength(args = {}) {
         if(exists(args.extended)) return 9 + args.extended.byteLength;
         return 9;
@@ -933,6 +955,7 @@ function Data(args = {}) {
     // - LibConfig, sends ChannelId, RSSI and timestamp
 
 
+    // Copy the supplied payload and optional extension into a newly framed message.
     function encode(args = {}) {
         const { length } = msg.setLengths(contentLength(args));
         const xorIndex   = length - 1;
@@ -960,6 +983,7 @@ function Data(args = {}) {
         return view;
     }
 
+    // Copy content after the channel into a new view, optionally decode it, and attach sender details.
     function decode(dataview, payloadDecoder = undefined) {
         const contentLength = dataview.getUint8(1, true);
         const id            = dataview.getUint8(2, true);
@@ -993,6 +1017,7 @@ function Data(args = {}) {
         return res;
     }
 
+    // Read the device address from the extended layout after the normal eight-byte sensor page.
     function channelIdDecoder(dataview) {
         const deviceNumber     = dataview.getUint16(13, true);
         const deviceType       = dataview.getUint8(15, true);
@@ -1027,14 +1052,17 @@ function Data(args = {}) {
     });
 }
 
+// Broadcasts carry measurements without asking the receiver to confirm each one.
 function BroadcastData() {
     return Data({typeId: 'broadcastData'}); // 78, 0x4E
 }
 
+// Confirmed-delivery packets are used for commands whose completion the app waits for.
 function AcknowledgedData() {
     return Data({typeId: 'acknowledgedData'}); // 79, 0x4F
 }
 
+// Reserved for multi-packet transfers; both operations deliberately throw until implemented.
 function BurstTransferData() {
 
     function encode() {
@@ -1051,6 +1079,7 @@ function BurstTransferData() {
     });
 }
 
+// Reserved for the faster burst format; encoding deliberately throws until implemented.
 function AdvancedBurstData() {
 
     function encode() {
@@ -1060,6 +1089,11 @@ function AdvancedBurstData() {
     return Object.freeze({ encode });
 }
 
+/**
+ * Adapter notices such as channel closure or delivery completion. These share
+ * message ID 0x40 with command responses, but byte 4 equals 1 for an event.
+ * Optional encryption-identification data is included only when the packet has it.
+ */
 function ChannelEvent() {
     const defaults = {
         channelNumber: 0,
@@ -1072,6 +1106,7 @@ function ChannelEvent() {
     const encryptionIdLength   = 4;
     const userInfoStringLength = 19;
 
+    // Account for the fixed event fields and optional four-byte ID / nineteen-byte user data.
     function calcContentLength(args) {
         let length = 3;
 
@@ -1085,6 +1120,7 @@ function ChannelEvent() {
         return length;
     }
 
+    // Build the event and any encryption-related fields before calculating its checksum.
     function encode(args) {
         const contentLength = calcContentLength(args);
         const { length }    = msg.setLengths(contentLength);
@@ -1116,6 +1152,7 @@ function ChannelEvent() {
         return view;
     }
 
+    // Use message length to decide whether optional ID and user-data fields are present.
     function decode(dataview) {
         const sync          = dataview.getUint8(0, true);
         const contentLength = dataview.getUint8(1, true);
@@ -1164,6 +1201,7 @@ function ChannelEvent() {
         decode,
     });
 }
+// A command reply records the initiating message ID and success/error code for the waiting queue.
 function ChannelResponse() {
     const defaults = {
         channelNumber: 0,
@@ -1224,6 +1262,7 @@ function ChannelResponse() {
     });
 }
 
+// Channel-state report. Encoding packs several settings; decoding leaves the status byte packed.
 function ChannelStatus() {
     const defaults = {
         channelNumber: 0,
@@ -1244,6 +1283,7 @@ function ChannelStatus() {
         tracking:   3,
     };
 
+    // Combine state, network slot and channel mode into their assigned groups of bits.
     function encodeChannelStatus(args) {
         let status = 0b00000000;
 
@@ -1294,10 +1334,16 @@ function ChannelStatus() {
     });
 }
 
+// A requested channel-ID reply uses the same field layout as the command that sets it.
 function ChannelId() {
     return SetChannelId();
 }
 
+/**
+ * Describes the adapter's capacity and optional features. Paired encode/decode
+ * helpers below convert named yes/no values to/from groups of bits. "no_..."
+ * standard flags mean a feature is absent; advanced flags mean it is supported.
+ */
 function Capabilities() {
     const defaults = {
         maxChannels:  0,
@@ -1311,6 +1357,7 @@ function Capabilities() {
     });
     const length = msg.getLength();
 
+    // Basic restrictions on receiving, sending and delivery-confirmed/burst messages.
     function encodeStandardOptions(args) {
         let options = 0b00000000;
 
@@ -1335,6 +1382,7 @@ function Capabilities() {
         };
     }
 
+    // First feature group: network identity, transmit power and search/script support.
     function encodeAdvancedOptions(args) {
         let options = 0b00000000;
 
@@ -1359,6 +1407,7 @@ function Capabilities() {
         };
     }
 
+    // Second feature group: indicator light, extended messages, scan/search and file support.
     function encodeAdvancedOptions2(args) {
         let options = 0b00000000;
 
@@ -1385,6 +1434,7 @@ function Capabilities() {
         };
     }
 
+    // Third feature group: burst transfers, event handling, shared search and encryption.
     function encodeAdvancedOptions3(args) {
         let options = 0b00000000;
 
@@ -1411,6 +1461,7 @@ function Capabilities() {
         };
     }
 
+    // Final group currently holds only the radio-active notification feature.
     function encodeAdvancedOptions4(args) {
         let options = 0b00000000;
 
@@ -1493,6 +1544,7 @@ function Capabilities() {
     });
 }
 
+// Read/write the adapter's numeric serial number as four bytes, lowest-value byte first.
 function SerialNumber() {
     const defaults = {
         serialNumber: 0,
@@ -1537,6 +1589,7 @@ function SerialNumber() {
     });
 }
 
+// Give the pairing list a readable sensor category, retaining an explicit unsupported fallback.
 function deviceTypeToString(deviceType) {
     if(equals(deviceType, 120)) return 'Heart Rate';
     if(equals(deviceType, 17))  return 'Trainer';
@@ -1545,6 +1598,7 @@ function deviceTypeToString(deviceType) {
     return 'unsupported';
 }
 
+// Public shortcuts delegate packet classification to the format that owns each layout.
 function isExtended(dataview) {
     return message.data.isExtended(dataview);
 }

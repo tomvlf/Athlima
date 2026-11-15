@@ -1,19 +1,8 @@
-/*
- * backup.js: browser-local backup and restore.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Creates and restores a downloadable copy of this browser's training data. A backup is a JSON text
+ * file; recorded FIT files are converted to text so they fit inside it. Version 2 includes coaching
+ * as well as device data. Only listed settings are copied: integration API keys are deliberately
+ * excluded.
  */
 
 import { CoachingService } from '../coaching/service.js';
@@ -21,6 +10,10 @@ import { openCoachingStorage } from '../coaching/storage.js';
 
 const SETTINGS = ['ftp', 'weight', 'theme', 'dockMode', 'measurement', 'volume', 'dataTileSwitch'];
 
+/**
+ * Open the existing ride/workout database, refusing to back up an uninitialized or blocked store
+ * rather than presenting an empty backup as success.
+ */
 async function openDatabase() {
     return new Promise((resolve, reject) => {
         const request = window.indexedDB.open(accountDatabase(), 3);
@@ -36,6 +29,7 @@ async function openDatabase() {
     });
 }
 
+/** Read every item in one database collection and wait for the read operation to finish. */
 async function records(database, name) {
     return new Promise((resolve, reject) => {
         const transaction = database.transaction(name, 'readonly');
@@ -45,6 +39,10 @@ async function records(database, name) {
     });
 }
 
+/**
+ * Turn binary file bytes into portable text. Small chunks avoid passing a whole recording as
+ * thousands of function arguments at once.
+ */
 function base64(bytes) {
     let text = '';
     for(let offset = 0; offset < bytes.length; offset += 8192) {
@@ -53,6 +51,11 @@ function base64(bytes) {
     return btoa(text);
 }
 
+/**
+ * Gather saved workouts, recordings, calendar, allowed settings and coaching into one version-2
+ * backup object. Also keep copies of scheduled built-in workouts so their calendar IDs still
+ * resolve after restoration, even if the built-in catalogue changes. The caller downloads the result.
+ */
 export async function createBackup(library = []) {
     const database = await openDatabase();
     try {
@@ -65,7 +68,7 @@ export async function createBackup(library = []) {
         const calendar = JSON.parse(accountStorage.getItem('training-calendar') || '[]');
         const planned = JSON.parse(accountStorage.getItem('planned') || '{"workouts":[],"modified":{}}');
         if(!Array.isArray(calendar)) throw new Error('Stored training calendar must be an array.');
-        // Built-in workout IDs are generated per browser load; retain scheduled copies.
+        // Retain scheduled copies so their calendar IDs also resolve after a library update.
         for(const entry of calendar) {
             const workout = library.find(w => String(w.id) === entry.workoutId);
             if(workout && !workouts.some(w => w.id === workout.id)) workouts.push(workout);
@@ -80,6 +83,12 @@ export async function createBackup(library = []) {
     } finally { database.close(); }
 }
 
+/**
+ * Check the backup before saving its contents. Workouts and recordings are added or replaced by ID,
+ * while settings/calendar and version-2 coaching are restored from the file. These storage systems
+ * cannot be updated as one operation; a later coaching failure is reported explicitly. Version 1
+ * has no coaching state.
+ */
 export async function restoreBackup(backup) {
     if(![1, 2].includes(backup?.version) || !Array.isArray(backup.workouts) || !Array.isArray(backup.activities) ||
        !Array.isArray(backup.calendar) || !backup.settings || typeof backup.settings !== 'object' ||

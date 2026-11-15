@@ -41,9 +41,17 @@ const WORDS = {
     cycling: {session: 'ride', sessions: 'rides', act: 'Ride', prepare: 'Prepare to ride', other: 'other ride', families: FAMILY_LABELS},
     running: {session: 'run', sessions: 'runs', act: 'View', prepare: 'View run', other: 'other run', families: RUN_TITLES},
 };
+/**
+ * Select cycling or running labels, including older plans that record the sport only on their
+ * workouts.
+ */
 const wordsFor = plan => WORDS[plan?.sport === 'running' || plan?.workouts?.[0]?.sport === 'running' ? 'running' : 'cycling'];
 
 const phaseName = type => PHASES[type]?.[0] || String(type ?? '').replaceAll('_', ' ');
+/**
+ * Format a calendar-only date in UTC so the displayed day does not shift with the browser's time
+ * zone.
+ */
 const dateLabel = (day, options = {weekday: 'short', day: 'numeric', month: 'short'}) =>
     new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, {...options, timeZone: 'UTC'});
 const rangeLabel = (start, end) => `${dateLabel(start, {day: 'numeric', month: 'short'})} – ${dateLabel(end, {day: 'numeric', month: 'short'})}`;
@@ -59,6 +67,10 @@ const sessionKind = (workout, words = WORDS.cycling) => workout.libraryName && w
     ? `${words.families[workout.family]} &middot; ` : '';
 const badge = (text, kind = '') => `<span class="plan-chip ${kind}">${escape(text)}</span>`;
 
+/**
+ * Describe a session's day, effort and outcome. An unresolved past date is shown as not yet logged
+ * rather than falsely marked completed.
+ */
 function sessionRow(workout, day, words) {
     const [status, kind] = workout.status === 'substituted' ? [`Done (${words.other})`, 'done'] : STATUS[workout.status] || [workout.status, ''];
     const hard = FAMILIES[workout.family]?.hard;
@@ -76,6 +88,10 @@ function sessionRow(workout, day, words) {
     </li>`;
 }
 
+/**
+ * Group a week's sessions and totals in an expandable section, highlighting the current week and
+ * counting completed/substituted sessions.
+ */
 function weekBlock(week, index, workouts, day, open, words) {
     const planned = workouts.reduce((total, w) => total + w.duration, 0);
     const done = workouts.filter(isDone).length;
@@ -95,6 +111,10 @@ function weekBlock(week, index, workouts, day, open, words) {
     </details>`;
 }
 
+/**
+ * Draw phase lengths proportionally across the plan, position today's marker and include a text
+ * legend so colours are not the only explanation.
+ */
 function timeline(plan, day) {
     const total = Math.max(1, daysBetween(plan.startDate, plan.endDate) + 1);
     const position = Math.min(100, Math.max(0, daysBetween(plan.startDate, day) / total * 100));
@@ -125,6 +145,10 @@ export function renderPlan(data, day) {
     }
     const workouts = [...plan.workouts].sort((a, b) => a.date.localeCompare(b.date));
     const weeks = plan.weeks?.length ? plan.weeks : [{id: 'all', startDate: plan.startDate, endDate: plan.endDate}];
+    /**
+     * Find sessions for a week by ID, retaining older records whose missing/stale week IDs can
+     * still be placed by their date.
+     */
     const inWeek = week => workouts.filter(w => week.id === 'all' || w.weekId === week.id
         || (!weeks.some(x => x.id === w.weekId) && w.date >= week.startDate && w.date <= week.endDate));
     const currentIndex = weeks.findIndex(w => w.startDate <= day && w.endDate >= day);

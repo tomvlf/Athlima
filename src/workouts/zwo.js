@@ -1,25 +1,19 @@
-/*
- * zwo.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * contains the project logic for this module and keeps related responsibilities together.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * Translates ZWO workout files between XML text and the ride player's interval/step objects. XML is
+ * structured text with named tags and attributes, like <SteadyState Duration="60" Power="0.65"/>.
+ * Durations are seconds, cycling powers are FTP fractions and cadence is rpm. Most factory
+ * functions return the same read/write/conversion interface for a different tag. This player parser
+ * is separate from the Coach's stricter template-eligibility checks.
  */
 
 import { equals, existance, exists,
          empty, first, last, repeat,
          capitalize, toFixed } from '../functions.js';
 
+/**
+ * Read a named setting from an XML element and apply its decoder, leaving an absent attribute
+ * undefined rather than inventing a target.
+ */
 function readAttribute(args = {}) {
     const el       = args.el;
     const name     = args.name;
@@ -32,6 +26,10 @@ function readAttribute(args = {}) {
     }
 }
 
+/**
+ * Serialize one supplied attribute through its encoder. This formatter is not a general
+ * XML-escaping function.
+ */
 function writeAttribute(args = {}) {
     const encode = existance(args.encode, ((x) => x));
     const name   = existance(args.name);
@@ -40,6 +38,10 @@ function writeAttribute(args = {}) {
     return `${name}="${encode(value)}"`;
 }
 
+/**
+ * Create a reusable attribute reader/writer with a name and conversion functions, such as turning
+ * Duration text into a number.
+ */
 function Attribute(args = {}) {
     const defaults = {
         name:      '',
@@ -54,11 +56,13 @@ function Attribute(args = {}) {
         return name;
     }
 
+    /** Read this configured attribute from an element using the shared missing-value behavior. */
     function read(args = {}) {
         const el = existance(args.el);
         return readAttribute({el, name, decode});
     }
 
+    /** Write this configured attribute from a supplied value using its matching encoder. */
     function write(args = {}) {
         const value = existance(args.value);
         return writeAttribute({name, value, encode});
@@ -71,6 +75,10 @@ function Attribute(args = {}) {
     });
 }
 
+/**
+ * Copy selected, present attributes into a player step while renaming their keys. Filters separate
+ * work/recovery settings from tag metadata.
+ */
 function attributesToStep(args = {}) {
     const tag    = existance(args.element);
     const filter = existance(args.filter, ((_) => true));
@@ -86,6 +94,10 @@ function attributesToStep(args = {}) {
     }, {});
 }
 
+/**
+ * Convert a simple tag's attributes to lower-case step fields, excluding the element name and child
+ * text messages.
+ */
 function Step(element) {
     const spec = {
         element: element,
@@ -96,6 +108,10 @@ function Step(element) {
     return attributesToStep(spec);
 }
 
+/**
+ * Extract the hard/work part of a repeated interval: OnDuration/OnPower become duration/power, with
+ * the work cadence preserved.
+ */
 function OnStep(element) {
     const spec = {
         element:    element,
@@ -106,6 +122,10 @@ function OnStep(element) {
     return attributesToStep(spec);
 }
 
+/**
+ * Extract the recovery part of a repeated interval, including CadenceResting as its cadence rather
+ * than reusing the work target.
+ */
 function OffStep(element) {
     const spec = {
         element:    element,
@@ -120,6 +140,10 @@ function isTextEventTag(name) {
     return equals(String(name).toLowerCase(), 'textevent');
 }
 
+/**
+ * Read direct child text-message tags for later placement on the workout timeline; messages are not
+ * extra training intervals.
+ */
 function readTextEvents(el) {
     const nodes = el.children || [];
     const acc   = [];
@@ -136,6 +160,10 @@ function readTextEvents(el) {
 
 // timeoffset counts from the start of the whole block.
 // offset counts from the start of the slice that block was cut into.
+/**
+ * Keep a message's optional display duration and replace its whole-block time offset with the
+ * step-relative offset used by the player.
+ */
 function toMessage(event, offset) {
     const message = {};
 
@@ -146,6 +174,10 @@ function toMessage(event, offset) {
     return message;
 }
 
+/**
+ * Place each message into the timed step containing its offset, copying only steps that need
+ * attached messages. End boundaries belong to the next step, not both.
+ */
 function assignMessages(intervals, children) {
     if(!exists(children) || empty(children)) return intervals;
 
@@ -195,6 +227,10 @@ function assignMessages(intervals, children) {
     return acc;
 }
 
+/**
+ * Build the common interface for one XML tag. Default conversions handle a single steady step;
+ * warm-ups, repeats and free riding supply their own conversions.
+ */
 function Element(args = {}) {
     const defaults = {
         name:     'Unknown',
@@ -214,6 +250,10 @@ function Element(args = {}) {
         return name;
     }
 
+    /**
+     * Read plain text content, leaving missing or empty elements undefined so metadata defaults can
+     * be applied later.
+     */
     function readContent(el) {
         if(exists(el)) {
             let value = el.textContent;
@@ -227,6 +267,10 @@ function Element(args = {}) {
         return undefined;
     }
 
+    /**
+     * Read the tag's attributes with registered decoders, retaining unknown attributes as text, and
+     * collect child workout messages.
+     */
     function read(args = {}) {
         const el            = existance(args.el);
         const attrsNodeList = el.attributes || [];
@@ -257,6 +301,10 @@ function Element(args = {}) {
         return acc;
     }
 
+    /**
+     * Assemble this tag's opening text, attributes, content and closing text. Inputs are serialized
+     * here, not validated as a complete workout.
+     */
     function write(args = {}) {
         let { content, ...attributes } = args;
 
@@ -275,6 +323,10 @@ function Element(args = {}) {
         return duration;
     }
 
+    /**
+     * Wrap a simple converted step with its interval duration, giving the player its expected
+     * nested shape.
+     */
     function defaultToInterval(element) {
         const duration = calcDuration(element);
         const step = Step(element);
@@ -285,6 +337,10 @@ function Element(args = {}) {
         };
     }
 
+    /**
+     * Convert the first step of an interval back to a simple element with present power, cadence
+     * and slope targets.
+     */
     function defaultFromInterval(interval) {
         const res = {
             element: name,
@@ -299,10 +355,15 @@ function Element(args = {}) {
         return res;
     }
 
+    /** Combine reading an XML element with this tag's player conversion. */
     function readToInterval(args = {}) {
         return toInterval(read(args));
     }
 
+    /**
+     * Retain the legacy composition of the tag writer and reverse-conversion hook; the main file
+     * writer uses the head/body conversion path below.
+     */
     function writeFromInterval(args = {}) {
         return fromInterval(write(args));
     }
@@ -323,6 +384,10 @@ function Element(args = {}) {
     });
 }
 
+/**
+ * Handle repeated work/recovery pairs, where Repeat counts complete pairs and On/Off attributes
+ * describe each half.
+ */
 function IntervalsT(args = {}) {
     const spec = {
         name:         'IntervalsT',
@@ -332,10 +397,18 @@ function IntervalsT(args = {}) {
         calcDuration: calcDuration,
     };
 
+    /**
+     * Count the full seconds in all repetitions, including the recovery following each work
+     * segment.
+     */
     function calcDuration(element) {
         return element.Repeat * (element.OnDuration + element.OffDuration);
     }
 
+    /**
+     * Expand each repetition into a work interval and a recovery interval, then distribute text
+     * messages across their combined timeline.
+     */
     function toInterval(element) {
         const duration   = calcDuration(element);
         const stepsCount = existance(element.Repeat, 1);
@@ -354,6 +427,10 @@ function IntervalsT(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Provide the existing fallback element interface for an unrecognized tag. This placeholder does
+ * not mean the Coach accepts the tag for prescription.
+ */
 function Unknown(args = {}) {
     const spec = {
         name:     'Unknown',
@@ -366,6 +443,10 @@ function Unknown(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Handle free riding, optionally described by timed Sim slope pairs or distance-based Track slope
+ * pairs rather than an ERG prescription.
+ */
 function FreeRide(args = {}) {
     const spec = {
         name:     'FreeRide',
@@ -374,6 +455,10 @@ function FreeRide(args = {}) {
         toInterval: toInterval,
     };
 
+    /**
+     * Expand slope/time or slope/distance pairs into steps. Fill remaining timed duration with flat
+     * riding, or extend it if the supplied simulation runs longer; attach any timed messages.
+     */
     function toInterval(element) {
         let duration   = existance(element.Duration, 1);
         const sim      = element.Sim;
@@ -422,6 +507,10 @@ function FreeRide(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Handle gradually changing power and optional cadence by dividing a block into small
+ * constant-target steps, normally ten seconds each.
+ */
 function Warmup(args = {}) {
     const defaults = {
         timeDx: 10,
@@ -437,6 +526,10 @@ function Warmup(args = {}) {
         fromInterval: fromInterval,
     }, args.spec);
 
+    /**
+     * Build successive power/cadence targets across the block and attach its messages to the
+     * resulting steps. The legacy conversion uses whole timeDx-sized slices.
+     */
     function toInterval(element) {
         const duration    = element.Duration;
         const powerLow    = element.PowerLow ?? element.Power;
@@ -476,6 +569,7 @@ function Warmup(args = {}) {
         }], element.children));
     }
 
+    /** Summarize a ramp as its total duration and first/last power targets for file output. */
     function fromInterval(interval) {
         const res = {
             element:  spec.name,
@@ -493,6 +587,10 @@ function Warmup(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Handle the legacy cool-down ramp conversion, using the file's endpoint powers to generate
+ * successive small steps.
+ */
 function Cooldown(args = {}) {
     const defaults = {
         timeDx: 10,
@@ -508,6 +606,7 @@ function Cooldown(args = {}) {
         fromInterval: fromInterval,
     };
 
+    /** Generate the cool-down's stepped power targets and distribute timed messages across them. */
     function toInterval(element) {
         const duration  = element.Duration;
         const powerLow  = element.PowerHigh;
@@ -535,6 +634,10 @@ function Cooldown(args = {}) {
         }], element.children));
     }
 
+    /**
+     * Write the interval's first and last powers as endpoint attributes, rather than serializing
+     * each small internal step.
+     */
     function fromInterval(interval) {
         const res = {
             element:  spec.name,
@@ -552,6 +655,10 @@ function Cooldown(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Reuse the warm-up conversion for a generic gradual change rather than duplicating ramp
+ * mathematics.
+ */
 function Ramp(args = {}) {
     const spec = {
         name:       'Ramp',
@@ -562,6 +669,10 @@ function Ramp(args = {}) {
     return Warmup(spec);
 }
 
+/**
+ * Handle a steady block, including files that supply a power or cadence range instead of one
+ * explicit target.
+ */
 function SteadyState(args = {}) {
 
     const spec = Object.assign({
@@ -571,6 +682,10 @@ function SteadyState(args = {}) {
         toInterval:   toInterval,
     }, args.spec);
 
+    /**
+     * Prefer an explicit target; otherwise average supplied range endpoints. With no power target,
+     * use the existing zero-power/flat-slope representation, then attach messages.
+     */
     function toInterval(element) {
         const duration  = element.Duration;
         const power     = element.Power;
@@ -617,6 +732,10 @@ function SteadyState(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Read a workout instruction message without adding training time. Its empty interval list lets the
+ * body converter omit it from the effort schedule.
+ */
 function TextEvent(args = {}) {
 
     const spec = Object.assign({
@@ -634,6 +753,10 @@ function TextEvent(args = {}) {
     return Element(spec);
 }
 
+/**
+ * Read metadata as text, returning undefined for missing/empty elements so the header can choose
+ * its defaults.
+ */
 function readContent(el) {
     if(exists(el)) {
         let value = el.textContent;
@@ -646,6 +769,10 @@ function readContent(el) {
     return undefined;
 }
 
+/**
+ * Read and write descriptive workout metadata such as author, name and category, separate from the
+ * actual effort sequence.
+ */
 function Head(args = {}) {
     const defaults = {
         author:      'Unknown',
@@ -657,6 +784,7 @@ function Head(args = {}) {
         tags:        '',
     };
 
+    /** Extract known metadata tags, supplying the established defaults only for missing values. */
     function read(args = {}) {
         const doc = existance(args.doc);
 
@@ -679,6 +807,10 @@ function Head(args = {}) {
         };
     }
 
+    /**
+     * Serialize the known metadata fields through their element writers, retaining a readable
+     * indentation layout.
+     */
     function write(args = {}) {
         const author      = existance(args.author, defaults.author);
         const name        = existance(args.name, defaults.name);
@@ -701,6 +833,7 @@ function Head(args = {}) {
         return elements.reduce((acc, el) => acc + el.padStart(el.length+4, ' ') + '\n', '\n');
     }
 
+    /** Copy the player workout's metadata into the file-writer header shape. */
     function fromInterval(intervals) {
         return {
             author: intervals.meta.author,
@@ -720,6 +853,10 @@ function Head(args = {}) {
     });
 }
 
+/**
+ * Read, expand and write the training tags inside <workout>. It chooses the tag-specific handler
+ * rather than putting all formats in one parser.
+ */
 function Body() {
     const defaults = {
         parent: 'workout',
@@ -727,6 +864,10 @@ function Body() {
 
     const parent = defaults.parent;
 
+    /**
+     * Select the registered handler for an element and requested operation, treating text-message
+     * tag names without case sensitivity.
+     */
     function apply(el, method = 'read') {
         const name = el.tagName;
 
@@ -741,24 +882,40 @@ function Body() {
         return Elements.Unknown[method]({el});
     }
 
+    /**
+     * Find the workout container's direct children. Header tags are outside this collection and do
+     * not become ride steps.
+     */
     function queryElements(doc) {
         const workoutEl = doc.querySelector(parent);
         const elements  = Array.from(workoutEl.children);
         return elements;
     }
 
+    /**
+     * Read each training tag into its element representation without expanding repetitions or ramps
+     * into player steps.
+     */
     function read(args = {}) {
         const doc = existance(args.doc);
         const elements = queryElements(doc);
         return elements.map((el) => apply(el, 'read'), []);
     }
 
+    /**
+     * Read and flatten each tag's player intervals; repeated pairs can produce several intervals
+     * and text-only events produce none.
+     */
     function readToInterval(args = {}) {
         const doc = existance(args.doc);
         const elements = queryElements(doc);
         return elements.flatMap((el) => apply(el, 'readToInterval'), []);
     }
 
+    /**
+     * Use the element's registered writer, or the existing unknown-tag writer, to generate one XML
+     * row.
+     */
     function writeElement(args = {}) {
         const { element, ...spec } = args;
 
@@ -779,6 +936,11 @@ function Body() {
         return first(steps).power > last(steps).power;
     }
 
+    /**
+     * Convert player intervals back into steady or rising/falling ramp elements using their step
+     * count and endpoint powers. This is a simplified reverse conversion, not a lossless copy of
+     * every original tag.
+     */
     function fromInterval(value) {
         const intervals = value.intervals;
         const acc = [];
@@ -805,6 +967,7 @@ function Body() {
         return acc;
     }
 
+    /** Serialize the converted training elements with indentation, preserving their order. */
     function writeElements(elements) {
         return elements.reduce((acc, element) => {
             const row = writeElement(element);
@@ -813,6 +976,7 @@ function Body() {
         }, '');
     }
 
+    /** Wrap the serialized training rows in the workout container. */
     function write(args = {}) {
         return `<workout>\n${writeElements(args)}    </workout>`;
     }
@@ -829,6 +993,10 @@ function encodeSim(arr) {
     return arr.join(',');
 }
 
+/**
+ * Read a comma-separated sequence of numeric slope/time or slope/distance values, omitting entries
+ * that do not parse as numbers.
+ */
 function decodeSim(str) {
     return str.split(',').reduce((acc, x) => {
         const n = parseFloat(x);
@@ -837,6 +1005,10 @@ function decodeSim(str) {
     }, []);
 }
 
+/**
+ * Attribute definitions select numeric/text/list conversion once for every tag using that field.
+ * Similar names such as Cadence and CadenceResting deliberately remain distinct.
+ */
 const Attrs = {
     Duration:    Attribute({name: 'Duration', decode: parseInt}),
     OnDuration:  Attribute({name: 'OnDuration', decode: parseInt}),
@@ -873,6 +1045,10 @@ const Attrs = {
     Message:    Attribute({name: 'Message'}),
 };
 
+/**
+ * This registry links XML tag names to their specialized handlers; metadata-only tags use the
+ * common Element implementation.
+ */
 const Elements = {
     Warmup:      Warmup(),
     // SteadyState: Element({name: 'SteadyState', tagOpen: '<SteadyState', tagClose: ' />'}),
@@ -897,6 +1073,10 @@ const body = Body();
 
 const parser    = new DOMParser();
 
+/**
+ * Parse the complete XML file into player metadata and intervals, adding a total duration from the
+ * converted intervals.
+ */
 function readToInterval(zwo) {
     const doc       = parser.parseFromString(zwo, 'text/xml');
     const meta      = head.read({doc});
@@ -909,6 +1089,10 @@ function readToInterval(zwo) {
     };
 }
 
+/**
+ * Parse the file into header/body element records without converting it to the player's interval
+ * structure.
+ */
 function read(zwo) {
     const doc          = parser.parseFromString(zwo, 'text/xml');
     const headElements = head.read({doc});
@@ -920,6 +1104,10 @@ function read(zwo) {
     };
 }
 
+/**
+ * Prepare a player workout for serialization by converting its metadata and interval body
+ * separately.
+ */
 function fromInterval(intervals) {
     const res = {
         head: head.fromInterval(intervals),
@@ -929,6 +1117,10 @@ function fromInterval(intervals) {
     return res;
 }
 
+/**
+ * Combine the prepared header/body into ZWO XML text. The caller decides whether to save or
+ * download that text.
+ */
 function write(args = {}) {
     const headElements = head.write(args.head);
     const bodyElements = body.write(args.body);

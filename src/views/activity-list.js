@@ -1,19 +1,11 @@
 /*
- * activity-list.js: front-end client module.
+ * Shows recent saved rides, week/month totals, and training-load estimates.
+ * ActivityList builds the cards; ActivityItem handles one card's menu and actions.
+ * db:/activity: messages bring data in, while action: messages target a card by ID.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * These custom HTML tags listen when connected to the page and cancel listeners
+ * when removed. render replaces their visible content. Names and other variable
+ * text are escaped before insertion into HTML so they remain text, not page code.
  */
 
 import { xf, formatDate, } from '../functions.js';
@@ -73,9 +65,8 @@ class ActivityList extends HTMLElement {
     }
 
     /**
-     * Re-renders activities restored from persisted storage.
-     *
-     * @param {object[]} activities - Stored activity records already loaded from the app.
+     * Loads saved rides from this browser, then redraws the list.
+     * If reading storage fails, show a readable error rather than an empty list.
      */
     async loadActivities() {
         try {
@@ -103,6 +94,7 @@ class ActivityList extends HTMLElement {
         const seconds = Number(data.duration || 0);
         return `${Math.ceil(seconds / 60)} min`;
     }
+    // Combine the saved ride with coaching details; return short, unit-labelled metrics.
     stats(data) {
         const coachedRide = coachingData()?.activities.find(activity =>
             activity.id === String(data.id) || activity.original?.id === String(data.id),
@@ -122,6 +114,11 @@ class ActivityList extends HTMLElement {
         if(items.length === 0) items.push(this.duration(data));
         return items;
     }
+    /**
+     * Return summary HTML using the athlete's local day and a Monday-start week.
+     * Coaching estimates describe accumulated training, not medical measurements;
+     * omit them if they cannot be calculated, while still showing activity totals.
+     */
     summary() {
         const data = coachingData();
         const rides = data?.activities ?? [];
@@ -161,6 +158,7 @@ class ActivityList extends HTMLElement {
             const remainder = rounded % 60;
             return hours ? `${hours}h ${remainder}m` : `${remainder}m`;
         };
+        // Keep period totals in the estimator's chosen load unit; duration is a fallback.
         const loadFor = list => {
             if(!state) return null;
             if(state.loadSource === 'duration') {
@@ -193,6 +191,7 @@ class ActivityList extends HTMLElement {
     uploadStatus(data) {
         return data.status;
     }
+    // Build one card, including its power preview and ID-addressed action buttons.
     template(i, data) {
         const status = this.uploadStatus(data);
         const metrics = this.stats(data);
@@ -301,6 +300,10 @@ class ActivityList extends HTMLElement {
 
 customElements.define('activity-list', ActivityList);
 
+/**
+ * Controls one saved ride's expanded details and upload indicators.
+ * onLoading/onSuccess/onFail swap styling classes to show upload progress.
+ */
 class ActivityItem extends HTMLElement {
     constructor() {
         super();
@@ -321,6 +324,8 @@ class ActivityItem extends HTMLElement {
     disconnectedCallback() {
         this.abortController.abort();
     }
+    // Route card requests: show menus, delete locally, download, or ask a provider to upload.
+    // Later success/failure messages change the indicator, not the stored ride here.
     onAction(action) {
         console.log(action, this.id);
 

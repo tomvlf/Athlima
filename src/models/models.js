@@ -1,19 +1,9 @@
-/*
- * models.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * defines the data structures and API contracts used by the app when storing and exchanging rider data.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+/**
+ * The ride engine's models: helpers that hold, convert and save measurements, settings, workouts
+ * and recordings. A workout is a recipe to follow; an activity is the record of what happened; a
+ * session is a ride still in progress. Small measurement/settings subclasses share the Model hooks
+ * below rather than implementing independent workflows. Live updates use xf messages, while saves
+ * explicitly call browser storage.
  */
 
 import { xf, exists, existance, empty, equals, mavg, avg, max,
@@ -37,6 +27,10 @@ import { Device, Status, ControlMode, } from '../ble/enums.js';
 import { TimerStatus, EventType, } from '../activity/enums.js';
 import { fromRecordedRide } from '../coaching/normalizer.js';
 
+/**
+ * Reduce valid recorded power samples to at most the requested number of averages for a compact
+ * preview chart. This is not the full one-second stream used for analysis.
+ */
 function summarizePowerProfile(samples, maximum = 64) {
     if(!Array.isArray(samples) || samples.length < 2) return undefined;
     const validSamples = samples.filter(value => Number.isFinite(value) && value >= 0);
@@ -51,7 +45,16 @@ function summarizePowerProfile(samples, maximum = 64) {
     });
 }
 
+/**
+ * Common setup for one live value. init/postInit are optional setup hooks; defaultValue supplies
+ * its initial value, defaultIsValid checks input and defaultParse converts restored data. Simple
+ * subclasses mainly override those defaults and units.
+ */
 class Model {
+    /**
+     * Run early setup, select the configured or default conversion/validation functions, then let
+     * the subclass finish configuring storage and limits.
+     */
     constructor(args = {}) {
         this.init(args);
         this.prop      = args.prop;
@@ -68,6 +71,10 @@ class Model {
     postInit() { return; }
     defaultValue() { return ''; }
     defaultIsValid(value) { return exists(value); }
+    /**
+     * Validate before replacing the model's state. Invalid values are logged and the default is
+     * returned, without assigning the invalid value.
+     */
     defaultSet(value) {
         const self = this;
         if(self.isValid(value)) {
@@ -86,21 +93,34 @@ class Model {
         const self = this;
         console.error(`Trying to set invalid ${self.prop}. ${typeof x}`, x);
     }
+    /**
+     * Supply the nonpersistent placeholder. Models that actually save settings replace it with a
+     * browser-storage adapter.
+     */
     defaultStorage() {
         const self = this;
         return {add: ((x)=>x),
                 restore: ((_)=> self.default)};
     }
+    /**
+     * Ask this model's configured storage adapter to save the value; models without a writable
+     * adapter must not use this path.
+     */
     backup(value) {
         const self = this;
         self.storage.set(value);
     }
+    /** Read the adapter's saved/default value and apply the model's parser before returning it. */
     restore() {
         const self = this;
         return self.parser(self.storage.restore());
     }
 }
 
+/**
+ * Configure a power reading and its expected range in watts. A watt measures rate of work, not
+ * accumulated energy.
+ */
 class Power extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -112,6 +132,7 @@ class Power extends Model {
     }
 }
 
+/** Configure a heart-rate reading in beats per minute and its expected whole-number range. */
 class HeartRate extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -124,6 +145,10 @@ class HeartRate extends Model {
     }
 }
 
+/**
+ * Configure a pedalling cadence reading in revolutions per minute and its expected whole-number
+ * range.
+ */
 class Cadence extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -135,6 +160,10 @@ class Cadence extends Model {
     }
 }
 
+/**
+ * Hold speed configuration and explicit conversions between kilometres/hour, metres/second and
+ * miles/hour. Callers must choose the conversion matching their source units.
+ */
 class Speed extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -159,6 +188,10 @@ class Speed extends Model {
     }
 }
 
+/**
+ * Configure the muscle-oxygen percentage reported by a compatible sensor and the thresholds used to
+ * display it. These are display values, not medical interpretations.
+ */
 class SmO2 extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -175,6 +208,10 @@ class SmO2 extends Model {
     }
 }
 
+/**
+ * Configure the total-haemoglobin reading supplied by a compatible muscle-oxygen sensor, separate
+ * from its oxygen-percentage reading.
+ */
 class THb extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -186,7 +223,15 @@ class THb extends Model {
     }
 }
 
+/**
+ * Remember which connected device supplies each measurement and trainer control, together with
+ * ride-display and automatic start/pause preferences.
+ */
 class Sources extends Model {
+    /**
+     * Follow live source-map changes and configure JSON storage, allowing the chosen devices and
+     * display options to survive a reload.
+     */
     postInit(args = {}) {
         const self = this;
         self.state = self.default;
@@ -201,9 +246,17 @@ class Sources extends Model {
 
         self.storage = new args.storage(storageModel);
     }
+    /**
+     * Merge a partial preference update into the existing map so changing one setting does not
+     * discard the others.
+     */
     defaultSet(target, source) {
         return Object.assign(target, source);
     }
+    /**
+     * Check whether the announced device is the selected source for a measurement before accepting
+     * its readings.
+     */
     isSource(path, value) {
         const self = this;
         if(exists(self.state[path])) {
@@ -246,6 +299,10 @@ class Sources extends Model {
     }
 }
 
+/**
+ * Base model for a rider-adjustable target. Subclasses choose limits, step size and parsing;
+ * inc/dec move by one step through the same bounded setter.
+ */
 class Target extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -257,6 +314,10 @@ class Target extends Model {
         const self = this;
         return Number.isInteger(value) && inRange(self.min, self.max, value);
     }
+    /**
+     * Reject nonnumeric input with the existing error path; otherwise parse and limit the requested
+     * target to its configured range.
+     */
     defaultSet(value) {
         const self = this;
         if(isNaN(value)) {
@@ -278,6 +339,10 @@ class Target extends Model {
     }
 }
 
+/**
+ * Store the beep volume from 0 to 100. mute selects the minimum; the browser sound module
+ * translates the value into loudness.
+ */
 class Volume extends Target {
     postInit(args = {}) {
         const self = this;
@@ -298,6 +363,10 @@ class Volume extends Target {
     }
 }
 
+/**
+ * Configure the requested trainer power in watts, distinct from the power actually reported by the
+ * sensor.
+ */
 class PowerTarget extends Target {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -306,6 +375,7 @@ class PowerTarget extends Target {
     }
 }
 
+/** Configure the trainer's requested resistance level; it is not a measured power value. */
 class ResistanceTarget extends Target {
     postInit(args = {}) {
         this.min = existance(args.min, -100);
@@ -315,6 +385,10 @@ class ResistanceTarget extends Target {
     parse(value) { return parseInt(value); }
 }
 
+/**
+ * Configure a road-grade target in percent, allowing decimal steps and negative values for
+ * descents.
+ */
 class SlopeTarget extends Target {
     postInit(args = {}) {
         this.min = existance(args.min, -40);
@@ -328,6 +402,10 @@ class SlopeTarget extends Target {
     parse(value) { return parseFloat(value); }
 }
 
+/**
+ * Configure a requested pedalling cadence in revolutions per minute; it remains separate from
+ * measured cadence.
+ */
 class CadenceTarget extends Target {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
@@ -337,6 +415,10 @@ class CadenceTarget extends Target {
     parse(value) { return parseInt(value); }
 }
 
+/**
+ * Restrict trainer mode to the shared ERG, resistance and simulation labels; ERG is the initial
+ * mode.
+ */
 class Mode extends Model {
     postInit(args) {
         this.state = this.defaultValue();
@@ -346,6 +428,10 @@ class Mode extends Model {
     defaultIsValid(value) { return this.values.includes(value); }
 }
 
+/**
+ * Keep the older ride engine's page labels. The platform navigation has additional routes and
+ * translates to these where needed.
+ */
 class Page extends Model {
     postInit(args) {
         this.values = ['settings', 'home', 'workouts'];
@@ -354,6 +440,11 @@ class Page extends Model {
     defaultIsValid(value) { return this.values.includes(value); }
 }
 
+/**
+ * Store functional threshold power, the reference in watts used to scale cycling workouts. The
+ * initial value is a software default, not an assessment of the rider. Zone helpers label intensity
+ * bands for displays.
+ */
 class FTP extends Model {
     postInit(args = {}) {
         const self = this;
@@ -381,11 +472,19 @@ class FTP extends Model {
     defaultPercentages() {
         return {'one': 0.54, 'two': 0.75, 'three': 0.87, 'four': 0.94, 'five': 1.05, 'six': 1.20};
     }
+    /**
+     * Convert values above the legacy threshold of 9 from watts to an FTP fraction. Smaller values
+     * are assumed already relative.
+     */
     toRelative(value, ftp) {
         const self = this;
         if(value > self.minAbsValue) return toFixed(value / ftp, 2);
         return value;
     }
+    /**
+     * Convert values below 9 from an FTP fraction to rounded watts, rounding the fraction to two
+     * decimals first. Other values are treated as already absolute.
+     */
     toAbsolute(value, ftp) {
         const self = this;
         if(value < self.minAbsValue) {
@@ -395,6 +494,10 @@ class FTP extends Model {
         }
         return value;
     }
+    /**
+     * Compare watts with configured fractions of FTP and return both the zone name and its
+     * zero-based display index.
+     */
     powerToZone(value, ftp, zones) {
         const self = this;
         if(!exists(ftp)) ftp = self.state;
@@ -436,6 +539,10 @@ class FTP extends Model {
         if(equals(zone, 'seven')) return '#FE340B';
         return '#636468';
     }
+    /**
+     * Choose an intensity-zone label directly from an FTP fraction, without first converting it to
+     * watts.
+     */
     percentageToZone(value) {
         const self = this;
         const zones = self.zones;
@@ -458,6 +565,10 @@ class FTP extends Model {
     }
 }
 
+/**
+ * Store body mass in kilograms for settings and calculations; the default is a placeholder, not a
+ * measured personal value.
+ */
 class Weight extends Model {
     postInit(args = {}) {
         const self = this;
@@ -477,6 +588,10 @@ class Weight extends Model {
     }
 }
 
+/**
+ * Store and switch the legacy dark/light preference used by ride components. Invalid switch inputs
+ * use the model's error/default path.
+ */
 class Theme extends Model {
     postInit(args = {}) {
         const self = this;
@@ -498,6 +613,10 @@ class Theme extends Model {
     }
 }
 
+/**
+ * Support a compact 150-pixel-high desktop window at the bottom of the screen. Normal browser tabs
+ * may ignore resizing, moving or closing requests.
+ */
 class DockMode extends Model {
     postInit(args = {}) {
         const self = this;
@@ -513,24 +632,34 @@ class DockMode extends Model {
     switch(state) {
         return !state;
     }
+    /**
+     * Attempt compact sizing only when enabled and the current window is taller than the compact
+     * mode.
+     */
     apply(state) {
         const self = this;
         if(state && window.innerHeight > 200) {
             self.resize();
         }
     }
+    /** Calculate compact-window width and bottom-of-screen position from the available display area. */
     calcSize() {
         const width = window.screen.availWidth;
         const height = 150;
         const top = window.screen.availHeight - height;
         return {width: width, height: height, top: top};
     }
+    /** Ask the browser to resize and move the current window to the compact position. */
     resize() {
         const self = this;
         let {width, height, top} = self.calcSize();
         window.resizeTo(width, height);
         window.moveTo(0, top);
     }
+    /**
+     * Request a separate compact app window and ask to close this one; browser popup/window
+     * policies still apply.
+     */
     open() {
         const href = document.location.href;
         let self = this;
@@ -541,6 +670,10 @@ class DockMode extends Model {
     }
 }
 
+/**
+ * Persist metric or imperial display preference. This changes presentation, not the stored physical
+ * units.
+ */
 class Measurement extends Model {
     postInit(args = {}) {
         const self = this;
@@ -562,6 +695,10 @@ class Measurement extends Model {
     }
 }
 
+/**
+ * Persist which alternative ride-data tile is selected, converting the saved text back into a
+ * numeric index.
+ */
 class DataTileSwitch extends Model {
     postInit(args = {}) {
         const self = this;
@@ -579,6 +716,10 @@ class DataTileSwitch extends Model {
     }
 }
 
+/**
+ * Manage finished rides: binary FIT files, list summaries and the pending hand-off to the Coach.
+ * Retain a small recent-file cache while protecting records still waiting for that hand-off.
+ */
 class Activity extends Model {
     // var activity = {
     //         id: UUID,
@@ -601,6 +742,10 @@ class Activity extends Model {
         this.capacity = 7;
     }
     defaultValue() { return []; }
+    /**
+     * Freeze the current ride into a FIT Blob, summary and Coach payload with one stable ID, then
+     * save it. Keep the same pending record available if saving fails.
+     */
     async createFromCurrent(db) {
         const id = uuid();
         const blob = fileHandler.toBlob(this.encode(db));
@@ -635,6 +780,10 @@ class Activity extends Model {
         this.pendingRecording = record;
         return this.retrySave(db);
     }
+    /**
+     * Save the pending recording and clear its recovery checkpoint in one database transaction.
+     * Only then clear the retry copy and announce the new activity.
+     */
     async retrySave(db) {
         const record = this.pendingRecording;
         if(!record) throw new Error('No unsaved recording is available.');
@@ -645,6 +794,10 @@ class Activity extends Model {
         xf.dispatch('activity:add', summary);
         return record;
     }
+    /**
+     * Put a new summary first and remove older completed cache entries beyond capacity. Pending
+     * Coach hand-offs are not discarded merely to meet the cache size.
+     */
     add(activity, activityList) {
         activityList.unshift(activity);
         const completed = activityList.filter(item => !item.pendingSync);
@@ -658,6 +811,10 @@ class Activity extends Model {
     remove(id) {
         idb.remove('activity', id);
     }
+    /**
+     * Send a selected saved recording to the supported Intervals.icu integration, save its upload
+     * status and announce the result to activity controls.
+     */
     async upload(service, id) {
         let record = await idb.get('activity', id);
 
@@ -672,6 +829,10 @@ class Activity extends Model {
         }
         return;
     }
+    /**
+     * Read a saved FIT Blob and offer it as a timestamp-named browser download; this does not
+     * delete the local recording.
+     */
     async download(id) {
         const self = this;
         const record = await idb.get('activity', id);
@@ -684,6 +845,10 @@ class Activity extends Model {
     fileName(timestamp) {
         return `workout-${dateToDashString(new Date(timestamp))}.fit`;
     }
+    /**
+     * Pass recorded sensor samples, laps, events and FTP to the FIT writer, which constructs the
+     * binary activity file.
+     */
     encode(db) {
         const records = db.records;
         const laps = db.laps;
@@ -697,6 +862,10 @@ class Activity extends Model {
             ftp,
         });
     }
+    /**
+     * Read local recording summaries newest first, adapt the old status format and recover richer
+     * summary fields from saved ride payloads when present.
+     */
     async restore() {
         const records = await idb.getAll('activity') ?? [];
 
@@ -732,6 +901,10 @@ class Activity extends Model {
 //   workout list or as the current selected workout
 // - Activity is about the current active recording, session, and the list of actities
 //   which are just recorded data or .fit format, Workout is about .zwo format
+/**
+ * Handle a selected workout recipe or imported course, including conversion from a planned
+ * Intervals.icu event. Some legacy download helpers also encode the current recording.
+ */
 class Workout extends Model {
     postInit(args = {}) {
         const self = this;
@@ -746,6 +919,10 @@ class Workout extends Model {
         return first(db.workouts);
     }
     // accessors
+    /**
+     * Find a workout by ID. This legacy lookup logs a missing ID and returns the first workout; it
+     * does not prove that the requested one exists.
+     */
     find(workouts, id) {
         for(let workout of workouts) {
             if(equals(workout.id, id)) {
@@ -756,6 +933,10 @@ class Workout extends Model {
         return first(workouts);
     }
     // parsers
+    /**
+     * Interpret binary contents as a FIT course and text contents as a ZWO workout, returning the
+     * ride engine's corresponding structure.
+     */
     parse(result, name = '') {
         if(isArray(result) || isObject(result)) {
             const view = new DataView(result);
@@ -765,6 +946,10 @@ class Workout extends Model {
         }
         return zwo.readToInterval(result);
     }
+    /**
+     * Decode the provider's text-encoded workout file, attach its planned date and provider ID, and
+     * give the local copy an ID.
+     */
     fromIntervalsEvent(event) {
         const workout = this.parse(atob(event.workout_file_base64));
         workout.meta.planned = true;
@@ -773,13 +958,22 @@ class Workout extends Model {
         workout.intervals_id = event.id;
         return workout;
     }
+    /** Convert each fetched provider event using the same planned-workout mapping. */
     fromIntervalsResponse(response) {
         return response.map(this.fromIntervalsEvent.bind(this));
     }
+    /**
+     * Read a user-selected file and retain its name alongside the contents so the parser can label
+     * an imported course.
+     */
     async readFromFile(file) {
         const result = await fileHandler.read(file);
         return {result, name: file.name};
     }
+    /**
+     * Legacy current-ride export path: encode the live records, laps and events as FIT, not as a
+     * ZWO recipe.
+     */
     encode(db) {
         const records = db.records;
         const laps = db.laps;
@@ -797,6 +991,10 @@ class Workout extends Model {
     fileName () {
         return `workout-${dateToDashString(new Date())}.fit`;
     }
+    /**
+     * Offer the live ride as a FIT download using the legacy export path; stored-recording
+     * downloads use Activity instead.
+     */
     download(db) {
         fileHandler.download()(this.encode(db), this.fileName(), fileHandler.Type.OctetStream);
     }
@@ -805,6 +1003,10 @@ class Workout extends Model {
 // TODO:
 // - rename to Libarary
 // - use to just manage the library list of workouts
+/**
+ * Manage the built-in and user-saved workout library. Built-in IDs use catalogue positions; saved
+ * entries with the same ID replace their built-in counterpart when restored.
+ */
 class Workouts extends Model {
     name = 'workouts';
 
@@ -812,6 +1014,10 @@ class Workouts extends Model {
         const self = this;
         self.workoutModel = args.workoutModel;
     }
+    /**
+     * Parse the bundled ZWO recipes and assign stable builtin-<index> IDs for this catalogue
+     * ordering.
+     */
     defaultValue() {
         const self = this;
         return workoutsFile.map((w, index) => Object.assign(self.workoutModel.parse(w), {id: `builtin-${index}`}));
@@ -820,6 +1026,7 @@ class Workouts extends Model {
         const self = this;
         return exists(value);
     }
+    /** Combine stored workouts with built-ins, preferring a stored copy when their IDs match. */
     async restore(db) {
         const self = this;
         const workouts = await idb.getAll(`${self.name}`) ?? [];
@@ -831,6 +1038,10 @@ class Workouts extends Model {
             return self.default.filter(workout => !ids.has(workout.id)).concat(workouts);
         }
     }
+    /**
+     * Find a library item by ID; the legacy fallback logs an error and returns the first item when
+     * no match exists.
+     */
     get(workouts, id) {
         for(let workout of workouts) {
             if(equals(workout.id, id)) {
@@ -840,12 +1051,20 @@ class Workouts extends Model {
         console.error(`tring to get a missing workout: ${id}`, workouts);
         return first(workouts);
     }
+    /**
+     * Assign an ID if needed, add the workout to the live list and request persistence. The
+     * separate save method returns the checked-write Promise.
+     */
     add(workouts, workout) {
         const self = this;
         workouts.push(idb.setId(workout));
         self.save(workout);
         return workouts;
     }
+    /**
+     * Persist a workout with a stable ID and return the checked-write Promise, allowing callers to
+     * wait for confirmed saving.
+     */
     save(workout) {
         const self = this;
         console.log(`:models :workouts :save`);
@@ -872,6 +1091,10 @@ function yesterdayOrOlder(timestamp) {
 
 // TODO:
 // - standardize the methods
+/**
+ * Cache Intervals.icu's dated workout recipes in this browser. Simple accessors read the list or
+ * its refresh timestamp; backup/restore persist the whole collection and notify the display.
+ */
 class Planned {
     name = 'planned';
     constructor(args = {}) {
@@ -924,6 +1147,10 @@ class Planned {
         xf.dispatch(`action:planned`, ':data');
     }
     // force refresh the wod data
+    /**
+     * Legacy "workout of the day" refresh: fetch the current week, save its recipes and announce
+     * today's first workout for selection.
+     */
     async wod(service) {
         const self = this;
         if(service === 'intervals') {
@@ -946,6 +1173,10 @@ class Planned {
             }
         }
     }
+    /**
+     * Refresh only the requested date range, retaining cached workouts outside it. Save the new
+     * collection before exposing it to the UI.
+     */
     async getIntervals(oldest, newest) {
         const response = await this.api.intervals.wod(oldest, newest);
         const workouts = this.workoutModel.fromIntervalsResponse(response);
@@ -959,6 +1190,7 @@ class Planned {
         xf.dispatch('action:planned', ':data');
         return workouts;
     }
+    /** Ask the Intervals.icu integration to refresh provider-managed FTP and body mass. */
     async getAthlete(service) {
         if(service === 'intervals') {
             await api.intervals.syncProfile();
@@ -966,13 +1198,25 @@ class Planned {
     }
 }
 
+/**
+ * Keep an unfinished ride recoverable and collect its samples, lap summaries and start/stop events.
+ * This data is separate from a finished Activity.
+ */
 function Session(args = {}) {
     let name = 'session';
 
+    /**
+     * Request a checkpoint under ID 0 using only the session fields selected by dbToSession. This
+     * older path logs storage errors through the IDB helper.
+     */
     function backup(db) {
         idb.put('session', idb.setId(dbToSession(db), 0));
     }
 
+    /**
+     * Read the last checkpoint and restore it only when it contains elapsed riding time; otherwise
+     * clear empty recovery data.
+     */
     async function restore(db) {
         const sessions = await idb.getAll(`${name}`);
         xf.dispatch(`${name}:restore`, sessions);
@@ -989,10 +1233,18 @@ function Session(args = {}) {
         }
     }
 
+    /**
+     * Copy saved ride fields back into live state. Playback restoration later pauses the clock
+     * rather than silently restarting it.
+     */
     function sessionToDb(db, session) {
         return Object.assign(db, session);
     }
 
+    /**
+     * Select timing, recording, workout and display state needed to resume the ride, rather than
+     * saving every transient app field.
+     */
     function dbToSession(db) {
         const session = {
             // Watch
@@ -1060,6 +1312,10 @@ function Session(args = {}) {
         return session;
     }
 
+    /**
+     * Clear the finished/discarded ride's samples, counters and targets while retaining the rider's
+     * persistent settings and workout library.
+     */
     function reset(db) {
         db.records = [];
         db.lap = [];
@@ -1099,6 +1355,11 @@ function Session(args = {}) {
         db.heartRateAvgCount = heartRateAvg.count;
     }
 
+    /**
+     * Append a sensor snapshot when the running clock advances, including validity flags for
+     * disconnected sensors. Add RR data when available and request a recovery checkpoint every 60
+     * elapsed seconds.
+     */
     function elapsed(x, db) {
         if(equals(db.watchStatus, TimerStatus.stopped)) {
             db.elapsed   = x;
@@ -1145,6 +1406,10 @@ function Session(args = {}) {
         }
     }
 
+    /**
+     * Finish the current lap with its duration and measurement summaries, then begin a fresh lap
+     * collection.
+     */
     function lap(x, db) {
         let timeEnd   = Date.now();
         let timeStart = db.lapStartTime;
@@ -1171,6 +1436,10 @@ function Session(args = {}) {
         db.lapStartTime = timeEnd + 0;
     }
 
+    /**
+     * Append start/stop events but suppress consecutive duplicates of the same type, keeping the
+     * FIT event history meaningful.
+     */
     function event(x, db) {
         if(!empty(db.events) && equals(last(db.events).type, x.type)) return;
         db.events.push(x);
@@ -1189,6 +1458,11 @@ function Session(args = {}) {
     });
 }
 
+/**
+ * Base for derived live measurements. Construction sets defaults and starts subscriptions;
+ * start/stop and subs/unsubs attach/remove listeners. Hooks such as format and shouldUpdate let
+ * subclasses customize calculations without duplicating the lifecycle.
+ */
 class MetaProp {
     constructor(args = {}) {
         const self = this;
@@ -1234,6 +1508,10 @@ class MetaProp {
         }
         return str;
     }
+    /**
+     * Create one cancellation signal for this model's listeners, then let the subclass declare
+     * which messages it needs.
+     */
     subs() {
         const self = this;
         this.abortController = new AbortController();
@@ -1244,6 +1522,7 @@ class MetaProp {
     unsubs() {
         this.abortController.abort();
     }
+    /** Apply a received value only when the subclass's update condition allows it. */
     onUpdate(propValue) {
         if(this.shouldUpdate(propValue)) {
             this.updateState(propValue);
@@ -1258,6 +1537,10 @@ class MetaProp {
     }
 }
 
+/**
+ * Maintain an incremental ride or lap average without storing every sample. This legacy accumulator
+ * ignores zero readings after a nonzero value, so it is not an average including coasting.
+ */
 class PropAccumulator extends MetaProp {
     postInit(args = {}) {
         this.event = args.event ?? this.getDefaults().event;
@@ -1281,6 +1564,7 @@ class PropAccumulator extends MetaProp {
         return Math.round(state);
     }
     reset() { this.count = 0; }
+    /** Follow a measurement message and, when configured, a reset event such as a lap boundary. */
     subsConfig() {
         if(!equals(this.prop, '')) {
             xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
@@ -1289,6 +1573,10 @@ class PropAccumulator extends MetaProp {
             xf.sub(`${this.event}`, this.onEvent.bind(this), this.signal);
         }
     }
+    /**
+     * Update sample count and running average for accepted nonzero samples, retaining the prior
+     * average on a later zero.
+     */
     updateState(value) {
         if(this.state === 0 && value === 0) {
             this.state = 0;
@@ -1309,6 +1597,10 @@ class PropAccumulator extends MetaProp {
     onEvent() {
         this.reset();
     }
+    /**
+     * Restore both the average and its sample count so the next sample continues the previous
+     * calculation.
+     */
     restore(db) {
         this.count = db[this.propName+"Count"] ?? this.count;
         this.state = db[this.propName] ?? this.state;
@@ -1316,6 +1608,11 @@ class PropAccumulator extends MetaProp {
     }
 }
 
+/**
+ * Accumulate power multiplied by 0.001 per one-second update. That is numerically work in
+ * kilojoules; the legacy kcal label is an approximate energy display, not measured calorie
+ * expenditure.
+ */
 class KcalAccumulator extends PropAccumulator {
     updateState(power) {
         this.state = this.state + power * 0.001;
@@ -1356,6 +1653,10 @@ const heartRateAvg = new PropAccumulator({
 
 
 
+/**
+ * Collect incoming readings over a fixed time window, then publish their average. Used for the
+ * one-second and three-second power displays; interval is in milliseconds.
+ */
 class PropInterval {
     constructor(args = {}) {
         const self = this;
@@ -1379,6 +1680,10 @@ class PropInterval {
             effect: '',
         };
     }
+    /**
+     * Subscribe to readings and start the averaging timer. stop cancels both; reset clears only the
+     * current window's samples.
+     */
     start() {
         this.subs();
         this.intervalId = setInterval(this.onInterval.bind(this), this.interval);
@@ -1401,10 +1706,15 @@ class PropInterval {
     unsubs() {
         this.abortController.abort();
     }
+    /** Add a reading to the current window and count it, including zero values. */
     onUpdate(propValue) {
         this.accumulator += propValue;
         this.count += 1;
     }
+    /**
+     * Publish the average only when readings arrived in this window, then empty the window for the
+     * next period.
+     */
     onInterval() {
         if(equals(this.count, 0)) return;
 
@@ -1414,6 +1724,10 @@ class PropInterval {
     }
 }
 
+/**
+ * Track counts and shares of nonzero power samples in FTP display zones. It reacts to elapsed-time
+ * messages; zero readings do not add zone time in this legacy display calculation.
+ */
 class PowerInZone {
     constructor(args = {}) {
         const self = this;
@@ -1459,6 +1773,10 @@ class PowerInZone {
     powerToZone(power) {
         return this.ftpModel.powerToZone(power);
     }
+    /**
+     * Classify a nonzero sample, update its zone count and recompute all observed shares before
+     * announcing the chart data.
+     */
     updateState(value) {
         if(equals(value, 0)) return this.state;
 
@@ -1478,6 +1796,10 @@ class PowerInZone {
     }
 }
 
+/**
+ * Use the cycling physics model to estimate movement from power. It follows the selected speed
+ * source and updates distance, altitude and ascent through app messages.
+ */
 class VirtualState extends MetaProp {
     postInit() {
         this.speed           = this.getDefaults().speed;
@@ -1523,6 +1845,10 @@ class VirtualState extends MetaProp {
         xf.sub(`db:weight`,     this.onWeight.bind(this), this.signal);
         xf.sub('watch:started', this.onStarted.bind(this), this.signal);
     }
+    /**
+     * Switch between power-derived and trainer-speed movement, restarting the timing reference when
+     * the source changes.
+     */
     onSources(sources) {
         if(!equals(this.source, sources.virtualState)) {
             this.lastUpdate = Date.now();
@@ -1534,9 +1860,14 @@ class VirtualState extends MetaProp {
         this.riderWeight = weight;
         this.systemWeight = this.riderWeight + this.equipmentWeight;
     }
+    /** Reset the last-update timestamp so time spent paused is not treated as riding time. */
     onStarted() {
         this.lastUpdate = Date.now();
     }
+    /**
+     * When power is the selected source, calculate motion since the last reading and announce the
+     * resulting speed and route distances. Convert the slope target from percent to a fraction.
+     */
     onUpdate(power, db) {
         if(!equals(this.source, this.prop)) return;
 
@@ -1571,6 +1902,10 @@ class VirtualState extends MetaProp {
     }
 }
 
+/**
+ * Alternative movement model that uses trainer-reported speed instead of estimating speed from
+ * power, while retaining the same distance/climbing outputs.
+ */
 class SpeedState extends VirtualState {
     getDefaults() {
         return {
@@ -1589,6 +1924,10 @@ class SpeedState extends VirtualState {
             distance: 0,
         };
     }
+    /**
+     * Advance distance and climbing from the selected trainer-speed reading and elapsed time,
+     * remembering the previous speed for acceleration.
+     */
     onUpdate(speed, db) {
         if(!equals(this.source, this.prop)) return;
 
@@ -1620,12 +1959,20 @@ class SpeedState extends VirtualState {
 // 0 means no gear report has arrived yet.
 // A real gear is 1 through 254. The protocol's highest set byte is 0xFF,
 // and that byte decodes to gear 254.
+/**
+ * Track virtual gear-button reports. Zero means no gear report yet; real gears are bounded from 1
+ * to 254. This is a software gear display, not detection of a physical chain position.
+ */
 class VirtualGear extends Model {
     postInit(args = {}) {
         this.min = existance(args.min, 1);
         this.max = existance(args.max, 254);
     }
     defaultValue() { return 0; }
+    /**
+     * Apply a batch of button/value messages in order, preserving the current gear for unrecognized
+     * messages.
+     */
     apply(gear, messages = []) {
         const list = isArray(messages) ? messages : [];
         let next = gear;
@@ -1636,6 +1983,10 @@ class VirtualGear extends Model {
 
         return next;
     }
+    /**
+     * React only to pressed shift buttons or a valid absolute gear report. Clamp valid shifts to
+     * the supported range and preserve the unknown state on an initial downshift.
+     */
     applyOne(gear, message) {
         if(!message) return gear;
 
@@ -1657,6 +2008,10 @@ class VirtualGear extends Model {
     }
 }
 
+/**
+ * Unimplemented historical formula note, not a live calculator. The active Coach load calculation
+ * is in coaching/power.js and coaching/workouts.js.
+ */
 class TSS {
     // TSS = (t * NP * IF) / (FTP * 3600) * 100
     // NP:

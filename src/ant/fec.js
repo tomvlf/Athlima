@@ -1,19 +1,10 @@
 /*
- * fec.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements the ANT+ transport and message protocol used to communicate with trainers and sensors.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * ANT+ Fitness Equipment Control (FE-C): the agreed message formats for trainer
+ * measurements and resistance commands. Each page is eight bytes; a byte holds
+ * a number from 0 to 255, and individual bits hold yes/no flags.
+ * Page factories expose encode (measurements/settings to a DataView of bytes)
+ * and decode (bytes to named values). Their field rules describe units and
+ * special numbers meaning "not available"; no function here sends radio data.
  */
 
 import { equals, existance, curry2, xor,
@@ -21,6 +12,7 @@ import { equals, existance, curry2, xor,
 import { format } from '../utils.js';
 import { DataPage } from './common.js';
 
+// Basic resistance as 0–100 percent, stored in half-percent steps; zero is its invalid marker here.
 function DataPage48() {
     // Data Page 48 (0x30) – Basic Resistance
     const number = 48;
@@ -62,6 +54,7 @@ function DataPage48() {
     });
 }
 
+// Requested power in watts, stored in quarter-watt steps rather than as a decimal.
 function DataPage49() {
     // Data Page 49 (0x31) – Target Power
     const number = 49;
@@ -103,6 +96,10 @@ function DataPage49() {
     });
 }
 
+/**
+ * Wind simulation settings: drag coefficient in kg/m, wind speed in km/h and a
+ * drafting multiplier from 0 to 1. Wind speed is shifted by 127 to fit one byte.
+ */
 function DataPage50() {
     // Data Page 50 (0x32) – Wind Resistance
     const number = 50;
@@ -134,6 +131,7 @@ function DataPage50() {
     const data   = DataPage({definitions});
     const length = data.length;
 
+    // Multiply frontal area (m²), drag factor and air density (kg/m³) to obtain kg/m.
     function calcWindRasistance(args = {}) {
         // WindResistanceCoefficient = FrontalSurfaceArea * DragCoefficient * AirDensity
         const frontalArea = existance(args.frontalArea, values.frontalArea.roadTouring);
@@ -183,6 +181,7 @@ function DataPage50() {
     });
 }
 
+// Road simulation: grade in percent and rolling resistance (crr, a unitless road/tyre factor).
 function DataPage51(args = {}) {
     // Data Page 51 (0x33) – Track Resistance
     const number = 51;
@@ -237,6 +236,10 @@ function DataPage51(args = {}) {
     });
 }
 
+/**
+ * Rider/bike mass in kg, wheel diameter in metres, its fine adjustment in mm,
+ * and gear ratio. Bike mass and diameter adjustment share byte 4, four bits each.
+ */
 function DataPage55(args = {}) {
     // Data Page 55 (0x37) – User Configuration
     const number = 55;
@@ -259,6 +262,7 @@ function DataPage55(args = {}) {
         const wheelDiameter  = data.encodeField('wheelDiameter', args.wheelDiameter);
         const gearRatio      = data.encodeField('gearRatio', args.gearRatio);
 
+        // Split bike weight around the four bits reserved for diameter adjustment.
         const bikeWeightMSN = bikeWeight >> 4;
         const bikeWeightLSN = bikeWeight & 0b1111;
         const combined      = (bikeWeightLSN << 4) + diameterOffset; // 0-3 diameter offset, 4-7 bike weight LSN
@@ -307,6 +311,10 @@ function DataPage55(args = {}) {
 }
 
 
+/**
+ * Pack/unpack the trainer's named state and lap-change flag into a small bit field
+ * (several values sharing one number). Unknown state names/numbers fall back to READY.
+ */
 function FEState() {
     // FEState Field
 
@@ -351,6 +359,7 @@ function FEState() {
     });
 }
 
+// Translate exercise-machine names and codes; unknown names default to a stationary bike.
 function EquipmentType() {
     // EquipmentType Field
 
@@ -390,6 +399,7 @@ function EquipmentType() {
     });
 }
 
+// Pack/unpack the heart-rate source and flags for distance support and simulated speed.
 function Capabilities() {
     // Capabilities Field
 
@@ -445,6 +455,11 @@ function Capabilities() {
     });
 }
 
+/**
+ * General equipment readings. The public speed value is km/h even though the
+ * radio field uses 0.001 m/s steps; elapsed time is seconds and heart rate is
+ * beats/minute. Short counters wrap around and are not full-ride totals.
+ */
 function DataPage16() {
     // Data Page 16 (0x10) – General FE Data
     const number = 16;
@@ -471,10 +486,12 @@ function DataPage16() {
     const equipmentTypeField = EquipmentType();
     const capabilitiesField  = Capabilities();
 
+    // Convert km/h to metres/second, then to the integer sent by the sensor.
     const encodeSpeed = curry2((prop, value) => {
         return value / definitions[prop].resolution / 3.6;
     });
 
+    // Convert back to km/h and round to two decimal places.
     const decodeSpeed = curry2((prop, value) => {
         return format(value * definitions[prop].resolution * 3.6, 100);
     });
@@ -536,6 +553,7 @@ function DataPage16() {
     });
 }
 
+// Three separate flags say whether power calibration, resistance calibration or user setup is needed.
 function TrainerStatus() {
     // TrainerStatus Field
 
@@ -559,6 +577,7 @@ function TrainerStatus() {
     });
 }
 
+// Translate the two-bit target-power limit report into ok, low, high or undetermined.
 function TrainerFlags() {
     // TrainerFlags Field, for target power mode
 
@@ -598,6 +617,11 @@ function TrainerFlags() {
     });
 }
 
+/**
+ * Trainer power in watts and cadence in revolutions/minute, plus event counters
+ * and status flags. Power shares two bytes with status: only its lower 12 bits
+ * hold the power reading. Accumulated power is a running sample sum, not energy.
+ */
 function DataPage25(args = {}) {
     // Data Page 25 (0x19) – Specific Trainer
     const number = 25;
@@ -683,6 +707,7 @@ function DataPage25(args = {}) {
     });
 }
 
+// Unregistered torque-page support: counters, wheel period and torque stay in raw device units.
 function DataPage26(args = {}) {
     // Data Page 26 (0x1A) – Specific Trainer Torque Data
     const number = 26;
@@ -748,6 +773,7 @@ function DataPage26(args = {}) {
     });
 }
 
+// Collect the supported page formats; page 26 is deliberately not in this dispatch table.
 function FEC() {
     const pages = {
         dataPage48: DataPage48(),
@@ -761,6 +787,7 @@ function FEC() {
         // dataPage26: DataPage26(),
     };
 
+    // Select by the first byte; an unknown page is returned unchanged rather than guessed.
     function decode(dataview) {
         const dataPage = dataview.getUint8(0, true);
         if(equals(dataPage, 48)) return pages.dataPage48.decode(dataview);

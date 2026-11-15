@@ -1,6 +1,9 @@
+# Static frontend for the existing Dockhand proxy setup; TLS stays with that proxy.
+# Keep old backend data volumes until exports/restoration have been verified.
 services:
   athlima:
     image: ghcr.io/tomvlf/athlima:latest
+    # Preserve the proxy's host port 1111, forwarding to Nginx's internal port 8080.
     ports:
       - "1111:8080"
     user: "101:101"
@@ -14,6 +17,7 @@ services:
     pids_limit: 64
     restart: unless-stopped
     pull_policy: always
+    # This checks page delivery only, not Bluetooth or optional Intervals.icu access.
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
       interval: 30s

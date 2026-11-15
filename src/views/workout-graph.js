@@ -1,19 +1,12 @@
 /*
- * workout-graph.js: front-end client module.
+ * Builds the main workout picture: coloured power bars for timed intervals or
+ * an elevation profile for a route. The live custom tag adds progress markers
+ * and hover details; exported helpers also build workout-library previews.
  *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * renders the screen, controls, and UI panels that let a rider interact with the app.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Interval bars are HTML boxes. Routes use SVG polygons (drawn shapes), with
+ * time/distance across the screen and power/elevation vertically.
+ * The browser's connected/disconnected callbacks attach/cancel listeners; render
+ * replaces the picture after workout, reference-power, or screen-size changes.
  */
 
 import { xf, exists, existance, equals, clamp, debounce, toFixed  } from '../functions.js';
@@ -43,6 +36,7 @@ function powerToHeight(power, powerMax, viewPort) {
     return height;
 }
 
+// Give each interval its share of the graph width, retaining a visible minimum.
 function intervalToWidth(intervalDuration, totalDuration, totalWidth) {
     return clamp(1,
                  totalDuration,
@@ -50,6 +44,7 @@ function intervalToWidth(intervalDuration, totalDuration, totalWidth) {
                 );
 }
 
+// Find the highest target in watts, keeping the scale at least 160% of reference power.
 function intervalsToMaxPower(intervals, ftp) {
     return intervals.reduce((highest, interval) => {
         interval.steps.forEach((step) => {
@@ -60,6 +55,7 @@ function intervalsToMaxPower(intervals, ftp) {
     }, ftp * 1.6);
 }
 
+// Append one interval's HTML group, using equal-width steps and stored tooltip values.
 function Interval(acc, interval, width, ftp, powerMax, viewPort) {
     const stepsLength = interval.steps.length;
 
@@ -83,6 +79,7 @@ function Interval(acc, interval, width, ftp, powerMax, viewPort) {
     }, `<div class="graph--bar-group" style="width: ${width}px;">`) + `</div>`;
 }
 
+// Convert timed intervals and FTP (reference watts) into bar HTML sized for this screen.
 function intervalsToGraph(workout, ftp, viewPort) {
     const totalWidth    = viewPort.width;
     const intervals     = workout.intervals;
@@ -101,6 +98,8 @@ function intervalsToGraph(workout, ftp, viewPort) {
     }, '<div class="graph--info--cont"></div>');
 }
 
+// Show a hovered bar's targets and position the tooltip near it, adjusting for space.
+// Values here come from graph-generated attributes rather than workout descriptions.
 function renderInfo(args = {}) {
     const power    = exists(args.power)    ? `${args.power}W `: '';
     const cadence  = exists(args.cadence)  ? `${args.cadence}rpm `: '';
@@ -130,6 +129,7 @@ function renderInfo(args = {}) {
     }
 }
 
+// Subscribes to workout, lap, and distance updates to keep a live progress overlay.
 class WorkoutGraph extends HTMLElement {
     constructor() {
         super();
@@ -200,6 +200,7 @@ class WorkoutGraph extends HTMLElement {
         this.viewPort = viewPort;
         this.render();
     }
+    // Read targets from the bar under the pointer, then reuse the shared tooltip renderer.
     onHover(e) {
         const self = this;
         const target = this.querySelector('.graph--bar:hover');
@@ -226,6 +227,7 @@ class WorkoutGraph extends HTMLElement {
     onMouseOut(e) {
         if(this.dom.info) this.dom.info.style.display = 'none';
     }
+    // Choose time-based bars or a distance-based route from the workout's available data.
     onWorkout(value) {
         this.workout = value; // this.workout = Object.assign({}, value);
 
@@ -248,6 +250,7 @@ class WorkoutGraph extends HTMLElement {
         this.index = index;
         this.progress({index: self.index, dom: self.dom, parent: self, lapTime: self.lapTime});
     }
+    // Move the route marker by metres travelled; wrapping supports repeated route laps.
     onDistance(distance) {
         const self = this;
         if(exists(this.workout?.points) && this.dom.active) {
@@ -274,6 +277,8 @@ class WorkoutGraph extends HTMLElement {
             this.progress({index: self.index, dom: self.dom, parent: self, lapTime: self.lapTime});
         }
     }
+    // Highlight the current interval and fill progress using its remaining lap seconds.
+    // Ignore finished workouts or updates arriving before their bars exist on the page.
     progress(args = {}) {
         if(this.workoutStatus === "done" || !args.dom?.intervals?.[args.index ?? 0] ||
            !this.workout.intervals?.[args.index ?? 0]) {
@@ -294,6 +299,7 @@ class WorkoutGraph extends HTMLElement {
 
         $dom.progress.style.width = `${left + (rect.width * lapPercentageComplete)}px`;
     }
+    // Rebuild the selected graph type, then reacquire page elements replaced by innerHTML.
     render() {
         const self = this;
         if(!this.workout.intervals && !this.workout.points) return;
@@ -330,6 +336,7 @@ customElements.define('workout-graph', WorkoutGraph);
 
 
 
+// Summarize one coordinate (usually elevation) across route points for graph scaling.
 function Segment(points, prop) {
     return points.reduce((acc, point, i) => {
         const value = point[prop];
@@ -341,10 +348,16 @@ function Segment(points, prop) {
     }, {min: 0, max: 0, start: 0, end: 0,});
 }
 
+// Express a value as a percentage of its chosen maximum.
 function scale(value, max = 100) {
     return 100 * (value/max);
 }
 
+/**
+ * Return a route's elevation picture from distance/elevation points.
+ * Full points define the bounds; simplified points draw fewer slope-coloured
+ * polygons. Vertical scaling makes flatter routes readable in the available space.
+ */
 function courseToGraph(course, viewPort) {
     const altitudeSpec  = Segment(course.points, 'y');
 

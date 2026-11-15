@@ -1,19 +1,8 @@
 /*
- * cycling-power-measurement.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Converts Bluetooth power-meter messages into named measurements. Power is
+ * watts; optional wheel/crank times become seconds, and crank differences
+ * produce cadence in revolutions/minute. A packet is one received group of bytes;
+ * its leading flags specify which optional values follow, so field positions vary.
  */
 
 //
@@ -24,6 +13,7 @@
 import { equals } from '../../functions.js';
 import { RevsOverTime, RateAdjuster } from '../cscs/revs-over-time.js';
 
+// Flag predicates decide whether an optional field occupies bytes in this message.
 const pedalPowerBalancePresent       = (flags) => ((flags >>  0) & 1) === 1;
 const pedalPowerBalanceRefPresent    = (flags) => ((flags >>  1) & 1) === 1;
 const accumulatedTorquePresent       = (flags) => ((flags >>  2) & 1) === 1;
@@ -95,9 +85,11 @@ const order = [
 // '30-00-21-00-2A-00-00-00-C4-60-12-00-F7-04'.split('-').map(x => Number('0x'+x))
 //
 
+// Keep one stream's cadence history while decoding its ordered, optional measurement fields.
 function CyclingPowerMeasurement(args = {}) {
     const architecture = true;
 
+    // Read a numeric field and apply its step size; packed three-byte angles need a special path.
     function getField(field, dataview, i) {
         if(equals(field.type, 'Uint24')) {
             return (((dataview.getUint16(i, architecture) & 0b1111111111110000) << 4) +
@@ -123,6 +115,7 @@ function CyclingPowerMeasurement(args = {}) {
         }
     });
 
+    // Read present fields that fit in the packet and calculate cadence once both crank values are known.
     function decode(dataview) {
         const byteLength = dataview.byteLength;
 

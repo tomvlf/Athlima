@@ -1,23 +1,14 @@
 /*
- * control-point.js: front-end client module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * implements Bluetooth Low Energy device handling, services, and characteristic decoding for sensors and trainers.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Wahoo trainer command formats. The first byte identifies the operation; later
+ * bytes hold settings such as watts, road grade or rider mass. A byte is a small
+ * whole-number storage unit, so decimal or negative measurements need scaling.
+ * Encoders return ArrayBuffers to send; decoders read DataViews and return named
+ * values. Actual Bluetooth writes and command ordering live in wcps.js.
  */
 
 import { equals, exists, toFixed, Spec, hex, dataviewToArray, print, } from '../../functions.js';
 
+// Wahoo's fixed three-byte unlock request; this is a protocol code, not an account password.
 function RequestControl() {
     const opCode = 0x20; // 32
     const length = 3;
@@ -51,6 +42,7 @@ function RequestControl() {
     });
 }
 
+// Encode the requested power in whole watts for constant-power (ERG) mode.
 function SetERG() {
     const opCode = 0x42;
     const length = 3;
@@ -83,6 +75,7 @@ function SetERG() {
     });
 }
 
+// Encode/decode percent road grade around a stored midpoint of 32768, which represents a flat road.
 function Grade() {
     // set Sim Grade
     const opCode = 0x46; // 70
@@ -106,10 +99,12 @@ function Grade() {
 
     const spec = Spec({definitions});
 
+    // Shift negative/positive percentages into a nonnegative two-byte number.
     function applyOffset(value) {
         return (value / 100 + 1) * 32768;
     }
 
+    // Recover percent grade and round to one decimal place for callers.
     function removeOffset(prop, value) {
         return toFixed((((value / 32768) - 1) * 100), 1);
     }
@@ -148,6 +143,7 @@ function Grade() {
     });
 }
 
+// Simulation-mode settings: combined mass in kg, unitless rolling resistance and air drag in kg/m.
 function SIM() {
     const opCode = 0x43; // 67
     const length = 7;
@@ -203,6 +199,7 @@ function SIM() {
 }
 
 
+// Wind speed in metres/second, shifted by 32.768 before storage so ordinary negative winds fit.
 function WindSpeed() {
     // set Wind Speed
     const opCode = 0x47; // 71
@@ -224,10 +221,12 @@ function WindSpeed() {
 
     const spec = Spec({definitions});
 
+    // Convert m/s to a shifted whole-number value with thousandth-m/s steps.
     function applyOffset(value) {
         return (value + 32.768) * 1000;
     }
 
+    // Undo the shift and return m/s rounded to hundredths.
     function removeOffset(prop, value) {
         return toFixed(((value / 1000) - 32.768), 2);
     }
@@ -266,8 +265,9 @@ function WindSpeed() {
     });
 }
 
+// Wheel travel per turn, supplied in millimetres and stored in tenths of a millimetre.
 function WheelCircumference() {
-    // set Wind Speed
+    // set Wheel Circumference
     const opCode = 0x48; // 72
     const length = 3;
 
@@ -317,6 +317,7 @@ function WheelCircumference() {
     });
 }
 
+// Continuous resistance intensity, supplied as a fraction from 0 (none) to 1 (maximum).
 function LoadIntensity() {
     // set Load Intensity
     const opCode = 0x40; // 64
@@ -340,10 +341,12 @@ function LoadIntensity() {
 
     const spec = Spec({definitions});
 
+    // Wahoo's stored scale runs backwards: higher requested intensity produces a smaller number.
     function applyOffset(value) {
         return Math.round((1 - value) * 16383);
     }
 
+    // Reverse that scale and round the 0–1 intensity to hundredths.
     function removeOffset(prop, value) {
         return toFixed((1 - (value / 16383)), 2);
     }
@@ -378,6 +381,7 @@ function LoadIntensity() {
     });
 }
 
+// Discrete resistance mode: one of the trainer's numbered levels, from 0 through 9.
 function LoadLevel() {
     // set Load Level
     const opCode = 0x41; // 65
@@ -429,6 +433,7 @@ function LoadLevel() {
     });
 }
 
+// Read command replies for mode sequencing; encode is an empty, unsupported placeholder.
 function Response() {
     // Format:
     //
@@ -474,11 +479,13 @@ function Response() {
         '0x48': {definition: 'setWheelCircumference', msg: 'setWheelCircumference'}, // 72
     };
 
+    // Recognize the known success/failure bytes and keep other statuses explicitly unknown.
     function decodeStatus(value) {
         if(equals(value, 0)) return 'fail';
         if(equals(value, 1)) return 'success';
         return ':unknown';
     }
+    // Convert a command's numeric operation code into the name used by the service's reply handler.
     function decodeRequest(value) {
         const hexValue = hex(value);
         if(exists(requests[hexValue])) {
@@ -490,6 +497,7 @@ function Response() {
     function encode(value) {
     }
 
+    // Read status/request and, on longer replies, an unscaled two-byte echoed value.
     function decode(dataview) {
         const raw = dataviewToArray(dataview).slice(dataview.byteOffset);
         const res = {};

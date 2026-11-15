@@ -1,24 +1,14 @@
 /*
- * cscs.test.js: test coverage module.
- *
- * Why this exists:
- * This file is part of Athlima and is kept separate so the application can be understood
- * as a set of focused responsibilities instead of one large unstructured script.
- * The code here is intentionally organized around one job so a new contributor can
- * follow the data flow and the reason for each step without reading unrelated code.
- *
- * What it does:
- * documents the expected behavior of the application and prevents regressions during development.
- *
- * Developer note:
- * Read this file as the boundary of the problem it solves: inputs, transformations,
- * persistence, and outputs. If a change affects the behaviour of this module, update
- * the tests and the surrounding callers in the same review.
+ * Checks wheel/crank field decoding and cadence across multiple Bluetooth
+ * readings. Counter wraparound (returning to zero), coasting and repeated
+ * messages must not create incorrect cadence. A separate case learns the
+ * repeated-message limit from simulated millisecond arrival times.
  */
 
 import { CSCMeasurement } from '../../src/ble/cscs/cycling-speed-cadence-measurement.js';
 import { RevsOverTime, RateAdjuster } from '../../src/ble/cscs/revs-over-time.js';
 
+// Make synthetic Bluetooth input from byte values without connecting a sensor.
 function view(bytes) {
     return new DataView(Uint8Array.from(bytes).buffer);
 }
@@ -50,6 +40,7 @@ describe('Cycling Speed and Cadence Measurement', () => {
 describe('RevsOverTime', () => {
     let cadence;
 
+    // Each case starts with fresh history; inputs use seconds and the output formatter produces rpm.
     beforeEach(() => {
         cadence = RevsOverTime({
             resolution: 1, maxRevs: 2 ** 16, maxTime: 64,

@@ -1,7 +1,16 @@
+/**
+ * The browser entry point named by index.html. It opens the standalone app without a login, mounts
+ * the platform and then enables supported offline caching. Startup failures are shown as readable
+ * text in the page, not hidden behind a blank screen.
+ */
 import { setAccountScope } from '../storage/account.js';
 
 const root = document.querySelector('#platform');
 
+/**
+ * Select unscoped local storage without deleting older account data, redirect the retired account
+ * link to Settings, then wait for the interface and offline registration.
+ */
 async function start() {
     setAccountScope(null);
     window.localStorage.removeItem('athlima-server-mode');
