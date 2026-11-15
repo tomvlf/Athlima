@@ -1,4 +1,5 @@
 {
+    "name": "athlima",
     "private": true,
     "type": "module",
     "engines": {

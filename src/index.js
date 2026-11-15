@@ -44,7 +44,6 @@ function startServiceWorker() {
             );
 
             console.log(`SW: register success.`);
-            console.log('Cache Version: Flux-v003');
         } catch(err) {
             console.log(`SW: register error: `, err);
         }

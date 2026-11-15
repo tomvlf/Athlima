@@ -1,5 +1,5 @@
 services:
-  auuki:
+  athlima:
     image: ghcr.io/tomvlf/athlima:latest
     ports:
       - "1111:8080"

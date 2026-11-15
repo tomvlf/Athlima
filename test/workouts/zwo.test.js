@@ -43,7 +43,7 @@ describe('Zwo', () => {
     test('Zwo.read without textevents', () => {
         const input = `
         <workout_file>
-            <author>Flux</author>
+            <author>Athlima</author>
             <name>Test Workout</name>
             <category>Sweet Spot</category>
             <subcategory></subcategory>
@@ -62,7 +62,7 @@ describe('Zwo', () => {
 
         const expected = {
             head: {
-                author: 'Flux',
+                author: 'Athlima',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",
@@ -88,7 +88,7 @@ describe('Zwo', () => {
     test('Zwo.read with textevents', () => {
         const input = `
             <workout_file>
-                <author>Flux</author>
+                <author>Athlima</author>
                 <name>Test Workout</name>
                 <category>Sweet Spot</category>
                 <subcategory></subcategory>
@@ -122,7 +122,7 @@ describe('Zwo', () => {
 
         const expected = {
             head: {
-                author: 'Flux',
+                author: 'Athlima',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",
@@ -168,7 +168,7 @@ describe('Zwo', () => {
     test('Zwo.readToInterval without textevents', () => {
         const input = `
         <workout_file>
-            <author>Flux</author>
+            <author>Athlima</author>
             <name>Test Workout</name>
             <category>Sweet Spot</category>
             <subcategory></subcategory>
@@ -188,7 +188,7 @@ describe('Zwo', () => {
         const expected = {
             // id: "{1ec20f99-b3d8-4eb9-c000-be96e947897a}",
             meta: {
-                author: 'Flux',
+                author: 'Athlima',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",
@@ -219,7 +219,7 @@ describe('Zwo', () => {
     test('Zwo.readToInterval with text events', () => {
         const input = `
             <workout_file>
-                <author>Flux</author>
+                <author>Athlima</author>
                 <name>Test Workout</name>
                 <category>Sweet Spot</category>
                 <subcategory></subcategory>
@@ -254,7 +254,7 @@ describe('Zwo', () => {
         const expected = {
             // id: "{1ec20f99-b3d8-4eb9-c000-be96e947897a}",
             meta: {
-                author: 'Flux',
+                author: 'Athlima',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",

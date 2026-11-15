@@ -50,7 +50,8 @@ leave existing history intact and show an error; choose **Sync now** to retry.
   geometry on demand. These are held in browser memory, with CSV export.
 - Uploading a recorded ride sends its FIT file as multipart form data to the
   resolved athlete. A stable `athlima:` external ID prevents re-import from
-  duplicating the local recording.
+  duplicating the local recording. Only this prefix links imports to local
+  recordings; activities with other external-ID prefixes import separately.
 
 Some provider-origin activities, including Strava-origin data, may not expose
 streams or routes through the Intervals.icu API.

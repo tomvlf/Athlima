@@ -129,6 +129,9 @@ It preserves host port 1111 for the existing HTTPS proxy, forwarding to containe
 port 8080. TLS remains handled by your existing proxy; no Caddy or backend is
 needed in this stack. Replace the stack's Compose content with this file and
 redeploy after publishing the new frontend image.
+The frontend service is named `athlima`. If the previous deployment used a
+different service name, remove the obsolete frontend container without deleting
+volumes before redeploying, so it cannot retain host port 1111.
 The old backend is no longer needed. Stop/remove its container separately if
 Dockhand leaves it as an orphan; preserve its data volume until any old data
 has been exported. Do not use volume deletion during this upgrade.

@@ -65,7 +65,7 @@ export function intervalsActivity(activity, syncedAt) {
     const type = typeof activity.type === 'string' && activity.type ? activity.type : 'Other';
     const duration = finite(activity.moving_time, 1) ?? finite(activity.elapsed_time, 1);
     if(!activity.id || !activity.start_date || !duration) return null;
-    const legacyId = /^(?:athlima|auuki):([\w-]{1,100})$/.exec(activity.external_id || '');
+    const legacyId = /^athlima:([\w-]{1,100})$/.exec(activity.external_id || '');
     const details = {};
     for(const [key, field] of Object.entries(detailFields)) {
         const value = detailValue(field === 'gear' ? activity.gear?.name : activity[field]);
