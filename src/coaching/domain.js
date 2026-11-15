@@ -38,8 +38,10 @@ export const DEFAULTS = Object.freeze({
     minimumHardSeparationDays: 2, hardPowerThreshold: 0.9, weeklyHardTimeShare: 0.2,
     readinessWindowDays: 3, readinessHighRpe: 9, readinessRpeMargin: 2, readinessLowSleepQuality: 2,
     readinessLowLegFreshness: 2, readinessHighSoreness: 4, readinessHighStress: 4,
-    readinessCautionScore: 3, readinessRpeScore: 2, readinessLegFreshnessScore: 2,
+    readinessCautionScore: 3, readinessRpeScore: 3, readinessLegFreshnessScore: 2,
     readinessSorenessScore: 2, readinessStressScore: 1, readinessSleepScore: 1,
+    // The most extreme ratings (soreness 5/5, leg freshness 1/5) reach caution on their own.
+    readinessExtremeSoreness: 5, readinessExtremeLegFreshness: 1, readinessExtremeScore: 3,
     readinessConservativeFactor: 0.7, outcomeReductionFactor: 0.85, adaptationWindowDays: 7,
     automaticMatchMinimumConfidence: 0.65,
     progressionSuccessfulSessionsPerLevel: 3, progressionMinimumQuality: 0.8,
@@ -64,6 +66,18 @@ export const DEFAULTS = Object.freeze({
     runInitialLoadPower: 0.8, runWeeklyPlanningLoadPower: 0.85, runLongRunShare: 0.3,
     // Duration proxy for the distance-spike association in Frandsen et al. 2025, not a proven safe limit.
     runSessionSpikeLimit: 1.1, runLongestSessionReferenceDays: 30, runInitialLongestSessionMinutes: 30,
+    cyclingSessionSpikeLimit: 1.25, cyclingSessionReferenceDays: 30, cyclingInitialSessionMinutes: 60,
+    // Return after a sport-specific break, adapted from Daniels' Running Formula return guidance
+    // (expert practice, not trial evidence): staged shares of the planned dose over a period as
+    // long as the break, capped, with no hard sessions until the configured share is reached.
+    returnToTrainingDays: 14, returnToTrainingShortGapDays: 28, returnToTrainingMaximumDays: 63,
+    returnToTrainingShortStages: Object.freeze([0.5, 0.75]),
+    returnToTrainingLongStages: Object.freeze([0.33, 0.5, 0.75]), returnToTrainingHardMinimumShare: 0.75,
+    // Hard-session eligibility: regular recent training plus some intensity evidence, any sensor.
+    sufficiencyMinimumSessions: 8, sufficiencyMinimumWeeks: 3, sufficiencyIntensityEvidenceShare: 0.5,
+    // Interval evidence from a one-second power stream (engineering heuristic): smoothed power at or
+    // above this share of the lowest hard target, for this share of the planned hard time.
+    intervalEvidenceTargetShare: 0.9, intervalEvidenceTimeShare: 0.85,
     runBeginnerMaximumDays: 4, runWalkThresholdMinutes: 30, runWalkStageWeeks: 2,
     // Daniels-style quality caps, expressed as shares of weekly running time.
     runThresholdWeeklyShare: 0.1, runIntervalWeeklyShare: 0.08, runRepetitionWeeklyShare: 0.05,
@@ -125,6 +139,8 @@ export function validateCoachingConfig(overrides = {}) {
         'taperDaysPriorityA', 'taperDaysPriorityB', 'taperDaysPriorityC',
         'taperQualityMinimumPlanDays', 'taperQualityMinimumDaysBeforeEvent', 'hardFocusCandidates',
         'runLongestSessionReferenceDays', 'runBeginnerMaximumDays', 'runWalkStageWeeks',
+        'cyclingSessionReferenceDays', 'returnToTrainingDays', 'returnToTrainingShortGapDays',
+        'returnToTrainingMaximumDays', 'sufficiencyMinimumSessions', 'sufficiencyMinimumWeeks',
         'maxPlanDays',
         'durabilityMinimumSeconds', 'durabilityWarmupSeconds', 'cpMinimumEfforts',
         'cpMinimumDuration', 'cpMaximumDuration'];
@@ -142,7 +158,10 @@ export function validateCoachingConfig(overrides = {}) {
         'durabilityMinimumPowerShare', 'durabilityMaximumPowerShare',
         'durabilityMaximumPowerVariation', 'cpMinimumFitQuality', 'taperMaximumPlanShare',
         'runInitialLoadPower', 'runWeeklyPlanningLoadPower', 'runLongRunShare',
-        'runThresholdWeeklyShare', 'runIntervalWeeklyShare', 'runRepetitionWeeklyShare', 'runRaceReadinessShare'];
+        'runThresholdWeeklyShare', 'runIntervalWeeklyShare', 'runRepetitionWeeklyShare', 'runRaceReadinessShare',
+        'returnToTrainingHardMinimumShare', 'sufficiencyIntensityEvidenceShare',
+        'intervalEvidenceTargetShare', 'intervalEvidenceTimeShare'];
+    const stages = values => increasingThresholds(values) && values.every(value => value < 1);
     if(shares.some(key => !bounded(config[key], 0, 1)) ||
        !positive(config.initialMinutes) || !positive(config.minimumSessionMinutes) ||
        !positive(config.minimumHardSessionMinutes) ||
@@ -187,6 +206,15 @@ export function validateCoachingConfig(overrides = {}) {
        !bounded(config.runSessionSpikeLimit, 1, 2) || !positive(config.runInitialLongestSessionMinutes) ||
        !positive(config.runWalkThresholdMinutes) || !bounded(config.riegelExponent, 1, 1.2) ||
        !positive(config.runLongEventDurationThreshold) || !positive(config.runLongEventDistanceThreshold) ||
+       !positive(config.cyclingInitialSessionMinutes) ||
+       !stages(config.returnToTrainingShortStages) || !stages(config.returnToTrainingLongStages) ||
+       config.returnToTrainingShortGapDays < config.returnToTrainingDays ||
+       config.returnToTrainingMaximumDays < config.returnToTrainingShortGapDays ||
+       !bounded(config.readinessExtremeSoreness, 1, 5) || !bounded(config.readinessExtremeLegFreshness, 1, 5) ||
+       config.readinessExtremeSoreness < config.readinessHighSoreness ||
+       config.readinessExtremeLegFreshness > config.readinessLowLegFreshness ||
+       !bounded(config.readinessExtremeScore, 0, 10) ||
+       !bounded(config.cyclingSessionSpikeLimit, 1, 2) ||
        !positive(config.runClimbingElevationThreshold) || !positive(config.runThresholdPaceMinimum) ||
        config.runThresholdPaceMaximum <= config.runThresholdPaceMinimum) {
         throw new Error('Invalid coaching configuration thresholds or ranges.');
@@ -268,12 +296,19 @@ export function validateProfile(profile) {
         DEFAULTS.runThresholdPaceMaximum)) {
         throw new Error('Threshold pace must be 2:00-15:00 per kilometre.');
     }
+    for(const key of ['ftpTestDate', 'thresholdPaceDate']) {
+        if(profile[key] != null) date(profile[key]);
+    }
     for(const key of ['maxHeartRate', 'thresholdHeartRate', 'restingHeartRate']) {
         if(profile[key] != null && (!positive(profile[key]) || profile[key] > 255)) throw new Error(`Invalid ${key}.`);
     }
     if(profile.maxHeartRate != null &&
        (profile.restingHeartRate >= profile.maxHeartRate || profile.thresholdHeartRate > profile.maxHeartRate)) {
         throw new Error('Heart-rate thresholds contradict maximum heart rate.');
+    }
+    if(profile.thresholdHeartRate != null && profile.restingHeartRate != null &&
+       profile.thresholdHeartRate <= profile.restingHeartRate) {
+        throw new Error('Threshold heart rate must be higher than resting heart rate.');
     }
     for(const key of ['powerMeter', 'heartRateMonitor', 'smartTrainer']) {
         if(profile[key] != null && typeof profile[key] !== 'boolean') throw new Error(`Invalid ${key}.`);

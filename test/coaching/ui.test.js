@@ -50,6 +50,7 @@ test('coaching forms create a persistent plan that appears and adapts in the exi
     document.body.append(panel, calendar);
     try {
         const form = panel.querySelector('[data-coach-form=setup]');
+        form.elements.adultAthleteConfirmed.checked = true;
         const start = localDay(new Date().toISOString(), form.elements.timeZone.value);
         form.elements.start.value = start;
         form.elements.date.value = addDays(start, 60);
@@ -97,6 +98,15 @@ test('coaching forms create a persistent plan that appears and adapts in the exi
         expect(service.data.plan.revision).toBe(2);
         expect(panel.textContent).toContain('Revision 2');
         expect(panel.querySelector('[role=alert]')).toBeNull();
+        service.data.safetyStatus = 'illness';
+        service.data.plan.trainingPaused = true;
+        panel.render();
+        expect(calendar.canStartCoaching(workout)).toBe(false);
+        expect(panel.textContent).toMatch(/Training is paused/);
+        const entry = calendar.coachingEntries().find(e => e.id === workout.id);
+        expect(calendar.renderCoachingActions(entry)).not.toContain('coach-export');
+        service.data.safetyStatus = null;
+        service.data.plan.trainingPaused = false;
     } finally {
         panel.remove();
         calendar.remove();
@@ -117,9 +127,9 @@ test('running setup derives threshold pace from a typed pace or a race and drops
     const panel = new CoachingPanel();
     const service = {data: {profile: null}};
     const base = {type: 'run_10k', timeZone: 'UTC', experience: 'intermediate', hours: '4', maxHours: '5',
-        day1: '45', day6: '90', longDay: '6'};
-    expect(panel.profileFrom(values({...base, thresholdPace: '4:45'}), service))
-        .toMatchObject({sport: 'running', ftp: null, thresholdPace: 285});
+        day1: '45', day6: '90', longDay: '6', adultAthleteConfirmed: 'on'};
+    expect(panel.profileFrom(values({...base, thresholdPace: '4:45', thresholdPaceDate: '2025-12-01'}), service))
+        .toMatchObject({sport: 'running', ftp: null, thresholdPace: 285, thresholdPaceDate: '2025-12-01'});
     expect(panel.profileFrom(values({...base, raceDistanceKm: '5', raceTime: '25:00'}), service).thresholdPace).toBe(315);
     expect(() => panel.profileFrom(values({...base, raceDistanceKm: '5'}), service)).toThrow('race distance and its finish time');
     expect(() => panel.profileFrom(values({...base, thresholdPace: '1:00'}), service)).toThrow('Threshold pace must be between');

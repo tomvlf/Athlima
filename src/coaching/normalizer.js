@@ -160,7 +160,7 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
         workKj: sourceWork ?? derivedWork,
         workCalculation: sourceWork != null ? {value: sourceWork, source: 'source', version: VERSION} :
             metric(derivedWork, 'low', 'Integrated available one-second power, otherwise average power x elapsed seconds / 1000.'),
-        ftp, intensityFactor: intensity ?? paceIntensity,
+        ftp, intensityFactor: sport === 'running' ? paceIntensity : intensity,
         ...(sport === 'running' ? {averageSpeed: speed, thresholdPace} : {}),
         rpe, feedback, streams,
         bestEfforts, details,

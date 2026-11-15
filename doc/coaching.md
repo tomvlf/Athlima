@@ -24,7 +24,8 @@ used as an isolated verdict about whether to train.
 
 ## Using the coach
 
-**Coach** guides you through four numbered steps:
+**Coach** guides you through four numbered steps. Setup requires confirmation
+that the athlete is an adult (18 or older); it does not collect a date of birth.
 
 1. **What are you training for?** Goal name, type (grouped into *Cycling* and
    *Running*; the goal type selects the sport), priority and a time frame
@@ -33,9 +34,11 @@ used as an isolated verdict about whether to train.
    replaces the time frame. Power targets are only shown for cycling goals.
 2. **Check your athlete profile.** Body weight comes from **Settings** and is
    required. Cycling uses FTP from **Settings**; without FTP, sessions use effort
-   (RPE) guidance. Running asks for a threshold pace (min:sec per km or mile), or
-   a recent race distance and finish time from which threshold pace is
-   estimated; without either, runs use effort guidance.
+   (RPE) guidance. Its optional last-tested date lets the plan flag an undated
+   or older FTP for review. Running asks for a threshold pace (min:sec per km or
+   mile), or a recent race distance and finish time from which threshold pace is
+   estimated; without either, runs use effort guidance. Its optional performance
+   date is used for the same reminder.
 3. **When can you train?** The longest session per weekday in minutes (0 for
    rest days), an indoor/outdoor preference per day, a long ride / long run day,
    weekly hours and experience in this sport.
@@ -43,8 +46,10 @@ used as an isolated verdict about whether to train.
    runs and better targets connect **Settings > Intervals.icu** first, or import
    activities later under **Training history and backup**. The existing Athlima
    activity summaries contain only duration, and the FIT cache retains only
-   seven rides. **More options** holds the start date, time zone, heart-rate
-   values and equipment.
+   seven rides.    **More options** holds the start date, time zone, heart-rate values and equipment.
+   An intensity threshold over 90 days old triggers a recalibration reminder,
+   not an automatic rejection: 90 days is a heuristic and not a validated
+   physiological expiry date.
 
 Once a plan is active, Coach shows the goal countdown, current phase, next
 session and upcoming sessions, plus post-ride feedback, plan adjustments and a
@@ -69,9 +74,36 @@ and unapproved technique drills are not prescribed. When no safe template fits (
 example, a sprint slot), the Coach explains that it generated a conservative
 session instead.
 
+Cycling sessions are initially capped at 125% of the longest recent session,
+then use the prior week's scheduled session as a planning projection. This is a
+conservative engineering heuristic, not a validated safe progression rate.
+Session caps apply to scheduled sessions from the adaptation date onwards;
+completed sessions are history and are not re-judged when an earlier session is
+later marked missed. Plans saved before the cycling cap existed use the longer
+of 60 minutes and their first week's longest planned ride as the pre-plan
+reference. Until overdue sessions are marked missed, they and any unmatched
+activities of the week count against its remaining budget, so later sessions
+can be briefly shorter until the next sync or app start resolves them.
+After at least 14 days without a recorded activity in the coached sport, the
+following weeks are staged as a return to training. A break of up to 28 days
+limits each week to 50% and then 75% of its planned dose; longer breaks use
+33%, 50% and 75%. The stages last as long as the break (at most 63 days) and
+are counted from the first activity after it, so recording the first session
+back does not end them. Hard sessions return only at the 75% stage. The plan
+start date counts as active, so a new plan without recent history is not
+treated as a break. These shares are adapted from Daniels' return-from-break
+guidance: expert coaching practice, not trial-validated rules. The app cannot
+determine whether a break was due to illness, injury, travel or missing
+imports; use the pause control for symptoms and review the plan before resuming.
+
 Progression levels are based on successfully completed or substituted sessions
 with a sufficient match-quality score, not on how many workouts were scheduled.
-After the configured number of successful sessions in a family, a later workout
+Hard-session progression additionally requires interval evidence: an
+Intervals.icu interval summary, or a one-second power stream (such as an
+Athlima recording) whose 3-second average stays at or above 90% of the lowest
+planned hard target for at least 85% of the planned hard time. Duration and
+average intensity alone do not establish that intervals were completed, so runs
+need an interval summary. After the configured number of successful sessions in a family, a later workout
 may progress one level only if there is unused weekly load capacity. Missed,
 failed or low-quality work does not earn progression. Day to day:
 
@@ -92,6 +124,11 @@ failed or low-quality work does not earn progression. Day to day:
    when the app opens, after a recording, or with **Review missed sessions**.
    Direct Intervals.icu sync runs only while the app is open; its progress is
    saved locally for retry.
+- Report pain or illness in **Symptoms and training pause**. This persistently
+   pauses coached starts, exports and missed-session review and reduces upcoming
+   training. Clearing the report does not mean the app has medically cleared the
+   athlete; concerning, persistent or worsening symptoms warrant qualified
+   healthcare assessment.
 
 The first implementation supports one athlete and one active goal at a time,
 over a 1-366 day horizon. Archive a plan before reconfiguring or generating a
@@ -102,6 +139,13 @@ a coaching selection with a different FTP rather than silently raising watts.
 Other profile changes likewise require reconfiguration for future plans.
 Do not stack the coach's prescription with separate library or Intervals.icu
 sessions; choose a substitution and let the completed ride update the coach.
+An active plan created before adult confirmation remains visible but cannot be
+started or exported; archive and reconfigure to confirm adulthood. New training
+history does not automatically add hard sessions to a previously generated plan:
+when history becomes sufficient for a plan generated without hard sessions, the
+plan shows a warning; review the data, then archive and regenerate if it should
+affect the schedule. Warnings from plan generation (undated or old FTP/threshold
+pace, race readiness) remain visible after every adaptation.
 
 ## Running coach
 
@@ -121,7 +165,9 @@ pace. Planned load reuses the interval-weighted power-load calculation on
 threshold-speed fractions. These are engineering estimates, not validated rTSS;
 planned and recorded interval loads can differ even with exact execution.
 Equal running and cycling scores do not imply equal physiological or injury
-stress, and their histories are modelled separately.
+stress, and their training loads are modelled separately. Subjective feedback
+from recent other-sport activities can raise fatigue caution, but their duration
+is not combined into the coached sport's load budget.
 
 **Threshold pace.** Enter it directly, or enter a recent all-out race. The race
 time is converted to a one-hour equivalent with Riegel's formula
@@ -137,15 +183,22 @@ effort (RPE) and recorded runs have no pace load.
   runs of 20-30 minutes. The stage advances every two weeks (up to 8 min run /
   1 min walk) before continuous running, so a complete novice run-walks for
   about 12 weeks. Run-walk sessions are never hard, and beginners are limited
-  to four running days per week. These stages and the frequency cap are coaching
+  to four running days per week. After the plan starts, a beginner's run may be
+  at most one stage beyond the hardest format completed in the previous 14
+  days (the plan's first stage when none was completed), so the calendar alone
+  never advances the stages; the planned format returns once completed runs
+  catch up. These stages, this ceiling and the frequency cap are coaching
   heuristics, not a trial-validated beginner or injury-rehabilitation programme.
 - *Single-run spike cap.* No planned run may be more than 10% longer than the
   duration reference for the previous 30 days. This is a **duration-based
   heuristic** inspired by Frandsen et al. 2025, whose observational study measured
   **distance**, not duration. It does not establish a safe threshold or prove
-  injury prevention. The initial historical maximum lacks its original date,
-  making that part of the window approximate. The cap is checked in
-  `validatePlan` and re-applied after every adaptation.
+  injury prevention. Dated completed sessions use their actual duration;
+  missed, failed and overdue unresolved sessions do not count as exposure. A
+  future scheduled week is used as a planning projection for later weeks, not
+  evidence that the athlete completed that dose. The cap is checked in
+  `validatePlan` for scheduled runs from the adaptation date onwards and
+  re-applied after every adaptation; completed runs are not re-judged.
 - *Weekly volume.* For runs the weekly minutes ramp (5%, 2.5% with weak data)
   and the weekly target load limit progression. The extra cycling-style
   scheduled-load ramp is not applied, to avoid shrinking training time as
@@ -155,12 +208,18 @@ effort (RPE) and recorded runs have no pace load.
   exceeds the weekly budget, all sessions are shortened proportionally, so the
   number of running days is kept.
 - *Quality caps.* Threshold running is limited to about 10%, interval running to
-  8% and repetitions to 5% of originally scheduled weekly running time, summed
+  8% and repetitions to 5% of scheduled weekly running time, summed
   across all sessions of that family. These are Daniels-inspired coaching caps,
   with time used as a proxy for distance, not validated physiological limits.
-  Adaptations retain the original weekly reference, so completed quality work
-  is not invalidated by a later reduction. In the taper the reference is the
-  largest of the preceding four weeks, so a short quality touch remains.
+  The caps are checked against the current scheduled weekly running time; missed
+  and failed sessions do not count toward volume. A completed session cannot be
+  changed, so when the rest of a week is missed only scheduled (including
+  overdue) hard runs are eased to easy runs, and validation flags an excess only
+  while a scheduled hard run contributes to it. Taper volume references a prior
+  non-recovery scheduled week and scales partial weeks by the days actually in
+  taper. A short final week may omit a hard session rather than compressing one
+  into too little time. The planned intensity distribution counts running steps
+  up to 88% of threshold speed as easy and above 101% as hard.
 - *Strides.* Runners who no longer use run-walk get 4 strides (6 in build,
   specific and peak phases) of 20 s at the end of one easy run per week. Strides
   are never added to hard sessions or the long run.
@@ -182,6 +241,8 @@ for runs, and the player rejects them. The calendar and session page show a
 pace guide per step (for example "threshold 5:06/km, easy 6:15/km") with a
 reminder to run by effort on hills, in heat or on trails. **Export ZWO** writes
 a running ZWO (`<sportType>run</sportType>`) for watches and apps that accept it.
+The export converts threshold-speed targets to the format's 10 km reference pace
+using a Riegel estimate; it is unavailable without a threshold pace.
 Runs synchronised from Intervals.icu (`Run`, `TrailRun`, `VirtualRun`) or
 imported as JSON (`"sport": "running"`, `distance` in metres) are matched only
 to running sessions and then adapt the plan as for cycling.
@@ -334,7 +395,9 @@ Goals have `id`, `name`, `type`, `date`, priority A/B/C, active state and option
 `distanceKm`, `elevationM`, `expectedDurationMinutes`, `terrain`, `targetPower`,
 `targetFTP`, `targetWKg`, `finishTimeMinutes` and `completionObjective`.
 Long or mountainous declared demands change capability weights. Explicit FTP
-and W/kg targets inform threshold gaps. There is no fabricated conversion from
+and W/kg targets inform threshold gaps; `targetPower` counts as an FTP target
+only for events expected to last 40-70 minutes, because sustainable power for
+shorter or longer events is not FTP. There is no fabricated conversion from
 terrain or finish time into predicted event power or physiological capacity.
 
 Normalized rides retain source summaries in `original`, an optional
@@ -392,8 +455,10 @@ caution.
 | Weekly metrics / ramp-rate difference | Last 7 days / chronic-load difference over 7 days |
 | Recent subjective concerns | Configured 3-day window |
 | Sleep-quality signal | One point toward the default three-point caution threshold; never an isolated verdict |
-| Other subjective signals | High RPE, low leg freshness and high soreness add 2 points each; high stress adds 1 |
-| Supported-data threshold | At least 8 medium-window rides, each level A or B |
+| Other subjective signals | High RPE, low leg freshness and high soreness add 2 points each; high stress adds 1. Soreness 5/5 or leg freshness 1/5 scores 3 alone (caution); extreme soreness also prompts a pain report |
+| Supported-data threshold | At least 8 medium-window sessions in the coached sport, spread over at least 3 different weeks, at least half with power/pace intensity, heart rate or RPE (no particular sensor required); medium confidence additionally needs data level A or B for every session |
+| Return to training (`returnToTraining*`) | After >=14 days without the coached sport: 50% / 75% of the planned weekly dose for breaks up to 28 days, otherwise 33% / 50% / 75%, over as many days as the break (max 63); no hard sessions below 75% |
+| Interval evidence (`intervalEvidence*`) | Interval summary, or a 3 s smoothed power stream >=90% of the lowest hard target for >=85% of planned hard time |
 | Weekly volume/load growth ceiling | 5%; 2.5% with weaker data |
 | Growth reference | Maximum scheduled volume/load in preceding four weeks, with absolute availability caps |
 | Initial duration | No greater than typical/maximum hours, day capacity, medium-window weekly average and recent weekly duration |
@@ -473,8 +538,9 @@ These are lower-confidence changes or need more data or user interface work:
   instead of percentages of maximum heart rate, and use heart rate as the load
   source (Banister TRIMP) when power and pace are missing.
 - **Monotony and strain** (Foster 1998) as an extra readiness signal.
-- **Data level for power-only or pace-only users.** These users cannot reach data
-  level A/B without heart rate and RPE, which keeps their plans conservative.
+- **Data level for power-only or pace-only users.** These users can now receive
+  hard sessions once their history is sufficient, but cannot reach data level
+  A/B without heart rate and RPE, which keeps the weekly ramp at the low-data rate.
 - **Progressive intensity distribution.** Evaluate pyramidal-to-polarized
   progression rather than treating the fixed `targetIntensityDistribution` as
   optimal. Filipas supports this in well-trained male runners, not all athletes.
@@ -700,8 +766,15 @@ and recovery re-entry, structured player/ZWO compatibility, matching,
 future-only adaptation, immutable revision history, duplicate events, failed
 persistence, IndexedDB restoration/conflicts, and the calendar form workflow.
 `test/coaching/running.test.js` covers every running goal, the spike cap,
-run-walk, strides, the race-readiness warning, pace load, Riegel estimates, run
-ZWO export and run-only matching.
+run-walk and its completion-based stage ceiling, strides, the race-readiness
+warning, pace load, Riegel estimates, run ZWO export, run-only matching, overdue
+sessions not counting as exposure, quality caps after a missed rest of week, and
+a completed long run staying valid when an earlier run is marked missed.
+Planning and metrics tests cover staged return to training, sensor-independent
+data sufficiency, extreme soreness/leg-fatigue caution, preserved generation
+warnings, stream-based interval evidence, completed rides staying valid when
+earlier rides are marked missed, overdue sessions using the weekly budget and
+legacy cycling plans without a stored longest-session reference.
 
 ### Threshold validation with representative data
 
@@ -744,6 +817,12 @@ plausibility; they are **not** physiological validation of the thresholds.
 * Beginner running plans grow slowly (about 2 minutes per week from 90
   minutes) and may not be enough for a long race; the readiness warning flags
   this.
+* Stream-based interval evidence is a heuristic (90% of the lowest hard target
+  for 85% of planned hard time); outdoor surges can count toward it. Hard runs
+  progress only with an Intervals.icu interval summary.
+* Duration from other sports is shown in the explanation but is not added to
+  the planned sport's load or spike cap; subjective feedback from those
+  activities still affects readiness.
 * Small leftover budget can produce 10-20 minute filler sessions.
 * A very short recorded ride matched to today's session counts as a
   low-quality completion and triggers the 15% short-term reduction.

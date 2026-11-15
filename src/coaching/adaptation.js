@@ -16,17 +16,94 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { VERSION, DEFAULTS, SPORTS, sum, round, addDays, sportOf, validateCoachingConfig } from './domain.js';
+import { VERSION, DEFAULTS, SPORTS, sum, round, addDays, daysBetween, sportOf, validateCoachingConfig } from './domain.js';
 import { progressWorkout, FAMILIES, familySpec } from './workouts.js';
 import { prescribeWorkout } from './library.js';
-import { validatePlan, rampReference, longestReference, qualityReferenceMinutes } from './planner.js';
+import { validatePlan, rampReference, longestReference, qualityReferenceMinutes, initialSessionReference } from './planner.js';
 import { explainAdaptation } from './explanations.js';
-import { runQualityExcess } from './running.js';
+import { runQualityExcess, RUN_WALK_STAGES } from './running.js';
+
+/**
+ * Staged return after a sport-specific break of at least `returnToTrainingDays` since the plan start
+ * (Daniels-style return shares; expert practice, not trial evidence). The plan start counts as an
+ * active day because the planner already sized the plan from the history before it. An ongoing break
+ * resumes on the snapshot date, so the staged return restarts for as long as no training is recorded.
+ *
+ * @returns {{days: number, resumedOn: string, share: (day: string) => number}|null}
+ */
+export function returnToTraining(state, plan, config) {
+    const windowStart = addDays(state.date, 1 - config.longDays);
+    const origin = plan.startDate > windowStart ? plan.startDate : windowStart;
+    if(origin > state.date) return null;
+    const active = [...new Set([origin, ...(state.activityLoads || []).map(a => a.day)
+        .filter(day => day >= origin && day <= state.date)])].sort();
+    let gap = daysBetween(active.at(-1), state.date) >= config.returnToTrainingDays
+        ? {from: active.at(-1), resumedOn: state.date} : null;
+    for(let i = active.length - 1; !gap && i > 0; i--) {
+        if(daysBetween(active[i - 1], active[i]) >= config.returnToTrainingDays) {
+            gap = {from: active[i - 1], resumedOn: active[i]};
+        }
+    }
+    if(!gap) return null;
+    const days = daysBetween(gap.from, gap.resumedOn);
+    const stages = days <= config.returnToTrainingShortGapDays
+        ? config.returnToTrainingShortStages : config.returnToTrainingLongStages;
+    const length = Math.min(days, config.returnToTrainingMaximumDays);
+    const share = day => {
+        const index = Math.floor(Math.max(0, daysBetween(gap.resumedOn, day)) * stages.length / length);
+        return index < stages.length ? stages[index] : 1;
+    };
+    return daysBetween(gap.resumedOn, state.date) < length ? {days, resumedOn: gap.resumedOn, share} : null;
+}
+
+const walkStage = format => format?.runWalk
+    ? RUN_WALK_STAGES.findIndex(([run, walk]) => run === format.runWalk[0] && walk === format.runWalk[1])
+    : RUN_WALK_STAGES.length;
+
+/** The planned session a temporary adjustment can later restore. */
+const originalOf = workout => ({family: workout.family, duration: workout.duration,
+    targetLoad: workout.targetLoad, progressionLevel: workout.progressionLevel,
+    libraryWorkoutId: workout.libraryWorkoutId ?? null,
+    ...(workout.runFormat ? {runFormat: {...workout.runFormat}} : {})});
+
+/**
+ * Beginner run-walk progression follows completed running rather than the calendar: a run may be
+ * at most one stage beyond the hardest format completed in the previous 14 days, and restarts at the
+ * plan's first stage when nothing was completed. Coaching heuristic, not a validated progression.
+ */
+function runWalkCeiling(plan, date) {
+    const completed = plan.workouts.filter(w => ['completed', 'substituted'].includes(w.status) &&
+        w.date <= date && daysBetween(w.date, date) < 14);
+    return completed.length ? Math.max(...completed.map(w => walkStage(w.runFormat))) + 1
+        : Math.min(...plan.workouts.map(w => walkStage(w.runFormat)));
+}
+
+/**
+ * Hard-session progression needs evidence that the intervals were completed. A provider interval
+ * summary counts; otherwise a one-second power stream must hold close to the lowest planned hard
+ * target for most of the planned hard time. Duration and average power cannot show skipped intervals,
+ * so runs without an interval summary are not verified.
+ */
+export function intervalsVerified(activity, workout, rules = DEFAULTS) {
+    if(!FAMILIES[workout.family]?.hard || activity.hasIntervals === true) return true;
+    const config = validateCoachingConfig(rules);
+    const power = activity.streams?.power;
+    const hardSteps = workout.steps.filter(s => s.power > config.hardPowerThreshold);
+    if((workout.sport ?? 'cycling') !== 'cycling' || !(activity.ftp > 0) || !power?.length || !hardSteps.length) return false;
+    const target = Math.min(...hardSteps.map(s => s.power)) * activity.ftp * config.intervalEvidenceTargetShare;
+    const window = 3;
+    let rolling = 0, held = 0;
+    for(const [i, value] of power.entries()) {
+        rolling += value - (i >= window ? power[i - window] : 0);
+        if(i >= window - 1 && rolling / window >= target) held++;
+    }
+    return held >= sum(hardSteps.map(s => s.duration)) * config.intervalEvidenceTimeShare;
+}
 
 export function matchWorkout(activity, workouts, explicitId = null, rules = DEFAULTS) {
     const config = validateCoachingConfig(rules);
     if(!SPORTS.includes(activity.sport)) return {workoutId: null, confidence: 0, quality: null, reason: 'Not a coached sport.'};
-    const candidates = workouts.filter(w => w.status === 'scheduled' && w.date === activity.day &&
+    const candidates = workouts.filter(w => ['scheduled', 'missed'].includes(w.status) && w.date === activity.day &&
         (w.sport ?? 'cycling') === activity.sport);
     if(explicitId && !candidates.some(w => w.id === explicitId)) {
         return {workoutId: null, confidence: 0, quality: null, reason: 'Explicit workout is not scheduled on this local date.'};
@@ -37,9 +114,13 @@ export function matchWorkout(activity, workouts, explicitId = null, rules = DEFA
             ? Math.max(0, 1 - Math.abs(activity.intensityFactor - w.targetIntensity)) : null;
         const quality = powerQuality == null ? durationQuality : (durationQuality + powerQuality) / 2;
         const confidence = explicitId ? 1 : durationQuality * (powerQuality == null ? 0.6 : 0.85 * powerQuality);
-        return {workoutId: w.id, confidence, quality,
-            reason: explicitId ? 'Explicit session identity; quality uses duration and available summary intensity.'
-                : 'Same local date, duration and available intensity; interval execution is not proven.'};
+        const progressionEligible = intervalsVerified(activity, w, config);
+        const evidence = !FAMILIES[w.family]?.hard ? ''
+            : progressionEligible ? ' Interval execution is supported by an interval summary or power stream.'
+                : ' Interval execution is not proven.';
+        return {workoutId: w.id, confidence, quality, progressionEligible,
+            reason: (explicitId ? 'Explicit session identity; quality uses duration and available summary intensity.'
+                : 'Same local date, duration and available intensity.') + evidence};
     }).sort((a, b) => b.confidence - a.confidence || a.workoutId.localeCompare(b.workoutId));
     return matches[0]?.confidence >= config.automaticMatchMinimumConfidence ? matches[0]
         : {workoutId: null, confidence: matches[0]?.confidence || 0, quality: null,
@@ -52,7 +133,7 @@ export function matchWorkout(activity, workouts, explicitId = null, rules = DEFA
  * weekly share of demanding time stays bounded. Both rules only shorten or ease sessions.
  */
 function enforceRunSafety(next, profile, config, date, changes) {
-    const initial = next.initialLimits.longestSessionMinutes ?? config.runInitialLongestSessionMinutes;
+    const {minutes: initial, date: initialDate} = initialSessionReference(next, config, true);
     const rebuild = (workout, minutes, family, note) => {
         const previous = JSON.parse(JSON.stringify(workout));
         const index = next.weeks.findIndex(w => w.id === workout.weekId);
@@ -62,18 +143,19 @@ function enforceRunSafety(next, profile, config, date, changes) {
             weeklyMinutes: qualityReferenceMinutes(next.weeks, index),
             runFormat: workout.runFormat ? {...workout.runFormat, strides: family === workout.family
                 ? workout.runFormat.strides : 0} : null});
-        modified.original = workout.original ?? {family: workout.family, duration: workout.duration,
-            targetLoad: workout.targetLoad, progressionLevel: workout.progressionLevel,
-            libraryWorkoutId: workout.libraryWorkoutId ?? null};
+        modified.original = workout.original ?? originalOf(workout);
         modified.adaptationNotes = [...workout.adaptationNotes, note];
         Object.assign(workout, modified);
         changes.push({id: workout.id, action: 'modified', previous, current: {...workout}});
     };
-    const future = () => next.workouts.filter(w => w.date > date && w.status === 'scheduled')
+    const future = () => next.workouts.filter(w => w.date >= date && w.status === 'scheduled')
         .sort((a, b) => a.date.localeCompare(b.date));
     for(const workout of future()) {
-        const cap = Math.floor(config.runSessionSpikeLimit * longestReference(workout.date, next.workouts, initial,
-            next.startDate, config, w => w.status !== 'missed'));
+        // Unresolved sessions before the adaptation date are not evidence of tolerated exposure.
+        const cap = Math.floor(config.runSessionSpikeLimit * longestReference(workout.date,
+            next.workouts.filter(w => w.weekId !== workout.weekId), initial,
+            next.startDate, config, w => !['missed', 'failed'].includes(w.status) &&
+                !(w.status === 'scheduled' && w.date < date), initialDate));
         if(workout.duration / 60 <= cap) continue;
         if(cap < config.minimumSessionMinutes) {
             next.workouts = next.workouts.filter(w => w.id !== workout.id);
@@ -84,15 +166,18 @@ function enforceRunSafety(next, profile, config, date, changes) {
             'Shortened so this run stays within 10% of the longest run kept in the previous 30 days.');
     }
     for(const [index, week] of next.weeks.entries()) {
-        const members = () => next.workouts.filter(w => w.weekId === week.id);
+        const members = () => next.workouts.filter(w => w.weekId === week.id &&
+            !['missed', 'failed'].includes(w.status));
         const hardSeconds = () => sum(members().flatMap(w => w.steps.filter(s => s.power > config.hardPowerThreshold))
             .map(s => s.duration));
         while(true) {
             const totalExceeded = hardSeconds() > sum(members().map(w => w.duration)) * config.weeklyHardTimeShare;
-            const excess = runQualityExcess(members(), qualityReferenceMinutes(next.weeks, index), config);
+            const excess = runQualityExcess(members(), sum(members().map(w => w.duration / 60)), config);
             if(!totalExceeded && !excess.length) break;
-            const hard = future().filter(w => w.weekId === week.id && FAMILIES[w.family].hard &&
-                (totalExceeded || excess.includes(w.family))).at(-1);
+            // Overdue scheduled sessions can still be completed late, so they are eased too.
+            const hard = next.workouts.filter(w => w.weekId === week.id && w.status === 'scheduled' &&
+                FAMILIES[w.family].hard && (totalExceeded || excess.includes(w.family)))
+                .sort((a, b) => a.date.localeCompare(b.date)).at(-1);
             if(!hard) break;
             rebuild(hard, hard.duration / 60, 'endurance',
                 'Changed to an easy run so quality time stays within the weekly caps.');
@@ -114,7 +199,9 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
     const next = JSON.parse(JSON.stringify(plan));
     const changes = [];
     const target = workoutId ? next.workouts.find(w => w.id === workoutId) : null;
-    if(workoutId && (!target || target.date > date || target.status !== 'scheduled')) {
+    const lateCompletion = target?.status === 'missed' && ['completed', 'substituted'].includes(trigger) &&
+        activity?.day === target.date;
+    if(workoutId && (!target || target.date > date || (target.status !== 'scheduled' && !lateCompletion))) {
         throw new Error('Only an unresolved workout on or before the adaptation date may be resolved.');
     }
     if(['completed', 'failed', 'substituted', 'missed'].includes(trigger) && !target) {
@@ -129,9 +216,12 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         target.matchedActivity = activity?.id ?? null;
         target.matchConfidence = match?.confidence ?? null;
         target.completionQuality = match?.quality ?? null;
+        target.progressionEligible = match?.progressionEligible === true;
+        target.completionDurationMinutes = activity ? activity.duration / 60 : null;
         changes.push({id: target.id, action: 'resolved', previous, current: {...target}});
     }
-    const reduceIntensity = state.readiness.status === 'caution' || trigger === 'recovery';
+    const reduceIntensity = state.readiness.status === 'caution' || trigger === 'recovery' || !!state.safetyStatus;
+    next.trainingPaused = !!state.safetyStatus;
     // Reductions are short-term responses; sessions beyond the window keep (or regain) their planned dose.
     const windowEnd = addDays(date, config.adaptationWindowDays);
     let reduction = reduceIntensity
@@ -150,19 +240,55 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
     };
     // A session inside an earlier reduction window keeps that reduction until the window ends;
     // a later event may only make it stricter, never undo an athlete's or the Coach's caution early.
-    const held = w => w.date > date && w.status === 'scheduled' && w.original?.until >= w.date &&
+    const held = w => w.date >= date && w.status === 'scheduled' && w.original?.until >= w.date &&
         !(policy(w).factor < w.original.factor || (policy(w).easy && !w.original.easy));
+    const sessionLimit = workout => {
+        const referenceDays = running ? config.runLongestSessionReferenceDays : config.cyclingSessionReferenceDays;
+        const {minutes: initial, date: initialDate} = initialSessionReference(next, config, running);
+        const previous = next.workouts.filter(w => w.date < workout.date && w.weekId !== workout.weekId &&
+            !['missed', 'failed'].includes(w.status) && !(w.status === 'scheduled' && w.date < date));
+        const recent = previous.filter(w => daysBetween(w.date, workout.date) <= referenceDays)
+            .map(w => ['completed', 'substituted'].includes(w.status)
+                ? w.completionDurationMinutes ?? w.duration / 60
+                : (w.original?.duration ?? w.duration) / 60);
+        const historical = initialDate && initialDate <= workout.date &&
+            daysBetween(initialDate, workout.date) <= referenceDays ? [initial] : [];
+        const reference = Math.max(0, ...recent, ...historical) ||
+            (running ? config.runInitialLongestSessionMinutes : config.cyclingInitialSessionMinutes);
+        return Math.floor(reference * (running ? config.runSessionSpikeLimit : config.cyclingSessionSpikeLimit));
+    };
+    const comeback = returnToTraining(state, plan, config);
+    const walkCeiling = running && profile.experience === 'beginner' ? runWalkCeiling(next, date) : Infinity;
+    // Held sessions keep their reduced dose as a ceiling; they may still shrink to respect actual load.
+    const dose = workout => {
+        const isHeld = held(workout);
+        const baseline = isHeld ? workout : workout.original ?? workout;
+        const factor = !isHeld && workout.date <= windowEnd ? reduction : 1;
+        const forceEasy = factor < 1 && reduceIntensity;
+        const plannedFormat = baseline.runFormat ?? workout.runFormat ?? null;
+        const walkLimited = !!plannedFormat &&
+            Math.min(walkStage(plannedFormat), walkCeiling) < RUN_WALK_STAGES.length;
+        const noHard = walkLimited || (!!comeback && comeback.share(workout.date) < config.returnToTrainingHardMinimumShare);
+        const family = forceEasy ? 'recovery' : FAMILIES[baseline.family]?.hard && noHard ? 'endurance' : baseline.family;
+        return {baseline, factor, forceEasy, held: isHeld, family, plannedFormat};
+    };
+    const formatFor = (plannedFormat, forceEasy) => {
+        if(!plannedFormat) return null;
+        const stage = Math.min(walkStage(plannedFormat), walkCeiling);
+        const runWalk = stage < RUN_WALK_STAGES.length ? [...RUN_WALK_STAGES[stage]] : null;
+        return {...plannedFormat, runWalk, strides: forceEasy || runWalk ? 0 : plannedFormat.strides};
+    };
     for(const week of next.weeks) {
         const members = next.workouts.filter(w => w.weekId === week.id);
-        const frozen = members.filter(w => w.date <= date || w.status !== 'scheduled' || held(w));
-        const future = members.filter(w => w.date > date && w.status === 'scheduled' && !held(w));
-        const planned = w => w.date > date && w.status === 'scheduled' && w.original ? w.original : w;
+        const frozen = members.filter(w => w.status !== 'scheduled');
+        const future = members.filter(w => w.date >= date && w.status === 'scheduled');
+        const planned = w => w.date >= date && w.status === 'scheduled' && w.original ? w.original : w;
         const originalMinutes = sum(members.map(w => planned(w).duration / 60));
         const originalLoad = sum(members.map(w => planned(w).targetLoad));
         // Plans generated before the planned dose was stored derive it from the pre-adjustment sessions.
         if(!Number.isFinite(week.plannedMinutes)) week.plannedMinutes = originalMinutes;
         if(!Number.isFinite(week.plannedLoad)) week.plannedLoad = round(originalLoad);
-        const minuteCap = Math.min(originalMinutes,
+        let minuteCap = Math.min(originalMinutes,
             Math.max(...envelope().map(w => w.minutes)) * (1 + week.rampLimit));
         // Running plans are bounded by target load rather than a weekly load ramp (see scheduleWorkouts).
         let loadCap = running ? originalLoad : Math.min(originalLoad,
@@ -173,27 +299,39 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
                 : plan.initialLimits.load;
             loadCap = Math.min(week.targetLoad, priorEnvelope);
         }
-        // An unexpectedly long/hard ride consumes this week's remaining training budget.
-        const alreadyAccounted = activity && plan.adaptations.some(a => a.observations.activityId === activity.id);
-        if(activity && trigger !== 'feedback' && !alreadyAccounted &&
-           activity.day >= week.startDate && activity.day <= week.endDate) {
-            const actualLoad = activity.loadMetrics[running ? 'pace' : 'power']?.value;
-            const excess = actualLoad == null ? Math.max(0, activity.duration / 60 - (target?.duration || 0) / 60) *
-                familySpec('endurance', sport).power ** 2 * 100 / 60
-                : Math.max(0, actualLoad - (target?.targetLoad || 0));
-            loadCap = Math.max(sum(frozen.map(w => w.targetLoad)), loadCap - excess);
+        const byActivityId = new Map((state.activityLoads || []).map(item => [item.id, item]));
+        // Everything validation counts but this adaptation cannot reshape uses the week's budget first:
+        // resolved sessions (also later ones when overdue sessions are resolved in date order), rides that
+        // matched nothing, and overdue sessions still awaiting an outcome.
+        const resolved = members.filter(w => ['completed', 'substituted'].includes(w.status));
+        const matchedIds = new Set(resolved.map(w => w.matchedActivity).filter(Boolean));
+        const resolvedMinutes = sum(resolved.map(w => Math.max(w.duration / 60,
+            byActivityId.get(w.matchedActivity)?.durationMinutes ?? 0)));
+        const resolvedLoad = sum(resolved.map(w => Math.max(w.targetLoad,
+            byActivityId.get(w.matchedActivity)?.plannedEquivalentLoad ?? 0)));
+        const unmatchedActivities = (state.activityLoads || []).filter(item =>
+            item.day >= week.startDate && item.day <= week.endDate &&
+            item.start >= plan.generatedAt && !matchedIds.has(item.id));
+        const overdue = members.filter(w => w.status === 'scheduled' && w.date < date);
+        const extraMinutes = sum(unmatchedActivities.map(item => item.durationMinutes)) +
+            sum(overdue.map(w => w.duration / 60));
+        const extraLoad = sum(unmatchedActivities.map(item => item.plannedEquivalentLoad)) +
+            sum(overdue.map(w => w.targetLoad));
+        const frozenMinutes = resolvedMinutes + extraMinutes;
+        const frozenLoad = resolvedLoad + extraLoad;
+        loadCap = Math.max(frozenLoad, loadCap);
+        const returnShare = comeback ? comeback.share(week.startDate > date ? week.startDate : date) : 1;
+        if(returnShare < 1) {
+            minuteCap = Math.max(frozenMinutes, Math.min(minuteCap, week.plannedMinutes * returnShare));
+            loadCap = Math.max(frozenLoad, Math.min(loadCap, week.plannedLoad * returnShare));
         }
-        const frozenMinutes = sum(frozen.map(w => w.duration / 60));
-        const frozenLoad = sum(frozen.map(w => w.targetLoad));
         let usedMinutes = frozenMinutes, usedLoad = frozenLoad;
         const recoveryLoadPerMinute = familySpec('recovery', sport).power ** 2 * 100 / 60;
         const weeklyMinutes = qualityReferenceMinutes(next.weeks, next.weeks.indexOf(week));
         const intended = future.map(workout => {
-            const baseline = workout.original ?? workout;
-            const factor = workout.date <= windowEnd ? reduction : 1;
-            const minutes = baseline.duration / 60 * factor;
-            const easy = factor < 1 && reduceIntensity;
-            return {minutes, load: easy ? minutes * recoveryLoadPerMinute : baseline.targetLoad * factor};
+            const {baseline, factor, forceEasy} = dose(workout);
+            const minutes = Math.min(baseline.duration / 60, sessionLimit(workout)) * factor;
+            return {minutes, load: forceEasy ? minutes * recoveryLoadPerMinute : baseline.targetLoad * factor};
         });
         // Share a capped week across all remaining sessions instead of dropping or downgrading the last ones.
         const weekScale = Math.max(0, Math.min(1,
@@ -212,11 +350,9 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
         usedLoad = frozenLoad;
         for(const [futureIndex, workout] of future.entries()) {
             const previous = JSON.parse(JSON.stringify(workout));
-            const baseline = workout.original ?? workout;
-            const factor = workout.date <= windowEnd ? reduction : 1;
-            const minutes = Math.floor(Math.min(baseline.duration / 60 * factor * scale, minuteCap - usedMinutes) + 0.000001);
-            const forceEasy = factor < 1 && reduceIntensity;
-            const family = forceEasy ? 'recovery' : baseline.family;
+            const {baseline, factor, forceEasy, held: isHeld, family, plannedFormat} = dose(workout);
+            const sessionMinutes = Math.min(baseline.duration / 60, sessionLimit(workout));
+            const minutes = Math.floor(Math.min(sessionMinutes * factor * scale, minuteCap - usedMinutes) + 0.000001);
             const loadPerMinute = forceEasy ? recoveryLoadPerMinute
                 : baseline.targetLoad / (baseline.duration / 60);
             const fitMinutes = Math.min(minutes, Math.floor((loadCap - usedLoad + 0.000001) / loadPerMinute));
@@ -228,21 +364,25 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
             const successes = (plan.progressionBaseline?.[baseline.family] || 0) +
                 next.workouts.filter(w => w.date <= date && w.family === baseline.family &&
                     ['completed', 'substituted'].includes(w.status) &&
+                    w.progressionEligible === true &&
                     w.completionQuality >= config.progressionMinimumQuality).length;
             const earnedLevel = Math.min(config.progressionMaximumLevel,
                 1 + Math.floor(successes / config.progressionSuccessfulSessionsPerLevel));
-            const progressionLevel = ['completed', 'substituted'].includes(trigger) && reduction === 1
+            // Held, eased or re-entry sessions never earn a harder progression level.
+            const progressionLevel = !isHeld && family === baseline.family &&
+                ['completed', 'substituted'].includes(trigger) && reduction === 1
                 ? Math.max(baseline.progressionLevel, earnedLevel) : baseline.progressionLevel;
+            const runFormat = running ? formatFor(plannedFormat, forceEasy) : null;
             const slot = {
                 id: workout.id, date: workout.date, minutes: fitMinutes, family,
                 level: forceEasy ? 1 : progressionLevel, phaseId: workout.phaseId,
                 weekId: workout.weekId, phaseType: week.phaseType, profile, rules: config,
-                ...(running ? {weeklyMinutes, runFormat: workout.runFormat
-                    ? {...workout.runFormat, strides: forceEasy ? 0 : workout.runFormat.strides} : null} : {}),
+                ...(running ? {weeklyMinutes, runFormat} : {}),
             };
             // Keep the planned library workout and shorten it rather than swapping the session.
             const unchanged = fitMinutes * 60 === workout.duration && family === workout.family &&
-                progressionLevel === workout.progressionLevel;
+                progressionLevel === workout.progressionLevel &&
+                JSON.stringify(runFormat) === JSON.stringify(running ? workout.runFormat ?? null : null);
             const sessionBudget = loadCap - usedLoad - sum(intended.slice(futureIndex + 1).map(i => i.load)) * scale;
             let modified = unchanged ? {...workout} : prescribeWorkout(slot, {
                 history: next.workouts.filter(w => w.date < workout.date),
@@ -289,13 +429,13 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
                     prefer: baseline.libraryWorkoutId ?? workout.libraryWorkoutId, rules: config, library: !running,
                 });
             }
-            const restored = !forceEasy && factor === 1 && modified.family === baseline.family &&
-                modified.duration === baseline.duration;
+            const restored = !isHeld && !forceEasy && factor === 1 && modified.family === baseline.family &&
+                modified.duration === baseline.duration &&
+                JSON.stringify(modified.runFormat?.runWalk ?? null) === JSON.stringify(plannedFormat?.runWalk ?? null);
             if(restored) delete modified.original;
+            else if(isHeld) modified.original = workout.original;
             else {
-                const {until: _until, factor: _factor, easy: _easy, ...base} = workout.original ?? {
-                    family: workout.family, duration: workout.duration, targetLoad: workout.targetLoad,
-                    progressionLevel: workout.progressionLevel, libraryWorkoutId: workout.libraryWorkoutId ?? null};
+                const {until: _until, factor: _factor, easy: _easy, ...base} = workout.original ?? originalOf(workout);
                 modified.original = factor < 1 ? {...base, until: windowEnd, factor, easy: forceEasy} : base;
             }
             modified.adaptationNotes = [...workout.adaptationNotes];
@@ -303,11 +443,20 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
             const changed = modified.duration !== workout.duration || modified.family !== workout.family ||
                 modified.progressionLevel !== workout.progressionLevel ||
                 JSON.stringify(modified.steps) !== JSON.stringify(workout.steps);
+            const returnNote = returnShare < 1 || (comeback && family !== baseline.family && !forceEasy)
+                ? `Returning after ${comeback.days} days without ${running ? 'running' : 'riding'}: ` +
+                  `this week is limited to ${Math.round(returnShare * 100)}% of its planned dose` +
+                  `${FAMILIES[baseline.family]?.hard && family !== baseline.family ? ' and hard efforts are replaced by easy aerobic work' : ''}.`
+                : null;
+            const walkNote = runFormat?.runWalk && walkStage(runFormat) < walkStage(plannedFormat)
+                ? 'Run-walk stage held back until the previous stage has been completed within the last 14 days.'
+                : null;
             if(changed) {
                 modified.adaptationNotes.push(progressed
                     ? `Progressed after ${successes} successful ${baseline.family} sessions, within the remaining weekly load budget.`
                     : restored && workout.original ? 'Restored to the planned session after the short-term adjustment ended.'
-                        : explainAdaptation(trigger, reduction));
+                        : forceEasy ? explainAdaptation(trigger, reduction)
+                            : returnNote ?? walkNote ?? explainAdaptation(trigger, reduction));
                 Object.assign(workout, modified);
                 if(restored) delete workout.original;
                 changes.push({id: workout.id, action: 'modified', previous, current: {...workout}});
@@ -342,11 +491,14 @@ export function adaptPlan({plan, profile, state, trigger, date, timestamp, worko
     if(running) enforceRunSafety(next, profile, config, date, changes);
     next.revision++;
     next.sourceSnapshot = state.id;
-    next.validationWarnings = validatePlan(next, profile, config);
+    next.validationWarnings = [...validatePlan(next, profile, config, date), ...(next.generationWarnings || [])];
+    if(next.dataSufficiency && next.dataSufficiency !== 'supported' && state.sufficiency === 'supported') {
+        next.validationWarnings.push('Recent training history now supports structured hard sessions, but this plan was generated without them. Archive it and generate a new plan to include them; the Coach does not add hard sessions automatically.');
+    }
     next.adaptations.push({
         trigger, previousRevision: plan.revision, newRevision: next.revision,
         observations: {snapshotId: state.id, readiness: state.readiness, activityId: activity?.id ?? null,
-            match, date},
+            match, date, returnToTraining: comeback ? {days: comeback.days, resumedOn: comeback.resumedOn} : null},
         changes, loadChange: round(sum(next.workouts.map(w => w.targetLoad)) - sum(plan.workouts.map(w => w.targetLoad))),
         reasoning: explainAdaptation(trigger, reduction), validationWarnings: next.validationWarnings,
         timestamp, plannerVersion: VERSION,

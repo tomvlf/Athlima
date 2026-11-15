@@ -21,7 +21,7 @@ import { normalizeActivity } from '../../src/coaching/normalizer.js';
 import { estimateState } from '../../src/coaching/state.js';
 
 export const profile = {
-    id: 'athlete', weight: 75, ftp: 250, experience: 'intermediate',
+    id: 'athlete', adultAthleteConfirmed: true, weight: 75, ftp: 250, experience: 'intermediate',
     timeZone: 'Europe/Paris', unitSystem: 'metric', typicalWeeklyHours: 6, maxWeeklyHours: 8,
     availableDays: [0, 2, 4, 6], maxSessionMinutes: {0: 90, 2: 75, 4: 75, 6: 180},
     longRideDay: 6, powerMeter: true, heartRateMonitor: true, smartTrainer: true,

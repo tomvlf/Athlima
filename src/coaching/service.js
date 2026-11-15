@@ -16,16 +16,17 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { VERSION, DEFAULTS, localDay, sportOf, validateProfile, validateCoachingConfig, date } from './domain.js';
+import { VERSION, DEFAULTS, addDays, localDay, sportOf, validateProfile, validateCoachingConfig, date } from './domain.js';
 import { normalizeActivity } from './normalizer.js';
 import { estimateState } from './state.js';
 import { generatePlan } from './planner.js';
-import { matchWorkout, adaptPlan } from './adaptation.js';
+import { matchWorkout, adaptPlan, intervalsVerified } from './adaptation.js';
 import { openCoachingStorage } from './storage.js';
+import { FAMILIES } from './workouts.js';
 
 const KEY = 'athlima-coaching-v1';
 const empty = () => ({version: VERSION, profile: null, goal: null, activities: [],
-    snapshots: [], revisions: [], plan: null});
+    snapshots: [], revisions: [], plan: null, safetyStatus: null});
 
 /**
  * Stores the athlete profile, training goal, imported activities, and generated plan.
@@ -51,6 +52,7 @@ export class CoachingService {
            !Array.isArray(this.data.snapshots) || !Array.isArray(this.data.revisions)) {
             throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
         }
+        this.data.safetyStatus ??= null;
     }
     /**
      * Persists the next coaching state and swaps the runtime state only after a successful write.
@@ -79,6 +81,7 @@ export class CoachingService {
      */
     async configure(profile, goal) {
         validateProfile(profile);
+        if(profile.adultAthleteConfirmed !== true) throw new Error('The coaching plan is designed for adults; confirm that the athlete is 18 or older.');
         if(this.data.plan?.status === 'active') throw new Error('Finish or archive the current plan before changing profile or goal.');
         if(this.data.activities.length && this.data.profile && this.data.profile.id !== profile.id) throw new Error('Existing coaching history belongs to a different athlete.');
         const activities = this.data.activities.map(activity => normalizeActivity({
@@ -99,9 +102,11 @@ export class CoachingService {
     snapshot(data, asOf, outcome = null) {
         const outcomes = data.plan?.workouts.filter(w => w.status !== 'scheduled').map(w =>
             ({date: w.date, status: w.status, quality: w.completionQuality, family: w.family,
-                activityId: w.matchedActivity ?? null, expectedRpe: w.expectedRpe ?? null})) || [];
+                activityId: w.matchedActivity ?? null, expectedRpe: w.expectedRpe ?? null,
+                progressionEligible: w.progressionEligible ?? false})) || [];
         if(outcome) outcomes.push(outcome);
         const state = estimateState(data.activities, data.profile, asOf, this.rules, outcomes);
+        state.safetyStatus = data.safetyStatus;
         state.id += `:${data.snapshots.length + 1}`;
         data.snapshots.push(state);
         return state;
@@ -115,6 +120,8 @@ export class CoachingService {
     async generate(startDate) {
         const next = JSON.parse(JSON.stringify(this.data));
         if(!next.profile || !next.goal) throw new Error('Configure an athlete and dated goal first.');
+        if(next.profile.adultAthleteConfirmed !== true) throw new Error('Confirm that the athlete is 18 or older before generating a plan.');
+        if(next.safetyStatus) throw new Error('Training is paused while pain or illness is reported. Update the symptom status before generating a plan.');
         if(next.plan?.status === 'active') throw new Error('Archive the current plan before generating another.');
         const state = this.snapshot(next, date(startDate));
         next.plan = generatePlan({profile: next.profile, goal: next.goal, state,
@@ -132,6 +139,26 @@ export class CoachingService {
         const next = JSON.parse(JSON.stringify(this.data));
         next.plan.status = 'archived';
         next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
+        return this.commit(next);
+    }
+    async setSafetyStatus(status, asOf) {
+        if(status !== null && !['pain', 'illness'].includes(status)) {
+            throw new Error('Safety status must be pain, illness, or null.');
+        }
+        if(status === this.data.safetyStatus) return this.data;
+        const next = JSON.parse(JSON.stringify(this.data));
+        next.safetyStatus = status;
+        if(next.plan?.status === 'active') {
+            const today = date(asOf || localDay(this.clock(), next.profile.timeZone));
+            const adaptationDate = today >= next.plan.endDate ? addDays(next.plan.endDate, -1) : today;
+            if(adaptationDate >= next.plan.startDate) {
+                const state = this.snapshot(next, adaptationDate);
+                next.plan = adaptPlan({plan: next.plan, profile: next.profile, state,
+                    trigger: 'recovery', date: adaptationDate, timestamp: this.clock()});
+            }
+            next.plan.trainingPaused = status !== null;
+            next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
+        }
         return this.commit(next);
     }
     /**
@@ -206,7 +233,8 @@ export class CoachingService {
         const matched = next.plan.workouts.find(w => w.id === match.workoutId);
         const state = this.snapshot(next, asOf, matched
             ? {date: activity.day, status: 'completed', quality: match.quality, family: matched.family,
-                activityId: activity.id, expectedRpe: matched.expectedRpe ?? null} : null);
+                activityId: activity.id, expectedRpe: matched.expectedRpe ?? null,
+                progressionEligible: match.progressionEligible} : null);
         next.plan = adaptPlan({plan: next.plan, profile: next.profile, state,
             trigger: match.workoutId ? 'completed' : 'unplanned', date: asOf,
             timestamp: this.clock(), workoutId: match.workoutId, activity,
@@ -255,6 +283,9 @@ export class CoachingService {
         const today = date(asOf || localDay(this.clock(), next.profile.timeZone));
         const activity = activityId ? next.activities.find(a => a.id === activityId) : null;
         if(activityId && !activity) throw new Error('Activity not found.');
+        if(next.safetyStatus && ['completed', 'substituted'].includes(trigger)) {
+            throw new Error('Training is paused while pain or illness is reported.');
+        }
         if(activity && next.plan.workouts.some(w => w.matchedActivity === activity.id)) {
             throw new Error('This activity is already matched to a workout.');
         }
@@ -265,13 +296,21 @@ export class CoachingService {
             Object.assign(activity, updated);
         }
         const workout = next.plan.workouts.find(w => w.id === workoutId);
+        if(activity && workout && activity.sport !== (workout.sport ?? 'cycling')) {
+            throw new Error('A different sport cannot substitute for this workout.');
+        }
         if(activity && workout && activity.day !== workout.date) throw new Error('Substitution must occur on the scheduled local date.');
+        const progressionEligible = activity && workout ? intervalsVerified(activity, workout, this.rules) : false;
         const match = activity && workout ? {workoutId, confidence: 1,
             quality: Math.min(activity.duration, workout.duration) / Math.max(activity.duration, workout.duration),
-            reason: 'Rider-confirmed substitution; duration quality, interval fidelity unknown.'} : null;
+            progressionEligible,
+            reason: `Rider-confirmed substitution; duration quality${FAMILIES[workout.family]?.hard
+                ? progressionEligible ? ', interval execution supported by an interval summary or power stream.'
+                    : ', interval fidelity unknown.' : '.'}`} : null;
         const state = this.snapshot(next, today, workout
             ? {date: workout.date, status: trigger, quality: match?.quality, family: workout.family,
-                activityId: activity?.id ?? null, expectedRpe: workout.expectedRpe ?? null} : null);
+                activityId: activity?.id ?? null, expectedRpe: workout.expectedRpe ?? null,
+                progressionEligible: match?.progressionEligible ?? false} : null);
         next.plan = adaptPlan({plan: next.plan, profile: next.profile, state, trigger, date: today,
             timestamp: this.clock(), workoutId, activity, match});
         next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
@@ -301,15 +340,17 @@ export class CoachingService {
     }
     async advance(asOf) {
         if(this.data.plan?.status !== 'active') return this.data.plan;
+        if(this.data.plan.trainingPaused || this.data.safetyStatus) return this.data.plan;
         const today = date(asOf || localDay(this.clock(), this.data.profile.timeZone));
         const due = this.data.plan.workouts.filter(w => w.status === 'scheduled' && w.date < today);
         // Resolve overdue sessions in one persistent transaction, with one revision per outcome.
         const next = JSON.parse(JSON.stringify(this.data));
         for(const workout of due) {
-            const day = today > next.plan.endDate ? next.plan.endDate : today;
-            const state = this.snapshot(next, day, {date: workout.date, status: 'missed', quality: null});
+            const current = next.plan.workouts.find(item => item.id === workout.id);
+            if(current?.status !== 'scheduled') continue;
+            const state = this.snapshot(next, today, {date: workout.date, status: 'missed', quality: null});
             next.plan = adaptPlan({plan: next.plan, profile: next.profile, state,
-                trigger: 'missed', date: day, timestamp: this.clock(), workoutId: workout.id});
+                trigger: 'missed', date: workout.date, timestamp: this.clock(), workoutId: workout.id});
             next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
         }
         if(today >= next.plan.endDate) next.plan.status = 'finished';

@@ -4,12 +4,12 @@
  * The rules and their evidence are documented in doc/coaching.md ("Running coach").
  */
 
-import { RUN_GOALS, addDays, sum } from '../../src/coaching/domain.js';
+import { RUN_GOALS, addDays, sum, round } from '../../src/coaching/domain.js';
 import { generatePlan, validatePlan, qualityReferenceMinutes } from '../../src/coaching/planner.js';
 import { adaptPlan, matchWorkout } from '../../src/coaching/adaptation.js';
 import { normalizeActivity } from '../../src/coaching/normalizer.js';
 import { estimateState } from '../../src/coaching/state.js';
-import { STRIDE, thresholdPaceFromRace, parsePace, formatPace, describeRunPaces } from '../../src/coaching/running.js';
+import { STRIDE, RUN_WALK_STAGES, thresholdPaceFromRace, predictedRaceSeconds, parsePace, formatPace, describeRunPaces } from '../../src/coaching/running.js';
 import { exportZwo, FAMILIES } from '../../src/coaching/workouts.js';
 import { profile, goal as rideGoal, start, timestamp, state as rideState } from './fixtures.js';
 
@@ -39,7 +39,9 @@ describe('running plans', () => {
         expect(() => validatePlan(plan, runner, plan.coachingConfig)).not.toThrow();
         const taper = plan.weeks.findIndex(w => w.phaseType === 'taper');
         expect(plan.weeks[taper - 1].phaseType).not.toBe('recovery');
-        for(const week of plan.weeks.filter(w => w.phaseType === 'taper')) {
+        const taperWeeks = plan.weeks.filter(w => w.phaseType === 'taper');
+        expect(taperWeeks.some(w => weekRuns(plan, w).some(x => FAMILIES[x.family].hard))).toBe(true);
+        for(const week of taperWeeks.filter(w => w.scheduledMinutes >= 120)) {
             expect(weekRuns(plan, week).some(w => FAMILIES[w.family].hard)).toBe(true);
         }
         for(const [index, week] of plan.weeks.entries()) {
@@ -88,6 +90,25 @@ describe('running plans', () => {
         expect(minutes.every((m, i) => !i || m >= minutes[i - 1])).toBe(true);
         expect(minutes.at(-1)).toBeGreaterThan(minutes[0]);
     });
+    test('a short recent run still yields a bounded novice plan rather than an empty plan', () => {
+        const shortRun = normalizeActivity({id: 'short', sport: 'running', start: `${addDays(start, -1)}T07:00:00Z`,
+            duration: 300, distance: 800, rpe: 3}, novice);
+        const plan = runPlan({p: novice, goal: {...runGoal, type: 'first_5k', distanceKm: 5}, history: [shortRun]});
+        expect(plan.workouts.length).toBeGreaterThan(0);
+        expect(weekRuns(plan, plan.weeks[0]).every(w => w.duration / 60 <= 11)).toBe(true);
+        expect(plan.workouts.some(w => FAMILIES[w.family].hard)).toBe(false);
+    });
+    test('running matching uses pace rather than power and a summary cannot earn hard-session progression', () => {
+        const plan = runPlan();
+        const hard = plan.workouts.find(w => FAMILIES[w.family].hard);
+        const activity = normalizeActivity({id: 'summary-run', sport: 'running', start: `${hard.date}T07:00:00Z`,
+            duration: hard.duration, distance: Math.round(hard.duration * hard.targetIntensity * 1000 / runner.thresholdPace),
+            normalizedPower: runner.ftp ? runner.ftp * 1.5 : 500, ftp: 250}, runner);
+        expect(activity.intensityFactor).toBeCloseTo(hard.targetIntensity);
+        expect(matchWorkout(activity, plan.workouts).progressionEligible).toBe(false);
+        const withIntervals = normalizeActivity({...activity.original, id: 'interval-run', hasIntervals: true}, runner);
+        expect(matchWorkout(withIntervals, plan.workouts).progressionEligible).toBe(true);
+    });
 
     test('strides are only added to easy runs and match their stride steps', () => {
         const plan = runPlan();
@@ -111,6 +132,88 @@ describe('running plans', () => {
             trigger: 'missed', date: longRun.date, timestamp, workoutId: longRun.id});
         expect(next.workouts.find(w => w.id === longRun.id).status).toBe('missed');
         expect(() => validatePlan(next, runner, next.coachingConfig)).not.toThrow();
+    });
+
+    test('a completed quality run followed by a missed rest of week leaves a valid plan', () => {
+        let plan = runPlan();
+        const quality = plan.workouts.find(w => w.family === 'threshold');
+        const activity = normalizeActivity({id: 'quality-run', sport: 'running', start: `${quality.date}T07:00:00Z`,
+            duration: quality.duration, rpe: 7,
+            distance: quality.duration * 1000 / runner.thresholdPace * quality.targetIntensity}, runner);
+        const state = estimateState(runHistory(), runner, start);
+        plan = adaptPlan({plan, profile: runner, state, trigger: 'completed', date: quality.date, timestamp,
+            workoutId: quality.id, activity, match: {confidence: 1, quality: 1}});
+        for(const {id} of plan.workouts.filter(w => w.weekId === quality.weekId && w.date > quality.date)) {
+            const workout = plan.workouts.find(w => w.id === id);
+            if(workout?.status !== 'scheduled') continue;
+            plan = adaptPlan({plan, profile: runner, state, trigger: 'missed', date: workout.date, timestamp,
+                workoutId: id});
+        }
+        expect(plan.workouts.filter(w => w.weekId === quality.weekId && w.id !== quality.id)
+            .every(w => w.status === 'missed')).toBe(true);
+        expect(() => validatePlan(plan, runner, plan.coachingConfig)).not.toThrow();
+    });
+
+    test('a completed long run stays valid history when an earlier run is marked missed afterwards', () => {
+        const plan = runPlan();
+        const later = plan.workouts.find(w => w.date === '2026-03-07');
+        const earlier = plan.workouts.find(w => w.date === '2026-02-28');
+        const state = estimateState(runHistory(), runner, start);
+        const activity = normalizeActivity({id: 'long-run', sport: 'running', start: `${later.date}T07:00:00Z`,
+            duration: later.duration, rpe: 3, distance: later.duration * 1000 / runner.thresholdPace * 0.8}, runner);
+        const done = adaptPlan({plan, profile: runner, state, trigger: 'completed', date: later.date, timestamp,
+            workoutId: later.id, activity, match: {confidence: 1, quality: 1}});
+        expect(earlier.duration).toBeLessThan(later.duration);
+        for(const date of [earlier.date, later.date]) {
+            const next = adaptPlan({plan: done, profile: runner, state, trigger: 'missed', date, timestamp,
+                workoutId: earlier.id});
+            expect(next.workouts.find(w => w.id === later.id)).toMatchObject({status: 'completed', duration: later.duration});
+        }
+    });
+
+    test('overdue unresolved runs are not treated as tolerated exposure', () => {
+        const plan = runPlan();
+        const date = addDays(start, 40);
+        const next = adaptPlan({plan, profile: runner, state: estimateState(runHistory(), runner, start),
+            trigger: 'feedback', date, timestamp});
+        const week = next.weeks.find(w => w.endDate >= date);
+        const upcoming = next.workouts.filter(w => w.weekId === week.id && w.date >= date);
+        expect(upcoming.length).toBeGreaterThan(0);
+        expect(upcoming.every(w => w.duration / 60 <= Math.floor(30 * 1.1))).toBe(true);
+        expect(plan.workouts.filter(w => w.weekId === week.id).some(w => w.duration / 60 > 33)).toBe(true);
+    });
+
+    test('beginner run-walk stages follow completed runs and restore the planned format', () => {
+        const goal = {...runGoal, type: 'first_5k', distanceKm: 5};
+        let plan = runPlan({p: novice, goal, history: []});
+        const stage = w => w.runFormat.runWalk
+            ? RUN_WALK_STAGES.findIndex(s => s[0] === w.runFormat.runWalk[0] && s[1] === w.runFormat.runWalk[1])
+            : RUN_WALK_STAGES.length;
+        const first = Math.min(...plan.workouts.map(stage));
+        const date = plan.workouts.find(w => stage(w) >= first + 2).date;
+        const state = estimateState([], novice, start);
+        plan = adaptPlan({plan, profile: novice, state, trigger: 'feedback', date, timestamp});
+        const upcoming = plan.workouts.filter(w => w.date >= date);
+        expect(upcoming.every(w => stage(w) === first)).toBe(true);
+        expect(upcoming.some(w => w.original?.runFormat && stage(w.original) > first)).toBe(true);
+
+        const done = upcoming[0];
+        const run = normalizeActivity({id: 'walk-run', sport: 'running', start: `${done.date}T07:00:00Z`,
+            duration: done.duration, distance: 2500, rpe: 3}, novice);
+        plan = adaptPlan({plan, profile: novice, state, trigger: 'completed', date: done.date, timestamp,
+            workoutId: done.id, activity: run, match: {confidence: 1, quality: 1}});
+        const later = plan.workouts.filter(w => w.date > done.date);
+        expect(Math.max(...later.map(stage))).toBe(first + 1);
+        expect(() => validatePlan(plan, novice, plan.coachingConfig)).not.toThrow();
+    });
+
+    test('easy runs count as easy in the planned intensity distribution', () => {
+        const plan = runPlan();
+        const week = plan.weeks[0];
+        const easySeconds = sum(weekRuns(plan, week).flatMap(w => w.steps.filter(s => s.power <= 0.88))
+            .map(s => s.duration));
+        expect(week.targetIntensityDistribution.easy).toBeCloseTo(easySeconds / (week.scheduledMinutes * 60));
+        expect(week.targetIntensityDistribution.easy).toBeGreaterThan(0.75);
     });
 });
 
@@ -136,6 +239,9 @@ describe('running metrics, paces and exports', () => {
         const run = plan.workouts.find(w => w.family === 'threshold');
         expect(exportZwo(run)).toContain('<sportType>run</sportType>');
         expect(exportZwo(run)).toContain('pace="2"');
+        const scale = predictedRaceSeconds(runner.thresholdPace, 10) / (10 * runner.thresholdPace);
+        expect(exportZwo(run)).toContain(`Power="${round(run.steps[0].power * scale)}" pace="2"`);
+        expect(() => exportZwo({...run, runThresholdPace: null})).toThrow(/requires a threshold pace/);
         const activity = normalizeActivity({id: 'a', sport: 'running', start: `${run.date}T07:00:00Z`,
             duration: run.duration, distance: Math.round(run.duration * 1000 / 300 * run.targetIntensity)}, runner);
         expect(matchWorkout(activity, plan.workouts).workoutId).toBe(run.id);

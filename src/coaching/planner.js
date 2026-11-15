@@ -45,12 +45,35 @@ export function taperDays(goal, total, config) {
  *
  * @returns {number} Reference duration in minutes.
  */
-export function longestReference(day, workouts, initial, startDate, config, counted = () => true) {
-    const window = config.runLongestSessionReferenceDays;
-    const planned = workouts.filter(w => w.date < day && counted(w) && daysBetween(w.date, day) <= window)
-        .map(w => w.duration / 60);
-    const history = daysBetween(startDate, day) <= window ? [initial] : [];
-    return Math.max(0, ...planned, ...history) || config.runInitialLongestSessionMinutes;
+function sessionReference(day, workouts, initial, initialDate, referenceDays, fallback, counted = () => true) {
+    const planned = workouts.filter(w => w.date < day && counted(w) && daysBetween(w.date, day) <= referenceDays)
+        .map(w => ['completed', 'substituted'].includes(w.status)
+            ? w.completionDurationMinutes ?? w.duration / 60
+            : (w.original?.duration ?? w.duration) / 60);
+    const history = initialDate && initialDate <= day && daysBetween(initialDate, day) <= referenceDays ? [initial] : [];
+    return Math.max(0, ...planned, ...history) || fallback;
+}
+
+export function longestReference(day, workouts, initial, startDate, config,
+    counted = w => !['missed', 'failed'].includes(w.status), initialDate = startDate) {
+    return sessionReference(day, workouts, initial, initialDate, config.runLongestSessionReferenceDays,
+        config.runInitialLongestSessionMinutes, counted);
+}
+
+/**
+ * Pre-plan longest-session reference. Cycling plans generated before the session cap stored none;
+ * their first generated week was already bounded by the pre-plan envelope, so it stands in for that history.
+ *
+ * @returns {{minutes: number, date: string}} Reference minutes and the date they apply from.
+ */
+export function initialSessionReference(plan, config, running) {
+    const stored = plan.initialLimits.longestSessionMinutes;
+    const fallback = running ? config.runInitialLongestSessionMinutes : config.cyclingInitialSessionMinutes;
+    const firstWeek = stored == null && !running
+        ? plan.workouts.filter(w => w.weekId === plan.weeks[0]?.id).map(w => (w.original?.duration ?? w.duration) / 60)
+        : [];
+    return {minutes: stored ?? Math.max(fallback, ...firstWeek),
+        date: plan.initialLimits.longestSessionDate ?? plan.startDate};
 }
 
 /**
@@ -59,8 +82,10 @@ export function longestReference(day, workouts, initial, startDate, config, coun
  */
 export function qualityReferenceMinutes(weeks, index) {
     const week = weeks[index];
-    const previous = weeks.slice(Math.max(0, index - 4), index).map(w => w.plannedMinutes ?? w.scheduledMinutes);
-    return week.phaseType === 'taper' && previous.length ? Math.max(...previous)
+    const previous = weeks.slice(Math.max(0, index - 4), index)
+        .filter(w => !['recovery', 'taper'].includes(w.phaseType))
+        .map(w => w.scheduledMinutes || w.plannedMinutes || w.targetMinutes);
+    return week.phaseType === 'taper' && previous.length ? previous.at(-1)
         : week.plannedMinutes ?? week.targetMinutes;
 }
 
@@ -74,6 +99,18 @@ function limitRunDays(days, longDay, maximum) {
     }
     for(const day of days) if(chosen.length < maximum && !chosen.includes(day)) chosen.push(day);
     return chosen.sort();
+}
+
+function intensityDistributionFor(workouts, config, sport) {
+    // Running steps are fractions of threshold speed: easy up to the top of pace zone 2, hard above threshold.
+    const cuts = sport === 'running' ? [config.runPaceZones[1], config.runPaceZones[3]] : config.powerThreeZoneThresholds;
+    const seconds = [0, 0, 0];
+    for(const step of workouts.flatMap(workout => workout.steps)) {
+        seconds[step.power <= cuts[0] ? 0 : step.power <= cuts[1] ? 1 : 2] += step.duration;
+    }
+    const total = sum(seconds);
+    return {easy: total ? seconds[0] / total : 0, moderate: total ? seconds[1] / total : 0,
+        hard: total ? seconds[2] / total : 0};
 }
 
 /**
@@ -230,14 +267,36 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
         }, {capability: 'threshold', deficit: -Infinity}).capability;
     };
     const initialLongest = state.longestRecentSessionMinutes > 0
-        ? state.longestRecentSessionMinutes : config.runInitialLongestSessionMinutes;
-    const spikeCap = day => running
-        ? Math.floor(config.runSessionSpikeLimit * longestReference(day, workouts, initialLongest, startDate, config))
-        : Infinity;
+        ? Math.max(config.minimumSessionMinutes, state.longestRecentSessionMinutes)
+        : running ? config.runInitialLongestSessionMinutes : config.cyclingInitialSessionMinutes;
+    const initialLongestDate = state.longestRecentSessionDate || startDate;
+    const spikeCap = (day, weekStart) => {
+        const completedWeeks = workouts.filter(w => w.date < weekStart &&
+            !['missed', 'failed'].includes(w.status));
+        return running
+            ? Math.floor(config.runSessionSpikeLimit * longestReference(day, completedWeeks, initialLongest,
+                startDate, config, w => !['missed', 'failed'].includes(w.status), initialLongestDate))
+            : Math.floor(config.cyclingSessionSpikeLimit * sessionReference(day, completedWeeks, initialLongest,
+                initialLongestDate, config.cyclingSessionReferenceDays, config.cyclingInitialSessionMinutes));
+    };
     const walkReference = state.activityCount ? state.longestRecentSessionMinutes || 0 : 0;
     for(const [weekIndex, week] of weeks.entries()) {
         let available = Array.from({length: daysBetween(week.startDate, week.endDate) + 1}, (_, i) =>
             addDays(week.startDate, i)).filter(d => profile.availableDays.includes(weekday(d)));
+        const weekDays = Array.from({length: daysBetween(week.startDate, week.endDate) + 1}, (_, i) =>
+            addDays(week.startDate, i));
+        const taperDays = weekDays.filter(day => phases.some(p => p.type === 'taper' &&
+            p.startDate <= day && day <= p.endDate)).length;
+        if(taperDays) {
+            const reference = scheduledHistory.filter(w => !['recovery', 'taper'].includes(w.phaseType)).at(-1) ??
+                scheduledHistory.at(-1);
+            const taperFactor = (weekDays.length - taperDays + taperDays * config.taperFactor) / 7;
+            if(reference) {
+                week.targetMinutes = Math.min(week.targetMinutes, Math.floor(reference.minutes * taperFactor));
+                week.targetLoad = Math.min(week.targetLoad, round(reference.load * taperFactor));
+            }
+            week.phaseType = 'taper';
+        }
         if(running && profile.experience === 'beginner') {
             available = limitRunDays(available, profile.longRideDay, config.runBeginnerMaximumDays);
         }
@@ -258,7 +317,7 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
             const long = weekday(day) === profile.longRideDay;
             const share = long && ordered.length > 1
                 ? Math.ceil(budget * longShare) : Math.floor(budget / (ordered.length - i));
-            const minutes = Math.min(profile.maxSessionMinutes[weekday(day)], share, spikeCap(day));
+            const minutes = Math.min(profile.maxSessionMinutes[weekday(day)], share, spikeCap(day, week.startDate));
             allocations.set(day, minutes >= config.minimumSessionMinutes ? minutes : 0);
             budget -= minutes >= config.minimumSessionMinutes ? minutes : 0;
         });
@@ -279,7 +338,7 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
         let hardCount = 0, weekLoad = 0, stridesPlanned = false;
         for(const day of available) {
             // Re-check against every earlier session, including this week's, exactly as validatePlan does.
-            const minutes = Math.min(allocations.get(day) || 0, spikeCap(day));
+            const minutes = Math.min(allocations.get(day) || 0, spikeCap(day, week.startDate));
             if(minutes < config.minimumSessionMinutes) continue;
             const phase = phases.find(p => p.startDate <= day && p.endDate >= day);
             const long = weekday(day) === profile.longRideDay;
@@ -336,8 +395,7 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
         while(true) {
             const minutes = sum(scheduled.map(w => w.duration / 60));
             const totalExceeded = hardSeconds() > minutes * 60 * config.weeklyHardTimeShare;
-            const excess = running ? runQualityExcess(scheduled,
-                week.phaseType === 'taper' ? weeklyMinutes : minutes, config) : [];
+            const excess = running ? runQualityExcess(scheduled, minutes, config) : [];
             if(!totalExceeded && !excess.length) break;
             const index = workouts.findLastIndex(w => w.weekId === week.id && FAMILIES[w.family].hard &&
                 (totalExceeded || excess.includes(w.family)));
@@ -354,8 +412,10 @@ export function scheduleWorkouts(weeks, phases, profile, state, gaps, planId) {
         }
         week.scheduledMinutes = sum(scheduled.map(w => w.duration / 60));
         week.scheduledLoad = round(sum(scheduled.map(w => w.targetLoad)));
-        scheduledHistory.push({minutes: week.scheduledMinutes, load: week.scheduledLoad});
+        week.targetIntensityDistribution = intensityDistributionFor(scheduled, config, sport);
+        scheduledHistory.push({minutes: week.scheduledMinutes, load: week.scheduledLoad, phaseType: week.phaseType});
     }
+
     return workouts;
 }
 
@@ -381,7 +441,11 @@ const RUN_STRENGTH_ADVICE = 'Consider progressive strength training for running 
     '(Balsalobre-Fernández et al. 2016; Blagrove et al. 2018). Start conservatively, seek qualified guidance ' +
     'for unfamiliar heavy or plyometric exercises, and account for the extra fatigue; strength is not scheduled or tracked here.';
 
-export function validatePlan(plan, profile, rules = plan.coachingConfig) {
+/**
+ * @param {string|null} [asOf=null] - Adaptation date. Session spike caps apply only to scheduled sessions
+ *   on or after it: completed sessions are history and overdue ones can no longer be reshaped.
+ */
+export function validatePlan(plan, profile, rules = plan.coachingConfig, asOf = null) {
     const config = validateCoachingConfig(rules);
     validateProfile(profile);
     const errors = [], warnings = [];
@@ -412,21 +476,29 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig) {
            !Number.isFinite(w.targetIntensity) ||
            Math.abs(w.targetIntensity - Math.sqrt(stepLoad(w.steps) / (w.duration / 3600 * 100))) > 0.001 ||
            Math.abs(stepLoad(w.steps) - w.targetLoad) > 0.02) errors.push('Invalid workout steps or target load.');
-        if(FAMILIES[w.family]?.hard) hard.push(w);
+        if(FAMILIES[w.family]?.hard && !['missed', 'failed'].includes(w.status)) hard.push(w);
     }
     hard.sort((a, b) => a.date.localeCompare(b.date));
     if(hard.some((w, i) => i && daysBetween(hard[i - 1].date, w.date) < config.minimumHardSeparationDays)) errors.push('Hard workouts need an easy/rest day between.');
-    if(sportOf(profile) === 'running') {
-        const initial = plan.initialLimits.longestSessionMinutes ?? config.runInitialLongestSessionMinutes;
-        const runs = [...plan.workouts].sort((a, b) => a.date.localeCompare(b.date));
-        if(runs.some(w => w.duration / 60 > config.runSessionSpikeLimit *
-            longestReference(w.date, runs, initial, plan.startDate, config) + 0.01)) {
+    const running = sportOf(profile) === 'running';
+    const {minutes: initial, date: initialDate} = initialSessionReference(plan, config, running);
+    const kept = plan.workouts.filter(w => !['missed', 'failed'].includes(w.status));
+    const checked = kept.filter(w => w.status === 'scheduled' && (!asOf || w.date >= asOf));
+    const priorWeeks = w => kept.filter(prior => prior.weekId !== w.weekId);
+    if(running) {
+        if(checked.some(w => w.duration / 60 > config.runSessionSpikeLimit *
+            longestReference(w.date, priorWeeks(w), initial, plan.startDate, config, undefined, initialDate) + 0.01)) {
             errors.push('A run exceeds the longest run of the previous 30 days by more than the spike limit.');
         }
+    } else if(checked.some(w => w.duration / 60 > config.cyclingSessionSpikeLimit * sessionReference(w.date,
+        priorWeeks(w), initial, initialDate, config.cyclingSessionReferenceDays,
+        config.cyclingInitialSessionMinutes) + 0.01)) {
+        errors.push('A cycling session exceeds the recent-session progression cap.');
     }
     const history = [];
     for(const [index, week] of plan.weeks.entries()) {
-        const workouts = plan.workouts.filter(w => w.weekId === week.id);
+        const workouts = plan.workouts.filter(w => w.weekId === week.id &&
+            !['missed', 'failed'].includes(w.status));
         const minutes = sum(workouts.map(w => w.duration / 60));
         const load = sum(workouts.map(w => w.targetLoad));
         if(!Number.isFinite(week.targetMinutes) || week.targetMinutes < 0 ||
@@ -436,10 +508,13 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig) {
            minutes > week.targetMinutes + 0.01 || load > week.targetLoad + 0.05) errors.push('Weekly target or availability exceeded.');
         if(workouts.filter(w => FAMILIES[w.family]?.hard).length >
            (profile.experience === 'beginner' ? config.beginnerHardSessionsPerWeek : config.experiencedHardSessionsPerWeek)) errors.push('Too many hard workouts.');
+        // Completed sessions are history: a share exceeded only by them (for example after the rest of
+        // the week was missed) cannot be corrected, so only scheduled hard sessions make it an error.
+        const scheduledHard = workouts.filter(w => w.status === 'scheduled' && FAMILIES[w.family]?.hard);
         const hardSeconds = sum(workouts.flatMap(w => w.steps.filter(s => s.power > config.hardPowerThreshold)).map(s => s.duration));
-        if(hardSeconds > minutes * 60 * config.weeklyHardTimeShare) errors.push('Weekly demanding interval time exceeded.');
+        if(scheduledHard.length && hardSeconds > minutes * 60 * config.weeklyHardTimeShare) errors.push('Weekly demanding interval time exceeded.');
         if(sportOf(profile) === 'running' &&
-           runQualityExcess(workouts, qualityReferenceMinutes(plan.weeks, index), config).length) {
+           runQualityExcess(workouts, minutes, config).some(family => scheduledHard.some(w => w.family === family))) {
             errors.push('Aggregate weekly running quality cap exceeded.');
         }
         if(history.length) {
@@ -459,14 +534,20 @@ export function validatePlan(plan, profile, rules = plan.coachingConfig) {
     if(!plan.workouts.length) warnings.push('No safe session fits the supplied dates and availability.');
     if(sportOf(profile) === 'running' && plan.workouts.length) {
         const goal = plan.goalDefinition ?? {};
-        const predicted = goal.distanceKm && profile.thresholdPace
-            ? predictedRaceSeconds(profile.thresholdPace, goal.distanceKm, config.riegelExponent) / 60 : null;
+        const standardDistance = {first_5k: 5, run_5k: 5, run_10k: 10,
+            half_marathon: 21.0975, marathon: 42.195}[goal.type];
+        const distance = goal.distanceKm ?? standardDistance;
+        const predicted = distance && profile.thresholdPace
+            ? predictedRaceSeconds(profile.thresholdPace, distance, config.riegelExponent) / 60 : null;
         const race = goal.expectedDurationMinutes ?? goal.finishTimeMinutes ?? predicted;
         const longest = Math.max(...plan.workouts.map(w => w.duration / 60));
         if(race && longest < race * config.runRaceReadinessShare) {
             warnings.push(`Longest planned run (${Math.round(longest)} min) stays below ${Math.round(config.runRaceReadinessShare * 100)}% of the expected race time ` +
                 `(about ${Math.round(race)} min): this plan may not provide enough endurance preparation. ` +
                 'This is a heuristic, not a readiness assessment. Consider a shorter race, a later date, or qualified coaching advice.');
+        }
+        if(['first_5k', 'run_5k', 'run_10k', 'half_marathon', 'marathon', 'ultra_trail'].includes(goal.type) && !race) {
+            warnings.push('Race readiness cannot be estimated from the available event and threshold-pace details; this plan does not establish race preparedness.');
         }
     }
     if(daysBetween(plan.startDate, plan.endDate) < 21) warnings.push('Short lead time: preparation and taper only, no accelerated build.');
@@ -479,6 +560,11 @@ export function generatePlan({profile, goal, state, startDate, generatedAt, regi
     const sport = sportOf(profile);
     const config = validateCoachingConfig(state.config);
     validateGoal(goal, startDate, registry, config);
+    for(const key of ['ftpTestDate', 'thresholdPaceDate']) {
+        if(profile[key] && profile[key] > startDate) {
+            throw new Error(`${key} cannot be after the plan start date.`);
+        }
+    }
     if(state.date !== startDate || state.athleteId !== profile.id || !Number.isFinite(Date.parse(generatedAt))) {
         throw new Error('Plan requires a state snapshot for its start date and an explicit generation timestamp.');
     }
@@ -495,6 +581,7 @@ export function generatePlan({profile, goal, state, startDate, generatedAt, regi
         const members = workouts.filter(w => w.phaseId === phase.id);
         phase.targetVolumeRange = [0, sum(members.map(w => w.duration / 60))];
         phase.targetLoadRange = [0, round(sum(members.map(w => w.targetLoad)))];
+        phase.targetIntensityDistribution = intensityDistributionFor(members, config, sport);
     }
     const plan = {
         id, athleteId: profile.id, goalId: goal.id, sport, startDate, endDate: goal.date, status: 'active',
@@ -503,11 +590,31 @@ export function generatePlan({profile, goal, state, startDate, generatedAt, regi
         coachingConfig: JSON.parse(JSON.stringify(config)),
         progressionBaseline: JSON.parse(JSON.stringify(state.successfulSessionsByFamily || {})),
         rationale: `${demand.rationale} ${gaps.rationale}${sport === 'running' ? ` ${RUN_STRENGTH_ADVICE}` : ''} Training decision support, not medical advice.`,
-        demand, gaps, phases, weeks, workouts, adaptations: [], validationWarnings: [],
+        demand, gaps, phases, weeks, workouts, adaptations: [], validationWarnings: [], generationWarnings: [],
+        dataSufficiency: state.sufficiency,
         initialLimits: {minutes: weeks[0].targetMinutes, load: weeks[0].targetLoad,
-            ...(sport === 'running' ? {longestSessionMinutes: state.longestRecentSessionMinutes > 0
-                ? state.longestRecentSessionMinutes : config.runInitialLongestSessionMinutes} : {})},
+            longestSessionMinutes: state.longestRecentSessionMinutes > 0
+                ? Math.max(config.minimumSessionMinutes, state.longestRecentSessionMinutes) : sport === 'running'
+                    ? config.runInitialLongestSessionMinutes : config.cyclingInitialSessionMinutes,
+            longestSessionDate: state.longestRecentSessionDate || startDate},
     };
     plan.validationWarnings = validatePlan(plan, profile, config);
+    const datedMetrics = sport === 'running'
+        ? [['thresholdPace', 'thresholdPaceDate', 'Threshold pace']]
+        : [['ftp', 'ftpTestDate', 'FTP']];
+    // Input-quality warnings are kept separately so plan revisions do not silently drop them.
+    for(const [metric, dateKey, label] of datedMetrics) {
+        if(profile[metric] == null) continue;
+        if(!profile[dateKey]) {
+            plan.generationWarnings.push(`${label} measurement date is not recorded; verify this value before relying on its intensity targets.`);
+        } else if(daysBetween(profile[dateKey], startDate) > 90) {
+            plan.generationWarnings.push(`${label} measurement is over 90 days old; verify or recalibrate it before relying on its intensity targets. The 90-day reminder is a heuristic, not a physiological validity cutoff.`);
+        }
+    }
+    if(sport === 'running' && ['first_5k', 'run_5k', 'run_10k', 'half_marathon', 'marathon', 'ultra_trail'].includes(goal.type) &&
+       state.sufficiency !== 'supported') {
+        plan.generationWarnings.push('Recent running history is insufficient to assess race preparation. This conservative plan is not evidence of readiness; consider a later or shorter event and qualified coaching advice.');
+    }
+    plan.validationWarnings.push(...plan.generationWarnings);
     return plan;
 }

@@ -377,7 +377,14 @@ xf.reg('ui:coaching:select', (workout, db) => {
     try {
         const data = coachingService().data, profile = data.profile;
         const current = data.plan?.workouts.find(w => w.id === workout.coachingWorkoutId);
-        if(data.plan?.status !== 'active' || !current || current.status !== 'scheduled' ||
+        if(data.plan?.trainingPaused || data.safetyStatus) {
+            throw new Error('Training is paused while pain or illness is reported.');
+        }
+        if(profile?.adultAthleteConfirmed !== true) {
+            throw new Error('Confirm that the athlete is 18 or older by reconfiguring the plan before starting it.');
+        }
+        if(data.plan?.status !== 'active' || data.plan.trainingPaused || data.safetyStatus ||
+           data.profile?.adultAthleteConfirmed !== true || !current || current.status !== 'scheduled' ||
            current.date !== localDay(new Date().toISOString(), profile.timeZone)) {
             throw new Error('Only unresolved workouts scheduled for today in the active coaching plan can be started.');
         }

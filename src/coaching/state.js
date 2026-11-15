@@ -16,7 +16,7 @@
  * the tests and the surrounding callers in the same review.
  */
 
-import { DEFAULTS, VERSION, addDays, sum, mean, metric, positive, round, sportOf,
+import { DEFAULTS, VERSION, addDays, daysBetween, sum, mean, metric, positive, round, sportOf,
     validateProfile, validateCoachingConfig } from './domain.js';
 
 export const POWER_DURATIONS = [5, 15, 30, 60, 180, 300, 720, 1200, 1800, 2400, 3600];
@@ -128,8 +128,10 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
         throw new Error('Coaching history windows must not exceed 730 days or the configured long window.');
     }
     const sport = sportOf(profile);
+    const allHistory = activities.filter(a => a.day <= asOf && a.day > addDays(asOf, -config.longDays));
     const history = activities.filter(a => a.sport === sport && a.day <= asOf &&
         a.day > addDays(asOf, -config.longDays));
+    const otherSport = allHistory.filter(a => a.sport !== sport);
     const recent = history.filter(a => a.day > addDays(asOf, -config.mediumDays));
     // One scale for the entire snapshot, never add TSS to RPE or HR units.
     const loadSource = [sport === 'running' ? 'pace' : 'power', 'sessionRpe', 'heartRate']
@@ -155,12 +157,12 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
     const monotony = deviation > 0 ? average / deviation : null;
     const recentOutcomes = outcomes.filter(o => o.date <= asOf && o.date > addDays(asOf, -config.mediumDays));
     const completed = recentOutcomes.filter(o => ['completed', 'substituted'].includes(o.status));
-    const feedback = history.filter(a => a.day > addDays(asOf, -config.readinessWindowDays));
+    const feedback = allHistory.filter(a => a.day > addDays(asOf, -config.readinessWindowDays));
     // A planned hard session is meant to feel hard: judge its RPE against the planned effort.
     const rpeLimit = activity => {
         const expected = outcomes.find(o => o.activityId === activity.id)?.expectedRpe;
         return Number.isFinite(expected)
-            ? Math.min(10, Math.max(config.readinessHighRpe, expected + config.readinessRpeMargin))
+            ? Math.min(10, expected + config.readinessRpeMargin)
             : config.readinessHighRpe;
     };
     const signals = {
@@ -181,23 +183,46 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
         signals.highSoreness ? 'High reported soreness.' : null,
         signals.highStress ? 'High reported stress.' : null,
     ].filter(Boolean);
+    const extremeSoreness = feedback.some(a => a.feedback.muscleSoreness != null &&
+        a.feedback.muscleSoreness >= config.readinessExtremeSoreness);
+    const extremeLegFreshness = feedback.some(a => a.feedback.legFreshness != null &&
+        a.feedback.legFreshness <= config.readinessExtremeLegFreshness);
     const signalWeights = {
         highRpe: config.readinessRpeScore,
         lowSleep: config.readinessSleepScore,
-        lowLegFreshness: config.readinessLegFreshnessScore,
-        highSoreness: config.readinessSorenessScore,
+        lowLegFreshness: extremeLegFreshness ? Math.max(config.readinessLegFreshnessScore, config.readinessExtremeScore)
+            : config.readinessLegFreshnessScore,
+        highSoreness: extremeSoreness ? Math.max(config.readinessSorenessScore, config.readinessExtremeScore)
+            : config.readinessSorenessScore,
         highStress: config.readinessStressScore,
     };
+    if(extremeSoreness) concerns.push('Extreme soreness reported: if this is pain rather than ordinary training soreness, report pain to pause training and seek a qualified assessment.');
     const readinessScore = sum(Object.entries(signals).map(([key, present]) =>
         present ? signalWeights[key] : 0));
     const cautionSignals = Object.keys(signals).filter(key => signals[key]);
     const readinessStatus = readinessScore >= config.readinessCautionScore
         ? 'caution' : concerns.length ? 'monitor' : 'unknown';
-    const sufficient = recent.length >= 8 && recent.every(a => ['A', 'B'].includes(a.dataLevel));
-    const confidence = sufficient ? 'medium' : 'low';
+    // Hard sessions need regular recent training, not a particular sensor: power, pace, heart rate
+    // or RPE are each accepted as evidence that intensity was observed.
+    const recentWeeks = new Set(recent.map(a => Math.floor(daysBetween(a.day, asOf) / 7))).size;
+    const intensityEvidence = recent.filter(a => a.intensityFactor != null || a.averageHeartRate != null ||
+        a.rpe != null).length;
+    const sufficient = recent.length >= config.sufficiencyMinimumSessions &&
+        recentWeeks >= config.sufficiencyMinimumWeeks &&
+        intensityEvidence >= recent.length * config.sufficiencyIntensityEvidenceShare;
+    const confidence = sufficient && recent.every(a => ['A', 'B'].includes(a.dataLevel)) ? 'medium' : 'low';
     const powerCurve = powerDuration(recent, profile.weight);
     const baseline = powerDuration(history, profile.weight);
     const cp = estimateCriticalPower(recent.flatMap(a => a.bestEfforts), config);
+    const longestActivity = longestWindow.reduce((best, activity) =>
+        !best || activity.duration > best.duration ? activity : best, null);
+    const activityLoads = history.map(activity => ({id: activity.id, day: activity.day, start: activity.start,
+        durationMinutes: activity.duration / 60,
+        load: sport === 'running' ? activity.loadMetrics.pace?.value : activity.loadMetrics.power?.value,
+        plannedEquivalentLoad: (sport === 'running' ? activity.loadMetrics.pace?.value :
+            activity.loadMetrics.power?.value) ?? (activity.duration / 60 *
+                (sport === 'running' ? config.runInitialLoadPower : config.initialLoadPower) ** 2 * 100 / 60)}));
+    const lastActivityDate = history.reduce((latest, activity) => activity.day > latest ? activity.day : latest, '');
     const rpes = recent.filter(a => a.rpe != null).sort((a, b) => a.start.localeCompare(b.start));
     const half = Math.floor(rpes.length / 2);
     return {
@@ -206,7 +231,10 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
         ftp: {...metric(profile.ftp ?? null, 'medium', 'Athlete-declared FTP, not inferred CP.'), source: 'athlete-profile'},
         wKg: metric(profile.ftp ? profile.ftp / profile.weight : null, 'medium', 'Declared FTP / body mass.'),
         thresholdPace: metric(profile.thresholdPace ?? null, 'medium', 'Athlete-declared running threshold pace, seconds per km.'),
-        longestRecentSessionMinutes: longestWindow.length ? Math.max(...longestWindow.map(a => a.duration / 60)) : 0,
+        longestRecentSessionMinutes: longestActivity ? longestActivity.duration / 60 : 0,
+        longestRecentSessionDate: longestActivity?.day ?? null,
+        lastActivityDate: lastActivityDate || null,
+        activityLoads,
         criticalPower: cp, maximumAerobicPower: metric(null, 'unavailable', 'No validated MAP protocol supplied.'),
         powerDuration: powerCurve, baselinePowerDuration: baseline,
         performanceComparison: 'Missing maximal efforts are not evidence of performance decline.',
@@ -233,7 +261,8 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
             confidence, 'Completed workouts with quality >=0.8 / completed workouts.'),
         successfulSessionsByFamily: Object.fromEntries([...new Set(recentOutcomes.map(o => o.family).filter(Boolean))]
             .map(family => [family, recentOutcomes.filter(o => o.family === family &&
-                ['completed', 'substituted'].includes(o.status) && o.quality >= config.progressionMinimumQuality).length])),
+                ['completed', 'substituted'].includes(o.status) && o.quality >= config.progressionMinimumQuality &&
+                o.progressionEligible === true).length])),
         recentRpeTrend: metric(half ? mean(rpes.slice(half).map(a => a.rpe)) -
             mean(rpes.slice(0, half).map(a => a.rpe)) : null, 'low', 'Recent half minus earlier half mean RPE.'),
         readiness: {concerns: [...new Set(concerns)], signals, score: readinessScore,
@@ -245,8 +274,9 @@ export function estimateState(activities, profile, asOf, options = {}, outcomes 
                     : concerns.length ? 'Subjective signals are below the combined caution threshold; monitor, do not diagnose.'
                         : 'No recent subjective signals; this is not proof of readiness.'},
         sufficiency: sufficient ? 'supported' : recent.length ? 'limited' : 'insufficient',
-        confidence, activityCount: history.length,
+        confidence, activityCount: history.length, recentActivityCount: recent.length,
         warnings: ['Load models use supplied history only; missing imports are not proof of rest.',
+            ...(otherSport.length ? ['Other-sport duration is not combined with this sport load; recent subjective feedback from those activities is considered.'] : []),
             ...new Set(history.flatMap(a => a.warnings)),
             ...(daily.some(d => d.incomplete) ? ['Some historical loads unavailable on the chosen scale.'] : [])],
     };

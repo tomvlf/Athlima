@@ -183,6 +183,10 @@ describe('persistent coaching loop', () => {
         const {service, setDate} = await setup();
         const workout = service.data.plan.workouts[0];
         setDate(workout.date);
+        await service.importActivities([{id: 'cross-sport', sport: 'running',
+            start: `${workout.date}T10:00:00Z`, duration: workout.duration, distance: 5000}]);
+        await expect(service.resolve({workoutId: workout.id, trigger: 'substituted',
+            activityId: 'cross-sport'})).rejects.toThrow(/different sport/);
         await service.recordRide({id: 'outdoor', start: `${workout.date}T10:00:00Z`, duration: workout.duration});
         expect(service.data.plan.workouts.find(w => w.id === workout.id).status).toBe('scheduled');
         await service.resolve({workoutId: workout.id, trigger: 'substituted', activityId: 'outdoor'});
@@ -219,6 +223,41 @@ describe('persistent coaching loop', () => {
         await expect(service.configure(profile, goal)).rejects.toThrow(/archive/);
         storage.setItem('athlima-coaching-v1', '{"version":"unknown"}');
         expect(() => new CoachingService(storage)).toThrow(/Unsupported/);
+    });
+    test('requires an adult confirmation before a profile can be configured', async () => {
+        const service = new CoachingService(memoryStorage(), () => timestamp);
+        await expect(service.configure({...profile, adultAthleteConfirmed: false}, goal))
+            .rejects.toThrow(/18 or older/);
+    });
+    test('pain or illness pauses execution and missed-session review until the status is cleared', async () => {
+        const {service, setDate} = await setup();
+        const workout = service.data.plan.workouts[0];
+        setDate(workout.date);
+        await service.setSafetyStatus('pain');
+        expect(service.data.plan.trainingPaused).toBe(true);
+        expect(service.data.plan.workouts.find(w => w.id === workout.id).duration)
+            .toBeLessThan(workout.duration);
+        const pausedRevision = service.data.plan.revision;
+        await service.advance(addDays(workout.date, 1));
+        expect(service.data.plan.revision).toBe(pausedRevision);
+        await expect(service.resolve({workoutId: workout.id, trigger: 'completed', asOf: workout.date}))
+            .rejects.toThrow(/paused/);
+        await service.setSafetyStatus(null, addDays(workout.date, 1));
+        expect(service.data.plan.trainingPaused).toBe(false);
+        expect(service.data.safetyStatus).toBeNull();
+    });
+    test('late activity imports reconcile a matching workout already marked missed', async () => {
+        const {service, setDate} = await setup();
+        const workout = service.data.plan.workouts[0];
+        setDate(addDays(workout.date, 1));
+        await service.advance();
+        expect(service.data.plan.workouts.find(w => w.id === workout.id).status).toBe('missed');
+        await service.importActivities([{id: 'late-activity', start: `${workout.date}T10:00:00Z`,
+            duration: workout.duration, normalizedPower: workout.targetIntensity * profile.ftp,
+            ftp: profile.ftp}]);
+        expect(service.data.plan.workouts.find(w => w.id === workout.id)).toMatchObject({
+            status: 'completed', matchedActivity: 'late-activity',
+        });
     });
     test('missed workouts are reviewed only once and dates after the event finish the plan', async () => {
         const {service, setDate} = await setup();

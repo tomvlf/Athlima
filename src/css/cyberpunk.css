@@ -56,6 +56,14 @@ body.platform-app {
     border-top-color: #54727d;
     box-shadow: inset 2px 0 #253e48, 0 12px 28px rgba(0, 0, 0, .18);
 }
+.mobile-app #platform .activity-periods > .activity-period, .mobile-app #platform .activity-periods > .mobile-details,
+.mobile-app #platform .activity-overview > .mobile-details, .mobile-app #platform .activity-overview > .activity-load-state,
+.mobile-app #legacy-slot #view--settings-settings {
+    border-radius: 0 16px 0 0;
+    border-top-color: #54727d;
+    box-shadow: inset 2px 0 #253e48;
+}
+.mobile-app #platform .activity-overview > p, .mobile-app #platform .activity-history + .muted { border-radius: 0 12px 0 0; }
 
 .platform-app .hero {
     background: linear-gradient(105deg, #13212b 20%, rgba(19, 33, 43, .96) 60%, rgba(19, 33, 43, .78)),
@@ -82,6 +90,17 @@ body.platform-app {
     background: #142731;
     border-color: #426a75;
 }
+/* Calendar navigation, day and session buttons sit on dark surfaces, so they must not take the primary button ink. */
+#platform .training-calendar--navigation button:not(.secondary):not(.danger) {
+    background: #142731;
+    border-color: #426a75;
+    color: var(--platform-text);
+}
+#platform .training-calendar .calendar-day--select:not(.secondary):not(.danger),
+#platform .training-calendar .calendar-event--select:not(.secondary):not(.danger) {
+    color: var(--platform-text);
+    box-shadow: none;
+}
 #platform input, #platform textarea, #platform select {
     border-radius: 0 6px 0 0;
     background: #0b141c;
@@ -90,8 +109,8 @@ body.platform-app {
 #platform input:disabled { color: var(--platform-muted); }
 #platform :focus-visible { outline-color: #a8fff2; }
 #platform .library-import:focus-within { outline-color: #a8fff2; }
-#platform-message:not(:empty) { border-radius: 0 10px 0 0; border-left: 3px solid var(--cyber-cyan); }
-#platform-message.error { border-left-color: #ffadb7; }
+#platform-message:not(:empty), #platform-content > p[role="alert"] { border-radius: 0 10px 0 0; border-left: 3px solid var(--cyber-cyan); }
+#platform-message.error, #platform-content > p[role="alert"] { border-left-color: #ffadb7; }
 #legacy-slot .coach-card { border-radius: 0 16px 0 0; }
 
 body.platform-app[data-route="player"] {
@@ -109,7 +128,20 @@ body.platform-app[data-route="player"] button:not(.secondary):not(.danger) { bor
 }
 
 @media (max-width: 700px) {
-    body.platform-app { background-attachment: scroll; }
+    /* Mobile browsers ignore fixed backgrounds; a fixed layer avoids the tiled seams of a scrolling cover image. */
+    body.platform-app { background-image: none; }
+    body.platform-app::before {
+        content: '';
+        position: fixed;
+        inset: 0 0 auto;
+        height: 100vh;
+        height: 100lvh;
+        z-index: -1;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(8, 11, 16, .86), rgba(8, 11, 16, .74) 50%, rgba(8, 11, 16, .6)),
+            var(--city-backdrop) center / cover no-repeat;
+    }
+    body.platform-app[data-route="player"]::before { display: none; }
     .platform-app .sidebar { box-shadow: none; }
     .platform-app .hero { background: #13212b; }
     .platform-app .platform-header::after { opacity: .5; }
@@ -117,6 +149,7 @@ body.platform-app[data-route="player"] button:not(.secondary):not(.danger) { bor
 
 @media (forced-colors: active) {
     body.platform-app, .platform-app .hero, .platform-app .sidebar { background-image: none; }
+    body.platform-app::before { display: none; }
     .platform-app .platform-header::after { display: none; }
     #platform .brand { text-shadow: none; }
     .platform-app .panel, .platform-app .workout-card, .platform-app .hero { box-shadow: none; }

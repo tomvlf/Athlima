@@ -19,12 +19,16 @@
 import { normalizeActivity, fromRecordedRide } from '../../src/coaching/normalizer.js';
 import { estimateCriticalPower, estimateState, powerDuration, estimateDurability,
     intensityDistribution } from '../../src/coaching/state.js';
-import { DEFAULTS, addDays, metric, localDay } from '../../src/coaching/domain.js';
+import { DEFAULTS, addDays, metric, localDay, validateProfile } from '../../src/coaching/domain.js';
 import { profile, start, history } from './fixtures.js';
 
 const ride = overrides => normalizeActivity({id: 'ride', start: `${start}T09:00:00Z`, duration: 3600, ...overrides}, profile);
 
 describe('activity normalization', () => {
+    test('rejects a threshold heart rate at or below the declared resting heart rate', () => {
+        expect(() => validateProfile({...profile, thresholdHeartRate: 50})).toThrow(/higher than resting/);
+        expect(() => validateProfile({...profile, thresholdHeartRate: 45})).toThrow(/higher than resting/);
+    });
     test('calculates independent loads, preserves originals and documents inputs', () => {
         const a = ride({normalizedPower: 200, averageHeartRate: 120, rpe: 6, source: 'manual'});
         expect(a.intensityFactor).toBe(0.8);
@@ -153,12 +157,21 @@ describe('versioned rider-state estimation', () => {
         expect(s.readiness.status).toBe('unknown');
         expect(s.sufficiency).toBe('insufficient');
     });
+    test('other-sport load stays separate but its recent high RPE contributes to fatigue caution', () => {
+        const run = normalizeActivity({id: 'cross-training', sport: 'running',
+            start: `${start}T09:00:00Z`, duration: 3600, distance: 8000, rpe: 9}, profile);
+        const state = estimateState([run], profile, start);
+        expect(state.activityCount).toBe(0);
+        expect(state.weeklyLoad).toBeNull();
+        expect(state.readiness.status).toBe('caution');
+        expect(state.warnings.join(' ')).toMatch(/Other-sport duration is not combined/);
+    });
     test('configurable windows and explicit feedback change readiness', () => {
         const a = ride({feedback: {sleepQuality: 1, muscleSoreness: 5}});
         const s = estimateState([a], profile, start, {longDays: 30, chronicDays: 20});
         expect(s.dailyLoad).toHaveLength(30);
         expect(s.readiness.status).toBe('caution');
-        expect(s.readiness.concerns).toHaveLength(2);
+        expect(s.readiness.concerns).toHaveLength(3);
         expect(() => estimateState([], profile, start, {chronicDays: 0})).toThrow();
     });
     test('a single poor-sleep report is monitoring only; missing subjective data stays unknown', () => {
@@ -168,8 +181,22 @@ describe('versioned rider-state estimation', () => {
         expect(monitored.readiness.confidence).toBe('low');
         expect(monitored.readiness.reason).toMatch(/not independently reduce training/);
         expect(estimateState([], profile, start).readiness.status).toBe('unknown');
-        expect(estimateState([ride({feedback: {muscleSoreness: 5}})], profile, start)
+        expect(estimateState([ride({feedback: {muscleSoreness: 4}})], profile, start)
             .readiness.status).toBe('monitor');
+    });
+    test('extreme soreness or leg fatigue alone reaches caution; extreme soreness points to pain reporting', () => {
+        for(const feedback of [{muscleSoreness: 5}, {legFreshness: 1}]) {
+            expect(estimateState([ride({feedback})], profile, start).readiness.status).toBe('caution');
+        }
+        expect(estimateState([ride({feedback: {muscleSoreness: 5}})], profile, start).readiness.concerns.join(' '))
+            .toMatch(/report pain to pause training and seek a qualified assessment/);
+    });
+    test('data sufficiency does not depend on owning a power meter', () => {
+        const unpowered = {...profile, powerMeter: false, ftp: null};
+        const rides = Array.from({length: 14}, (_, i) => normalizeActivity({id: `hr-ride-${i}`,
+            start: `${addDays(start, -i * 2)}T09:00:00Z`, duration: 3600, averageHeartRate: 130, rpe: 4}, unpowered));
+        expect(estimateState(rides, unpowered, start).sufficiency).toBe('supported');
+        expect(estimateState(rides.slice(0, 3), unpowered, start).sufficiency).not.toBe('supported');
     });
     test('readiness and CP decision thresholds are configurable and validated', () => {
         const highRpe = ride({rpe: 8});
@@ -192,11 +219,15 @@ describe('versioned rider-state estimation', () => {
         expect(estimateState([maximal], profile, start, {},
             [{date: maximal.day, status: 'completed', activityId: maximal.id, expectedRpe: 9}]).readiness.status)
             .toBe('caution');
+        const unexpectedlyHard = ride({rpe: 8});
+        expect(estimateState([unexpectedlyHard], profile, start, {},
+            [{date: unexpectedlyHard.day, status: 'completed', activityId: unexpectedlyHard.id,
+                expectedRpe: 3}]).readiness.status).toBe('caution');
         expect(() => estimateState([], profile, start, {readinessRpeMargin: -1})).toThrow(/configuration/);
     });
     test('only successfully completed sessions contribute to family progression history', () => {
         const outcomes = [
-            {date: start, family: 'threshold', status: 'completed', quality: 0.9},
+            {date: start, family: 'threshold', status: 'completed', quality: 0.9, progressionEligible: true},
             {date: start, family: 'threshold', status: 'substituted', quality: 0.79},
             {date: start, family: 'aerobic', status: 'missed', quality: null},
         ];

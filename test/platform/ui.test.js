@@ -26,6 +26,7 @@ import { normalizeActivity } from '../../src/coaching/normalizer.js';
 import { models } from '../../src/models/models.js';
 import { idb } from '../../src/storage/idb.js';
 import { profile as coachingProfile } from '../coaching/fixtures.js';
+import { today } from '../../src/platform/format.js';
 
 jest.mock('../../src/index.js', () => {
     queueMicrotask(() => globalThis.window.dispatchEvent(new CustomEvent('app:ready')));
@@ -487,4 +488,31 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     await settle();
     expect(root.querySelector('#platform-message').getAttribute('role')).toBe('alert');
     expect(root.querySelector('#platform-message').textContent).toContain('Reconnect');
+
+    const session = {id: 'coach-today', date: today({profile: profileData}), status: 'scheduled', sport: 'cycling',
+        title: 'Coach endurance', description: 'Steady aerobic ride', family: 'endurance', duration: 60, expectedRpe: 3,
+        steps: [{duration: 60, power: .6}]};
+    const coachPlan = {status: 'active', trainingPaused: false, workouts: [session]};
+    coachingData.mockReturnValue({activities: [], plan: {...coachPlan, trainingPaused: true}, profile: profileData});
+    await go('workout/coach-today');
+    expect(root.querySelector('[data-action="start-workout"]')).toBeNull();
+    expect(root.textContent).toContain('Training is paused while pain or illness is reported');
+    coachingData.mockReturnValue({activities: [], plan: coachPlan, profile: profileData});
+    await go('workout/coach-today');
+    let engineAccepts = false;
+    xf.sub('ui:coaching:select', workout => { if(engineAccepts) db.workout = workout; });
+    const loadedWorkout = db.workout;
+    dispatch.mockClear();
+    root.querySelector('[data-action="start-workout"]').click();
+    await settle();
+    expect(dispatch.mock.calls.map(([event]) => event)).toEqual(['ui:coaching:select']);
+    expect(window.location.hash).toBe('#/workout/coach-today');
+    expect(db.workout).toBe(loadedWorkout);
+    engineAccepts = true;
+    dispatch.mockClear();
+    root.querySelector('[data-action="start-workout"]').click();
+    await settle();
+    expect(dispatch.mock.calls.map(([event]) => event)).toEqual(['ui:coaching:select', 'ui:watchStart', 'ui:workoutStart']);
+    expect(window.location.hash).toBe('#/player');
+    expect(db.workout.coachingWorkoutId).toBe('coach-today');
 });

@@ -191,7 +191,7 @@ describe('training calendar', () => {
     test('calculates historical models at each week end and never forecasts future weeks', () => {
         jest.useFakeTimers().setSystemTime(new Date('2026-11-18T12:00:00Z'));
         const data = {
-            profile: {timeZone: 'UTC'},
+            profile: {timeZone: 'UTC', adultAthleteConfirmed: true},
             activities: [{id: 'ride-1', day: '2026-11-03', sport: 'cycling', duration: 3600}],
             plan: null,
         };
@@ -300,7 +300,7 @@ describe('training calendar', () => {
         const calendar = new TrainingCalendar();
         const date = scenario === 'future' ? '2026-11-17' : '2026-11-03';
         const data = {
-            profile: {timeZone: 'UTC'},
+            profile: {timeZone: 'UTC', adultAthleteConfirmed: true},
             plan: {status: scenario === 'archived' ? 'archived' : 'active', workouts: []},
             activities: [{id: 'ride-1', day: date, duration: 1800}],
         };

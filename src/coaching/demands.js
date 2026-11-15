@@ -53,15 +53,20 @@ export function analyzeGaps(state, demand, goal) {
     // Riegel (1981) is optimistic for the marathon (Vickers & Vertosick 2016), so this gap is low confidence.
     const predicted = running && goal.finishTimeMinutes && goal.distanceKm
         ? predictedRaceSeconds(state.thresholdPace?.value, goal.distanceKm, state.config?.riegelExponent) : null;
+    // FTP approximates quasi-steady power for about an hour, so event target power is only comparable
+    // with it for events of roughly that length; other durations need a power-duration model.
+    const hourTargetPower = goal.targetPower && duration >= 40 && duration <= 70 ? goal.targetPower : null;
+    const ftpTarget = goal.targetFTP ?? hourTargetPower;
     const ftpGap = running ? predicted ? Math.max(0, 1 - goal.finishTimeMinutes * 60 / predicted) : null
-        : goal.targetFTP && state.ftp.value ? Math.max(0, 1 - state.ftp.value / goal.targetFTP)
+        : ftpTarget && state.ftp.value
+            ? Math.max(0, 1 - state.ftp.value / ftpTarget)
             : goal.targetWKg && state.wKg.value ? Math.max(0, 1 - state.wKg.value / goal.targetWKg) : null;
     const gaps = {
         endurance: metric(enduranceGap, 'low', 'Weekly duration versus declared event duration; a planning heuristic only.'),
         threshold: running
             ? metric(ftpGap, 'low', 'Riegel finish-time prediction from threshold pace versus target time; optimistic beyond the half marathon.',
                 {predictedMinutes: predicted == null ? null : Math.round(predicted / 60)})
-            : metric(ftpGap, state.confidence, 'Declared FTP or W/kg versus explicit target.'),
+            : metric(ftpGap, state.confidence, 'Declared FTP or W/kg versus explicit target; event target power counts only for events of about an hour.'),
         aerobic: metric(null, 'unavailable', 'No validated aerobic-capacity target comparison.'),
         sprint: metric(null, 'unavailable', 'No validated sprint-capacity target comparison.'),
         durability: metric(null, 'unavailable', 'Observational durability is not a universal capability score.'),

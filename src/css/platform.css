@@ -39,6 +39,9 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 #platform .auth-card .app-versions { border-top: 1px solid var(--platform-border); padding-top: 14px; margin-bottom: 0; }
 #platform-message:not(:empty) { padding: 14px 20px; background: #213b3a; border: 1px solid #3b6962; border-radius: 8px; margin-bottom: 20px; }
 #platform-message.error { background: #4a2d32; border-color: #a35b64; }
+#platform-content > p[role="alert"] { padding: 14px 20px; background: #4a2d32; border: 1px solid #a35b64; border-radius: 8px; }
+/* Shown only in the mobile settings row; desktop keeps the original standalone unit toggle. */
+.settings-switch-label { display: none; }
 .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; }
 .panel { padding: 28px; border: 1px solid var(--platform-border); border-radius: 16px; background: var(--platform-panel); margin-bottom: 24px; min-width: 0; }
 .dashboard-grid > .panel { margin-bottom: 0; }
@@ -205,8 +208,8 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 .auth-card { width: min(100%, 500px); padding: 40px; background: #17212d; border: 1px solid var(--platform-border); border-radius: 20px; }
 #platform .auth-card h1 { margin: 28px 0 20px; font-size: 42px; }
 .auth-card .brand { margin-bottom: 35px; }
-.skip-link { position: fixed; top: -60px; left: 250px; z-index: 100; background: #223141; padding: 10px; }
-.skip-link:focus { top: 10px; }
+.skip-link { position: fixed; top: 10px; left: 250px; z-index: 100; background: #223141; padding: 10px; transform: translateY(calc(-100% - 20px)); }
+.skip-link:focus { transform: none; }
 
 /* Preserve the original custom elements and controls; route only their presentation. */
 #legacy-slot .wrapper { max-width: none; width: 100%; margin: 0; padding: 0; }
@@ -225,6 +228,8 @@ body[data-route="coach"] training-calendar, body[data-route="calendar"] coaching
 #legacy-slot coaching-panel h4 { margin: 18px 0 6px; font-size: 14px; color: var(--platform-muted); }
 #legacy-slot coaching-panel ul, #legacy-slot coaching-panel ol { padding-left: 20px; }
 #legacy-slot coaching-panel label small { display: block; margin-top: 4px; font-weight: 400; }
+/* Sport-specific fields are toggled with the hidden attribute; layout rules above must not reveal them. */
+coaching-panel [hidden] { display: none !important; }
 .coach-intro, .coach-step, .coach-card, .coach-hero { padding: 24px 28px; margin-bottom: 20px; border: 1px solid var(--platform-border); border-radius: 16px; background: var(--platform-panel); min-width: 0; }
 .coach-intro { background: linear-gradient(135deg, #213e3b, #172834 70%); }
 #platform .coach-intro h2, #platform .coach-hero h2 { font-size: 24px; margin: 0 0 6px; }
@@ -242,6 +247,8 @@ body[data-route="coach"] training-calendar, body[data-route="calendar"] coaching
 #platform .coach-day input, #platform .coach-day select { padding: 8px; text-align: center; font-size: 14px; }
 #platform .coach-day select { margin-top: 6px; font-size: 12px; min-height: 36px; }
 .coach-submit { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 18px; }
+#platform input[type="checkbox"] { flex: none; width: 22px; height: 22px; min-height: 0; margin: 1px 0 0; padding: 0; accent-color: var(--platform-accent); }
+#platform .coach-submit label { display: flex; flex: 1 1 100%; align-items: flex-start; gap: 10px; margin: 0; font-size: 14px; }
 #platform .coach-submit button[value="generate"] { font-size: 17px; padding: 12px 28px; }
 #platform .coach-submit p { margin: 0; flex: 1 1 250px; }
 .coach-alert, .coach-notice, .coach-callout { padding: 14px 20px; border-radius: 10px; margin: 0 0 20px !important; }
@@ -361,11 +368,31 @@ body[data-route="player"] #graph-workout { margin-top: 24px; }
 .activity-periods > .mobile-details { min-width: 0; flex: 1; }
 
 /* Mobile is a ride-first experience, with its own navigation and information density. */
-.mobile-app .sidebar { inset: auto 0 0; width: 100%; padding: 6px 8px max(6px, env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--platform-border); }
+.mobile-app { --tab-bar-height: calc(59px + max(6px, env(safe-area-inset-bottom))); }
+/* The mobile shell is dark-only, so the legacy light palettes would put dark ink on dark panels; its Theme option is hidden. */
+body.mobile-app.white-theme, body.mobile-app.auto-theme { --background-color: var(--dark); --background-color-2: var(--chrome); --foreground-color: var(--white); --foreground-color-inactive: var(--gray); --border-color: var(--white-opacity-01); --progress: #fff4; --input-color: var(--white); --toogle-inactive-color: var(--gray); --toogle-active-color: var(--white); }
+/* The viewport scrolls on the root element, so reserve the fixed tab bar there for focus and anchor scrolling. */
+html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+.mobile-app .sidebar { inset: auto 0 0; width: 100%; padding: 6px 4px max(6px, env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--platform-border); }
 #platform .sidebar .app-versions[hidden] { display: none; }
 .mobile-app #platform .sidebar .brand, .mobile-app .sidebar-bottom { display: none; }
-.mobile-app .sidebar nav { display: flex; justify-content: space-around; margin: 0; gap: 2px; }
-.mobile-app #platform .sidebar nav a { font-size: 11px; padding: 10px 8px; min-height: 44px; }
+.mobile-app .sidebar nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin: 0; }
+.mobile-app #platform .sidebar nav .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; min-width: 0; min-height: 52px; margin: 0; padding: 3px 2px; border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--platform-muted); font-size: 11px; font-weight: 600; line-height: 1.25; text-decoration: none; }
+.mobile-app #platform .sidebar nav .tab svg { flex: none; width: 52px; height: 30px; padding: 3px 14px; border-radius: 15px; transition: background-color .15s, color .15s; }
+.mobile-app #platform .sidebar nav .tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-app #platform .sidebar nav .tab.active { color: var(--platform-text); font-weight: 750; }
+.mobile-app #platform .sidebar nav .tab.active svg { background: var(--platform-accent); color: #09111b; }
+.mobile-app #platform .sidebar nav .tab:focus-visible { outline-offset: -3px; }
+.mobile-app #platform .more-menu { position: fixed; inset: 0 0 var(--tab-bar-height); z-index: 30; display: flex; align-items: flex-end; background: rgba(4, 7, 11, .62); touch-action: none; }
+.mobile-app #platform .more-menu[hidden] { display: none; }
+.mobile-app #platform .more-menu-panel { width: 100%; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 16px 12px 12px; border: 1px solid var(--platform-border); border-bottom: 0; border-radius: 16px 16px 0 0; background: #101820; box-shadow: 0 -12px 30px rgba(0, 0, 0, .35); touch-action: pan-y; }
+.mobile-app #platform .more-menu .eyebrow { margin: 0 4px 10px; }
+.mobile-app #platform .more-menu ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mobile-app #platform .sidebar .more-menu a { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 12px; border: 1px solid #2f4452; border-radius: 0 12px 0 0; background: #142731; box-shadow: none; color: var(--platform-text); font-size: 14px; font-weight: 600; text-decoration: none; }
+.mobile-app #platform .sidebar .more-menu a svg { flex: none; color: var(--cyber-cyan, var(--platform-accent)); }
+.mobile-app #platform .sidebar .more-menu a[aria-current="page"] { border-color: var(--platform-accent); background: #2c2e20; color: var(--platform-accent); }
+.mobile-app #platform .sidebar .more-menu a:focus-visible { outline-offset: 2px; }
+.mobile-app .skip-link { left: 12px; }
 .mobile-app #main-content { margin: 0 auto; max-width: 900px; padding: 20px 16px 100px; }
 .mobile-app .platform-header { margin-bottom: 8px; }
 .mobile-app #platform .app-versions { margin-bottom: 14px; }
@@ -382,21 +409,27 @@ body[data-route="player"] #graph-workout { margin-top: 24px; }
 .mobile-app .ride-metric strong { font-size: clamp(30px, 7vw, 58px); }
 .mobile-app .ride-metric strong.free-cadence { font-size: 16px; }
 .mobile-app .ride-actions { gap: 8px; }
-.mobile-app[data-route="player"] .ride-actions { position: sticky; bottom: 76px; z-index: 10; padding: 8px 0; background: #101820; }
+.mobile-app[data-route="player"] .ride-actions { position: sticky; bottom: calc(var(--tab-bar-height) + 6px); z-index: 10; padding: 8px 0; background: #101820; }
 .mobile-app #platform .ride-actions button { font-size: 12px; min-height: 54px; padding: 8px; }
 .mobile-app .ride-adjust { gap: 12px; font-size: 12px; }
 .mobile-app .interval-context { font-size: 11px; padding-top: 14px; }
-.mobile-app .session-row .button { font-size: 12px; }
-.mobile-app #main-content { padding: 14px 12px calc(88px + env(safe-area-inset-bottom)); }
+.mobile-app #platform .session-row .button { flex: none; white-space: nowrap; font-size: 14px; }
+.mobile-app #main-content { padding: 14px 12px calc(var(--tab-bar-height) + 24px); }
 .mobile-app .platform-header { gap: 12px; margin-bottom: 12px; }
 .mobile-app #platform h1 { font-size: 25px; }
 .mobile-app #platform h2 { font-size: 17px; margin-bottom: 10px; }
+/* Matches the weight of the disclosure summaries that title the compact panels. */
+.mobile-app #platform .panel > h2 { font-weight: 650; }
 .mobile-app #platform p { margin: 8px 0 12px; }
 .mobile-app #platform .hero-title { font-size: 25px; margin: 12px 0; }
+.mobile-app #platform .today-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; font-size: 14px; line-height: 1.5; }
 .mobile-app .panel, .mobile-app .dashboard-grid > .panel { padding: 14px; margin-bottom: 12px; border-radius: 12px; }
+/* The panel padding already spaces the last element from the panel edge. */
+.mobile-app #platform .panel > :last-child { margin-bottom: 0; }
 .mobile-app .stats { gap: 10px; margin: 12px 0; }
-.mobile-app .stat { min-width: 75px; }
-.mobile-app .stat strong { font-size: 25px; }
+.mobile-app .stat { display: flex; flex-direction: column; min-width: 75px; }
+/* Values stay aligned when a long label wraps onto two lines. */
+.mobile-app .stat strong { margin-top: auto; font-size: 25px; }
 .mobile-app .button-row { gap: 8px; margin: 10px 0; }
 .mobile-app #platform button, .mobile-app #platform .button { padding: 8px 12px; }
 .mobile-app #platform label { margin: 10px 0; }
@@ -410,24 +443,46 @@ body[data-route="player"] #graph-workout { margin-top: 24px; }
 .mobile-app #platform .library-filters { padding: 12px 14px; }
 .mobile-app .library-filters > .eyebrow, .mobile-app .library-filters > h2 { display: none; }
 .mobile-app .library-layout { gap: 12px; }
-.mobile-app .library-toolbar { gap: 8px; margin-bottom: 10px; }
-.mobile-app .library-actions { gap: 8px; }
+.mobile-app .library-toolbar { display: grid; gap: 8px; margin-bottom: 10px; }
+.mobile-app #platform .library-count { margin: 0; }
+.mobile-app .library-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 8px; }
+.mobile-app #platform .library-actions .button { min-width: 0; margin: 0; padding: 6px 10px; font-size: 13px; line-height: 1.25; text-align: center; }
 .mobile-app .library-filter-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
-.mobile-app .workout-grid { gap: 12px; }
-.mobile-app .workout-card-content { padding: 12px 14px 6px; }
-.mobile-app .workout-card-metrics { gap: 6px 12px; margin-top: 8px; }
-.mobile-app .workout-card-profile .profile-graph, .mobile-app .workout-card-profile .course-profile { height: 54px; margin: 6px 14px 12px; }
+.mobile-app .workout-grid { gap: 10px; }
+.mobile-app .workout-card-content { padding: 12px 14px 8px; }
+.mobile-app #platform .workout-card h2 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.35; }
+.mobile-app #platform .workout-card-category { margin: 2px 0 0; }
+/* Keep the metrics on one row; a long value wraps inside its own column instead of pushing the last metric onto a new row. */
+.mobile-app .workout-card-metrics { display: grid; grid-auto-flow: column; grid-auto-columns: auto; justify-content: start; gap: 4px clamp(10px, 5vw - 4px, 16px); margin-top: 10px; line-height: 1.3; }
+.mobile-app .workout-card-metrics > div { min-width: 0; }
+.mobile-app .workout-card-metrics dd { margin-top: 2px; font-size: 15px; }
+.mobile-app .workout-card-profile { min-height: 0; padding: 0 14px; }
+.mobile-app .workout-card-profile .profile-graph, .mobile-app .workout-card-profile .course-profile { height: 44px; margin: 4px 0 10px; }
 .mobile-app .profile-graph, .mobile-app .course-profile { height: 76px; margin: 12px 0; }
 .mobile-app .interval-list { columns: 1; margin: 8px 0; font-size: 13px; }
 .mobile-app .session-row { padding: 10px 0; gap: 10px; }
 .mobile-app .session-row .button-row { flex-wrap: wrap; }
-.mobile-app .week-chart { height: 135px; margin-bottom: 10px; }
+/* Sized by its bars (up to 100px) so a full bar never overlaps the stats above and an empty week stays compact. */
+.mobile-app .week-chart { height: auto; padding: 4px 0; margin-bottom: 10px; }
 .mobile-app #platform .activity-overview .activity-periods { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
 .mobile-app #platform .activity-overview .activity-period { padding: 12px; }
 .mobile-app .activity-period-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.mobile-app .activity-period-metrics dt { font-size: 10px; }
-.mobile-app .activity-period-metrics dd { font-size: 15px; }
+.mobile-app .activity-period-metrics > div { display: flex; flex-direction: column; }
+.mobile-app .activity-period-metrics dt { font-size: 11px; }
+/* Values stay aligned even when a long load label wraps onto two lines. */
+.mobile-app .activity-period-metrics dd { margin-top: auto; padding-top: 3px; font-size: 15px; }
 .mobile-app #platform .activity-period h3 { margin-bottom: 8px; font-size: 14px; }
+/* Disclosures and notes between panels get a panel surface so their text never sits on the photo backdrop. */
+.mobile-app #platform .activity-overview > .mobile-details, .mobile-app #platform .activity-periods > .mobile-details,
+.mobile-app #platform .activity-overview .activity-load-state { margin: 0 0 8px; padding: 0 12px; border: 1px solid var(--platform-border); border-radius: 14px; background: var(--platform-panel); }
+/* Load figures use the same label-over-value columns as the period totals instead of chips that wrap unevenly. */
+.mobile-app #platform .activity-overview .activity-load-state { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px; }
+.mobile-app #platform .activity-overview .activity-load-state span { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 0; border: 0; background: none; font-size: 11px; }
+.mobile-app #platform .activity-overview .activity-load-state strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mobile-app #platform .activity-overview .mobile-details .activity-period { padding: 0 0 12px; border: 0; background: none; }
+.mobile-app #platform .activity-overview .mobile-details .activity-overview-note { margin: 0 0 12px; }
+.mobile-app #platform .activity-overview > p, .mobile-app #platform .activity-history + .muted { margin: 0 0 12px; padding: 10px 12px; border-radius: 14px; background: rgba(16, 24, 32, .9); font-size: 12px; }
+.mobile-app #platform .empty-state { padding: 0; }
 .mobile-app #platform .activity-history tbody tr { gap: 6px 12px; padding: 12px 0; }
 .mobile-app #platform .activity-history td::before { display: inline; margin-right: 6px; }
 .mobile-app #platform .activity-history td:first-child::before,
@@ -449,32 +504,119 @@ body[data-route="player"] #graph-workout { margin-top: 24px; }
 .mobile-app #platform .interval-context .muted { font-size: 10px; }
 .mobile-app .ride-actions { margin-top: 10px; }
 .mobile-app .ride-settings { margin-top: 12px; padding-top: 8px; }
+.mobile-app #legacy-slot .wrapper { min-height: 0; font-family: inherit; }
+.mobile-app #legacy-slot .page { min-height: 0; padding-bottom: 0; }
+.mobile-app #legacy-slot #view--workouts-calendar { padding: 0; }
 .mobile-app #legacy-slot coaching-panel { font-size: 14px; line-height: 1.5; }
 .mobile-app #legacy-slot .coach-card { padding: 14px; margin-bottom: 12px; }
 .mobile-app #legacy-slot .coach-step, .mobile-app #legacy-slot .coach-intro,
 .mobile-app #legacy-slot .coach-hero { padding: 14px; margin-bottom: 12px; }
-.mobile-app #legacy-slot .coach-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+.mobile-app #legacy-slot .coach-fields { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .mobile-app #legacy-slot .coach-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .mobile-app #legacy-slot .coach-day { padding: 8px; }
 .mobile-app #legacy-slot .coach-fields label { margin: 8px 0; }
-.mobile-app #legacy-slot .training-calendar--header { gap: 8px; margin-bottom: 10px; }
-.mobile-app #legacy-slot .training-calendar--week-summary { margin: 8px 0; padding: 10px; }
-.mobile-app #legacy-slot .training-calendar--day { margin-top: 12px; padding: 12px; }
-.mobile-app #legacy-slot .training-calendar--entry { padding: 10px 0; gap: 8px; }
-.mobile-app #legacy-slot .device-card { font-size: 13px; --font-size-value: 1em; --size--icon: 2em; }
-.mobile-app #legacy-slot .device-card--header--label { font-size: 13px; line-height: 2; }
+/* Mobile calendar: a compact 7-day grid that fits the screen; tapping a day lists its sessions below. */
+.mobile-app #legacy-slot .training-calendar { padding: 0; }
+.mobile-app #legacy-slot .training-calendar--header { gap: 8px; margin-bottom: 8px; }
+.mobile-app #platform .training-calendar--header h2 { margin: 0; }
+/* The week view repeats the page title; keep that heading for assistive tech and show the date range instead. */
+.mobile-app #platform .training-calendar--header > div > h2 { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mobile-app #platform .training-calendar--week-label { margin: 0; padding: 10px 0; font-size: 17px; text-align: left; text-transform: uppercase; }
+.mobile-app #platform .training-calendar--navigation { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px minmax(0, 1fr); gap: 6px; width: 100%; }
+.mobile-app #platform .training-calendar--navigation button { min-height: 44px; padding: 6px 10px; font-size: 14px; }
+.mobile-app #platform .training-calendar--navigation button[aria-label] { font-size: 24px; line-height: 1; }
+.mobile-app #legacy-slot .training-calendar .mobile-details > summary { text-align: left; }
+.mobile-app #platform .training-calendar--scroll-hint { display: none; }
+.mobile-app #platform .training-calendar--grid-wrap { overflow: hidden; margin-top: 4px; }
+.mobile-app #platform .training-calendar--grid, .mobile-app #platform .training-calendar--grid thead,
+.mobile-app #platform .training-calendar--grid tbody { display: block; width: 100%; min-width: 0; }
+.mobile-app #platform .training-calendar--grid colgroup,
+.mobile-app #platform .training-calendar--grid thead th:first-child,
+.mobile-app #platform .mobile-details .training-calendar--grid .calendar-week { display: none; }
+.mobile-app #platform .training-calendar--grid tr { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.mobile-app #platform .training-calendar--grid thead th { padding: 8px 0; text-align: center; font-size: 10px; letter-spacing: .02em; }
+.mobile-app #platform .training-calendar--grid .calendar-week { order: 1; grid-column: 1 / -1; padding: 10px 12px; border-top: 1px solid rgba(255, 255, 255, .07); border-right: 0; }
+.mobile-app #legacy-slot .training-calendar--week-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; margin: 0; padding: 0; }
+.mobile-app #legacy-slot .training-calendar--week-summary h3,
+.mobile-app #legacy-slot .training-calendar--week-summary p { grid-column: 1 / -1; margin: 0; }
+.mobile-app #legacy-slot .training-calendar--week-summary > div { flex-direction: column; justify-content: flex-start; gap: 0; padding: 0; font-size: 11px; }
+.mobile-app #legacy-slot .training-calendar--week-summary strong { font-size: 15px; }
+.mobile-app #platform .training-calendar--grid .calendar-day { position: relative; height: auto; min-height: 56px; padding: 6px 2px 8px; }
+.mobile-app #platform .training-calendar--grid .calendar-day.selected { box-shadow: none; }
+.mobile-app #platform .training-calendar .calendar-day--select { position: static; justify-content: center; min-height: 0; padding: 0; font-size: 14px; }
+.mobile-app #platform .training-calendar .calendar-day--select::after { content: ''; position: absolute; inset: 0; }
+.mobile-app #platform .training-calendar .calendar-day--select:focus-visible { outline: none; }
+.mobile-app #platform .training-calendar .calendar-day--select:focus-visible::after { outline: 2px solid #a8fff2; outline-offset: -2px; }
+.mobile-app #platform .training-calendar .calendar-day--month { display: none; }
+.mobile-app #platform .training-calendar .calendar-day--number { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 14px; }
+.mobile-app #platform .training-calendar .outside-month .calendar-day--number { color: var(--platform-muted); font-weight: 400; }
+.mobile-app #platform .training-calendar .calendar-day.today .calendar-day--number { box-shadow: inset 0 0 0 2px var(--cyber-cyan, #78f5ec); color: var(--cyber-cyan, #78f5ec); text-decoration: none; }
+.mobile-app #platform .training-calendar .calendar-day.selected .calendar-day--number { background: var(--platform-accent); box-shadow: none; color: #09111b; }
+.mobile-app #platform .training-calendar--grid .calendar-day--events { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin: 4px 0 0; pointer-events: none; }
+.mobile-app #platform .training-calendar--grid .calendar-event { flex: none; width: 6px; height: 6px; border: 0; border-radius: 50%; background: #8aa6ff; }
+.mobile-app #platform .training-calendar--grid .calendar-event.is-activity { background: #65e4be; }
+.mobile-app #platform .training-calendar--grid .calendar-event > * { display: none; }
+.mobile-app #legacy-slot .training-calendar--day { margin: 12px 0 0; padding: 14px; border: 1px solid var(--platform-border); border-radius: 0 16px 0 0; background: var(--platform-panel); }
+.mobile-app #platform .training-calendar--day h3 { margin: 0 0 10px; font-size: 16px; font-weight: 700; }
+.mobile-app #legacy-slot .training-calendar--entries { gap: 10px; }
+.mobile-app #legacy-slot .training-calendar--entry { padding: 12px; gap: 10px; font-size: 14px; border-radius: 0 12px 0 0; }
+.mobile-app #legacy-slot .training-calendar--name { font-size: 17px; }
+.mobile-app #legacy-slot .training-calendar--description { font-size: 13px; line-height: 1.5; color: var(--platform-muted); }
+.mobile-app #legacy-slot .training-calendar--entry-actions { gap: 8px; }
+.mobile-app #legacy-slot .training-calendar--form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--platform-border); }
+.mobile-app #legacy-slot .training-calendar--form label { grid-column: 1 / -1; margin: 0; color: var(--platform-muted); font-size: 13px; }
+.mobile-app #legacy-slot .training-calendar--form select { min-width: 0; }
+.mobile-app #legacy-slot .training-calendar--form button { font-size: 15px; }
+.mobile-app #legacy-slot .training-calendar--day .training-calendar--empty { padding: 2px 0; color: var(--platform-muted); }
+/* Each device row stacks its identity above the source toggles, so four 43 px toggles and long device names fit on 320 px phones. */
+.mobile-app #legacy-slot .device-card { font-size: 13px; --font-size-value: 1em; --size--icon: 2em; --grid-template-columns--device-card--body--row: 40px repeat(4, minmax(0, 1fr)); }
+/* The empty side columns of the legacy header collapse so the section label starts at the card edge. */
+.mobile-app #legacy-slot .device-card--header { grid-template-columns: auto 1fr auto; }
+.mobile-app #legacy-slot .device-card--header--label { color: var(--platform-muted); font-size: 11px; letter-spacing: .12em; line-height: 2; text-align: left; }
 .mobile-app #legacy-slot .device-card--cont { padding: 8px 0; }
-.mobile-app #legacy-slot .device-card--body--row { padding: 0; align-items: center; min-height: 44px; }
-.mobile-app #legacy-slot .device-card--body--row.second { margin-top: 8px; }
+/* Tiles align on their toggles even when a header such as "Heart Rate" wraps onto two lines. */
+.mobile-app #legacy-slot .device-card--body--row { padding: 0; align-items: end; gap: 4px; min-height: 44px; }
+.mobile-app #legacy-slot .device-card--body--row > connection-switch { grid-row: 1 / span 2; align-self: start; }
+.mobile-app #legacy-slot .device-card--body--row > connection-switch + .device-card--tile { grid-column: 2 / -1; align-self: center; }
+.mobile-app #legacy-slot .device-card--body--row.second { margin-top: 12px; }
 .mobile-app #legacy-slot .device-card--tile { min-width: 0; }
 .mobile-app #legacy-slot .device-card--tile--header { font-size: 10px; }
 .mobile-app #legacy-slot .device-card--tile--value { padding: 4px 0; }
 .mobile-app #legacy-slot #view--settings-settings > .mobile-details { border-bottom: 1px solid var(--platform-border); }
+.mobile-app #legacy-slot #view--settings-settings > .mobile-details:last-child { border-bottom: 0; }
 .mobile-app #legacy-slot #view--settings-settings > .mobile-details > summary { margin: 0; padding: 12px 0; }
 .mobile-app #legacy-slot #view--settings-settings > .mobile-details .device-card--header,
 .mobile-app #legacy-slot #view--settings-settings > .mobile-details .page--heading { display: none; }
-.mobile-app #platform .training-calendar--grid .calendar-day { height: 80px; }
-.mobile-app #platform .training-calendar--grid th, .mobile-app #platform .training-calendar--grid td { padding: 6px; }
+.mobile-app #platform-content > p[role="alert"] { padding: 10px 12px; font-size: 13px; }
+/* The device list gets a panel surface instead of sitting on the photo backdrop. */
+.mobile-app #legacy-slot #view--settings-settings { padding: 0 12px; border: 1px solid var(--platform-border); border-radius: 12px; background: var(--platform-panel); }
+/* Dock mode opens a sized popup window; mobile browsers open it as a duplicate full tab instead. */
+.mobile-app #legacy-slot dock-mode-btn { display: none; }
+.mobile-app #legacy-slot .settings-btn-row { margin: 0; }
+/* The unit toggle reads as a labelled settings row rather than a lone primary button. */
+.mobile-app #legacy-slot #msystem-settings { justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--platform-text); font-size: 14px; }
+.mobile-app #legacy-slot .settings-switch-label { display: inline; font-weight: 650; }
+.mobile-app #legacy-slot #msystem-settings .settings-switch-bnt,
+.mobile-app #legacy-slot #view--settings-settings .option--value:not(sound-control) { width: auto; height: auto; padding: 4px 12px; border: 1px solid #3a4b5e; border-radius: 99px; background: #223141; font-size: 12px; font-weight: 700; letter-spacing: 1px; line-height: 1.5; }
+/* Options become a settings list under the disclosure title; the legacy heading would repeat it. */
+.mobile-app #legacy-slot #view--settings-settings .list--sub-section { margin: 0; }
+.mobile-app #legacy-slot #view--settings-settings .list--sub-section > .list--row--outer { border-bottom: 0; border-top: 1px solid var(--platform-border); }
+.mobile-app #legacy-slot #view--settings-settings .list--sub-section > .list--row--outer:first-child,
+.mobile-app #legacy-slot #view--settings-settings .list--row--outer:has(dock-mode-default),
+.mobile-app #legacy-slot #view--settings-settings .list--row--outer:has(theme-layout) { display: none; }
+.mobile-app #legacy-slot #view--settings-settings .list--sub-section > .list--row--outer:nth-child(2) { border-top: 0; }
+.mobile-app #legacy-slot #view--settings-settings .option { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0; }
+.mobile-app #legacy-slot #view--settings-settings .option--name { font-size: 14px; line-height: 1.3; text-transform: none; }
+/* The legacy toggles listen on the value element; extending it over the row makes the whole row tappable. */
+.mobile-app #legacy-slot #view--settings-settings .option--value:not(sound-control)::after { content: ""; position: absolute; inset: 0; }
+.mobile-app #legacy-slot #view--settings-settings sound-control { display: flex; align-items: center; gap: 2px; font-size: 13px; }
+.mobile-app #legacy-slot #view--settings-settings svg.sound--item { box-sizing: border-box; width: 44px; height: 44px; padding: 10px; }
+.mobile-app #legacy-slot #view--settings-settings .sound--volume { min-width: 4.5ch; text-align: right; }
+.mobile-app #legacy-slot #about { margin: 0; padding: 0 0 14px; font-size: 14px; line-height: 1.5; text-align: left; color: var(--platform-muted); }
+.mobile-app #legacy-slot #about p { margin: 0; }
+.mobile-app #legacy-slot #about .about--text { margin: 0 0 10px; }
+.mobile-app #legacy-slot #about :is(.about--version, .about--links, .privacy-policy) { margin: 4px 0 0; }
+.mobile-app #legacy-slot #about .a { text-transform: none; }
 .mobile-app .plan-overview-head { gap: 10px; }
 .mobile-app .plan-stats { gap: 10px; margin: 12px 0; }
 .mobile-app .plan-next { padding: 12px 0 0; gap: 10px; }
@@ -531,5 +673,11 @@ body[data-route="player"] #graph-workout { margin-top: 24px; }
     .mobile-app .ride-metric strong.free-cadence { font-size: 18px; }
     .mobile-app .ride-profile-axis, .mobile-app .ride-profile-plot { height: 120px; }
     .mobile-app #main-content { padding-top: 10px; }
+    .mobile-app { --tab-bar-height: calc(51px + max(6px, env(safe-area-inset-bottom))); }
+    .mobile-app #platform .sidebar nav .tab { flex-direction: row; gap: 4px; min-height: 44px; }
+    .mobile-app #platform .sidebar nav .tab svg { width: 40px; height: 28px; padding: 2px 8px; }
+}
+@media (forced-colors: active) {
+    .mobile-app #platform .sidebar nav .tab.active { outline: 2px solid Highlight; outline-offset: -2px; }
 }
 @media (prefers-reduced-motion: reduce) { #platform *, #legacy-slot * { animation: none !important; transition: none !important; } }

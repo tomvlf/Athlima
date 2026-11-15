@@ -103,6 +103,7 @@ class CoachingPanel extends HTMLElement {
             this.innerHTML = `
                 ${this.error ? `<p class="coach-alert" role="alert">${escape(this.error)}</p>` : ''}
                 ${this.notice ? `<p class="coach-notice" role="status">${escape(this.notice)}</p>` : ''}
+                ${data.profile ? this.safetyForm(data) : ''}
                 ${plan ? this.planView(data, plan) : this.setupForm(data)}
                 <p class="coach-disclaimer">Training decision support, not medical advice. Recommendations are
                     conservative, deterministic rules, not guarantees.</p>`;
@@ -141,7 +142,8 @@ class CoachingPanel extends HTMLElement {
         const week = plan.weeks.filter(w => w.startDate <= today).at(-1) || plan.weeks[0];
         const daysLeft = Math.max(0, Math.round((Date.parse(goal.date || plan.endDate) - Date.parse(today)) / 86400000));
         const progress = workouts.length ? Math.round(done / workouts.length * 100) : 0;
-        const next = upcoming[0];
+        const adultConfirmed = profile.adultAthleteConfirmed === true;
+        const next = plan.trainingPaused || !adultConfirmed ? null : upcoming[0];
         return `
             <header class="coach-hero">
                 <div>
@@ -162,8 +164,12 @@ class CoachingPanel extends HTMLElement {
             </header>
             ${ftpChanged ? `<p class="coach-alert" role="alert">Your profile FTP has changed (plan: ${escape(profile.ftp ?? 'none')} W,
                 profile: ${escape(db.ftp ?? 'none')} W). Archive and regenerate this plan before starting its workouts.</p>` : ''}
+            ${plan.trainingPaused || data.safetyStatus ? `<p class="coach-alert" role="alert">Training is paused while
+                ${escape(data.safetyStatus || 'symptom status is being reviewed')} is reported. Do not start or export planned sessions.
+                If symptoms are concerning, persistent, worsening, or affect normal activity, seek assessment from a qualified healthcare professional.</p>` : ''}
+            ${!adultConfirmed ? '<p class="coach-alert" role="alert">This legacy profile has no adult confirmation. Archive and reconfigure, confirming the athlete is 18 or older, before starting or exporting coached workouts.</p>' : ''}
             ${!plan.workouts.length ? '<p class="coach-alert" role="status">No sessions fit the current training-load and availability limits. Review the warnings below and check your history and profile before archiving and regenerating.</p>' : ''}
-            ${overdue ? `<div class="coach-callout">
+            ${overdue && !plan.trainingPaused && adultConfirmed ? `<div class="coach-callout">
                 <p><strong>${overdue} past session${overdue === 1 ? '' : 's'} not yet resolved.</strong>
                     ${running ? 'Runs and activities' : 'Rides'} you recorded are matched automatically. Review the rest so the coach can adapt; missed training is never made up.</p>
                 <button type="button" data-coach="review">Review missed sessions</button></div>` : ''}
@@ -175,8 +181,11 @@ class CoachingPanel extends HTMLElement {
                         <p class="coach-next-title">${escape(next.title)}</p>
                         <p class="muted">${minutes(next.duration)} · Effort ${escape(next.expectedRpe)}/10 (${escape(RPE[next.expectedRpe] || '')})</p>
                         <p>${escape(String(next.description ?? "").replace(/^./, c => c.toUpperCase()))}</p>
-                        <a class="button" href="#/calendar">${next.date === today && !running ? 'Start from calendar' : 'Open calendar'}</a>`
-                        : '<p class="muted">No more sessions are planned. Archive this plan and set a new goal to continue.</p>'}
+                        ${next.date === today && !running
+                            ? `<a class="button" href="#/workout/${encodeURIComponent(next.id)}">Prepare to ride</a>`
+                            : '<a class="button" href="#/calendar">Open calendar</a>'}`
+                        : plan.trainingPaused || !adultConfirmed ? '<p class="muted">No session is offered until the safety and adult-confirmation requirements are met.</p>'
+                            : '<p class="muted">No more sessions are planned. Archive this plan and set a new goal to continue.</p>'}
                 </section>
                 <section class="coach-card">
                     <h3>Coming up</h3>
@@ -193,7 +202,7 @@ class CoachingPanel extends HTMLElement {
                 <div class="coach-actions">
                     <div><button type="button" class="secondary" data-coach="recovery">Make upcoming training easier</button>
                         <p class="muted">Feeling tired, ill or short on time? Future sessions are reduced; nothing is made up later.</p></div>
-                    ${overdue ? '' : `<div><button type="button" class="secondary" data-coach="review">Review missed sessions</button>
+                    ${overdue || plan.trainingPaused || !adultConfirmed ? '' : `<div><button type="button" class="secondary" data-coach="review">Review missed sessions</button>
                         <p class="muted">Marks past, unmatched sessions as missed and adapts the plan.</p></div>`}
                     <div>${this.confirmArchive ? `<button type="button" class="danger" data-coach="archive">Yes, archive this plan</button>
                         <button type="button" class="secondary" data-coach="cancel-archive">Cancel</button>`
@@ -243,6 +252,23 @@ class CoachingPanel extends HTMLElement {
                 <button type="submit">Save feedback</button>
             </form>
         </details>`;
+    }
+    safetyForm(data) {
+        const status = data.safetyStatus || '';
+        return `<section class="coach-card">
+            <h3>Symptoms and training pause</h3>
+            ${status ? `<p class="coach-alert" role="status">Training is paused because ${escape(status)} was reported.</p>` : ''}
+            <p class="muted">Report pain or illness to pause coaching sessions. This tool cannot assess symptoms or clear you to train.
+                Resume only when symptoms have resolved; seek qualified healthcare advice for concerning, persistent or worsening symptoms.</p>
+            <form data-coach-form="safety">
+                <label>Current status<select name="status">
+                    <option value="" ${selected(!status)}>No reported pain or illness</option>
+                    <option value="pain" ${selected(status === 'pain')}>Pain</option>
+                    <option value="illness" ${selected(status === 'illness')}>Illness</option>
+                </select></label>
+                <button type="submit" class="secondary">${status ? 'Update symptom status' : 'Save status'}</button>
+            </form>
+        </section>`;
     }
     historyTools() {
         return `<details class="coach-card">
@@ -320,6 +346,14 @@ class CoachingPanel extends HTMLElement {
                             placeholder="e.g. 5"></label>
                         <label>and its finish time (h:mm:ss or mm:ss)<input name="raceTime" placeholder="e.g. 27:30"
                             inputmode="numeric"><small>An all-out effort from the last 2 months gives the best estimate.</small></label>
+                        <label>Date of threshold estimate / race result<input type="date" name="thresholdPaceDate"
+                            value="${escape(profile?.thresholdPaceDate || '')}" max="${today}">
+                            <small>Optional; helps flag when pace may need recalibration.</small></label>
+                    </div>
+                    <div class="coach-fields" data-sport="cycling" ${sport === 'cycling' ? '' : 'hidden'}>
+                        <label>When was FTP last tested or updated?<input type="date" name="ftpTestDate"
+                            value="${escape(profile?.ftpTestDate || '')}" max="${today}">
+                            <small>Optional; an undated FTP will be flagged for review.</small></label>
                     </div>
                 </section>
 
@@ -362,6 +396,9 @@ class CoachingPanel extends HTMLElement {
                         </div>
                     </details>
                     <div class="coach-submit">
+                        <label><input type="checkbox" name="adultAthleteConfirmed"
+                            ${profile?.adultAthleteConfirmed === true ? 'checked' : ''} required>
+                            I confirm that the athlete is an adult (18 or older).</label>
                         <button type="submit" name="operation" value="generate" ${ready ? '' : 'disabled'}>Create my plan</button>
                         <p class="muted">Your answers are saved with the plan. You can change them later by archiving the plan and starting over.</p>
                     </div>
@@ -384,15 +421,22 @@ class CoachingPanel extends HTMLElement {
             .map(day => [day, values.get(`env${day}`) || 'either']).filter(([, v]) => v !== 'either'));
         const profile = {
             id: service.data.profile?.id || 'local-athlete', sport,
+            adultAthleteConfirmed: values.get('adultAthleteConfirmed') === 'on',
             ftp: sport === 'cycling' ? db.ftp || null : null, weight: db.weight, unitSystem: db.measurement,
             experience: values.get('experience'), timeZone: values.get('timeZone'),
             typicalWeeklyHours: hours, maxWeeklyHours: maxHours,
             longRideDay: longDay === '' || longDay == null ? null : Number(longDay),
             maxSessionMinutes: limits, availableDays: Object.keys(limits).map(Number),
         };
+        if(sport === 'cycling' && values.get('ftpTestDate')) {
+            profile.ftpTestDate = values.get('ftpTestDate');
+        }
         if(sport === 'running') {
             const thresholdPace = this.thresholdPaceFrom(values);
-            if(thresholdPace != null) profile.thresholdPace = thresholdPace;
+            if(thresholdPace != null) {
+                profile.thresholdPace = thresholdPace;
+                if(values.get('thresholdPaceDate')) profile.thresholdPaceDate = values.get('thresholdPaceDate');
+            }
         }
         if(Object.keys(dayPreferences).length) profile.dayPreferences = dayPreferences;
         for(const [name] of HEART_RATE) if(optional(values.get(name)) != null) profile[name] = optional(values.get(name));
@@ -463,6 +507,11 @@ class CoachingPanel extends HTMLElement {
                 } else {
                     this.notice = 'Answers saved. Choose "Create my plan" when you are ready.';
                 }
+            } else if(form.dataset.coachForm === 'safety') {
+                await service.setSafetyStatus(values.get('status') || null);
+                this.notice = values.get('status')
+                    ? 'Training paused. Planned sessions cannot be started while symptoms are reported.'
+                    : 'Status updated. Upcoming training remains conservative; this is not medical clearance.';
             } else if(form.dataset.coachForm === 'import') {
                 const rides = JSON.parse(values.get('rides'));
                 await service.importActivities(rides);

@@ -362,6 +362,7 @@ class TrainingCalendar extends HTMLElement {
             month: 'long',
             year: 'numeric',
         });
+        const mobile = window.innerWidth <= 700;
 
         return `
             <header class="training-calendar--header">
@@ -374,9 +375,9 @@ class TrainingCalendar extends HTMLElement {
                 </div>
             </header>
             <details class="mobile-details" data-mobile-details="calendar-month"
-                ${(this.querySelector('[data-mobile-details="calendar-month"]')?.open ?? window.innerWidth > 700) ? 'open' : ''}>
+                ${(this.querySelector('[data-mobile-details="calendar-month"]')?.open ?? true) ? 'open' : ''}>
                 <summary>Month overview</summary>
-                <div class="mobile-details-body">${this.renderCalendarTable(weeks.reverse(), heading, this.displayMonth.getMonth())}</div>
+                <div class="mobile-details-body">${this.renderCalendarTable(mobile ? weeks : weeks.reverse(), heading, this.displayMonth.getMonth())}</div>
             </details>`;
     }
 
@@ -673,19 +674,22 @@ class TrainingCalendar extends HTMLElement {
         const items = entries.length
             ? entries.map(entry => this.renderEntry(entry)).join('')
             : '<li class="training-calendar--empty">No workouts planned for this day.</li>';
+        const form = this.workouts.length
+            ? `<form class="training-calendar--form">
+                   <label for="training-calendar-workout">Add a workout</label>
+                   <select id="training-calendar-workout" name="workout" required>
+                       <option value="">Choose from your library</option>${options}
+                   </select>
+                   <button type="submit">Schedule</button>
+               </form>`
+            : '<p class="training-calendar--empty">Your workout library is still loading.</p>';
+        // Phones show the day's sessions first; scheduling another workout is the secondary action.
+        const mobile = window.innerWidth <= 700;
 
         return `
             <section class="training-calendar--day" aria-label="Workouts for ${heading}">
                 <h3>${heading}</h3>
-                ${this.workouts.length
-                    ? `<form class="training-calendar--form">
-                           <label for="training-calendar-workout">Add a workout</label>
-                           <select id="training-calendar-workout" name="workout" required>
-                               <option value="">Choose from your library</option>${options}
-                           </select>
-                           <button type="submit">Schedule</button>
-                       </form>`
-                    : '<p class="training-calendar--empty">Your workout library is still loading.</p>'}
+                ${mobile ? '' : form}
                 ${this.storageError
                     ? `<p class="training-calendar--error" role="alert">${escapeHTML(this.storageError)}</p>`
                     : ''}
@@ -696,6 +700,7 @@ class TrainingCalendar extends HTMLElement {
                     ? `<p class="training-calendar--error" role="alert">${escapeHTML(this.actionMessage)}</p>`
                     : ''}
                 <ul class="training-calendar--entries">${items}</ul>
+                ${mobile ? form : ''}
             </section>`;
     }
 
@@ -705,8 +710,11 @@ class TrainingCalendar extends HTMLElement {
         const today = localDay(new Date().toISOString(), data.profile.timeZone);
         const activities = data.activities.filter(a => a.day === workout.date &&
             !data.plan.workouts.some(w => w.matchedActivity === a.id));
-        return `<button type="button" data-action="coach-export" data-entry="${escapeHTML(entry.id)}">Export ZWO</button>
-            ${workout.status === 'scheduled' && workout.date <= today && data.plan.status === 'active' ? `
+        return `${!data.plan.trainingPaused && !data.safetyStatus && data.profile.adultAthleteConfirmed === true &&
+                (workout.sport !== 'running' || data.profile.thresholdPace > 0)
+                ? `<button type="button" data-action="coach-export" data-entry="${escapeHTML(entry.id)}">Export ZWO</button>` : ''}
+            ${!data.plan.trainingPaused && !data.safetyStatus && data.profile.adultAthleteConfirmed === true &&
+                workout.status === 'scheduled' && workout.date <= today && data.plan.status === 'active' ? `
                 <button type="button" data-action="coach-missed" data-entry="${escapeHTML(entry.id)}">Missed</button>
                 <button type="button" data-action="coach-failed" data-entry="${escapeHTML(entry.id)}">Not completed</button>
                 ${activities.length ? `<select aria-label="Completed substitute session" data-substitute="${escapeHTML(entry.id)}">
@@ -719,7 +727,8 @@ class TrainingCalendar extends HTMLElement {
     canStartCoaching(workout) {
         const data = coachingData();
         // Runs happen away from the indoor player: follow them on a watch or export the ZWO.
-        return workout.sport !== 'running' && data.plan.status === 'active' && workout.status === 'scheduled' &&
+        return workout.sport !== 'running' && data.profile.adultAthleteConfirmed === true &&
+            !data.plan.trainingPaused && !data.safetyStatus && data.plan.status === 'active' && workout.status === 'scheduled' &&
             workout.date === localDay(new Date().toISOString(), data.profile.timeZone);
     }
 
@@ -790,7 +799,7 @@ class TrainingCalendar extends HTMLElement {
                 const workout = service.data.plan.workouts.find(w => w.id === action.dataset.entry);
                 if(!workout) throw new Error('Coaching workout not found.');
                 if(action.dataset.action === 'coach-export') {
-                    fileHandler.download()(exportZwo(workout),
+                    fileHandler.download()(exportZwo(workout, coachingData()?.profile.thresholdPace),
                         `${workout.date}-${workout.sport === 'running' ? 'run-' : ''}${workout.family}.zwo`, 'application/xml');
                 } else {
                     const select = [...this.querySelectorAll('[data-substitute]')]

@@ -19,7 +19,7 @@
 import { VERSION, DEFAULTS, sum, round, sportOf, validateCoachingConfig } from './domain.js';
 import { explainWorkout } from './explanations.js';
 import { powerAccumulator } from './power.js';
-import { RUN_FAMILIES, RUN_TITLES, STRIDE, runSteps } from './running.js';
+import { RUN_FAMILIES, RUN_TITLES, STRIDE, runSteps, predictedRaceSeconds } from './running.js';
 
 export const FAMILIES = Object.freeze({
     endurance: {power: 0.65, rpe: 3, hard: false},
@@ -71,7 +71,7 @@ export function buildWorkout({id, date, family, steps, level = 1, phaseId, weekI
         : `${family[0].toUpperCase()}${family.slice(1)}`;
     return {
         id, externalId: id, date, family, type: spec.hard ? 'intervals' : 'steady',
-        ...(sport === 'running' ? {sport, runFormat} : {}),
+        ...(sport === 'running' ? {sport, runFormat, runThresholdPace: profile.thresholdPace ?? null} : {}),
         title: title || `${name} ${Math.round(seconds / 60)} min`,
         description: description || reason, reason,
         purpose: family, duration: seconds, targetLoad: round(stepLoad(steps)),
@@ -139,14 +139,18 @@ export function toAppWorkout(workout) {
     };
 }
 
-export function exportZwo(workout) {
+export function exportZwo(workout, thresholdPace = workout.runThresholdPace) {
     const escape = value => String(value).replace(/[&<>"']/g, c =>
         ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'}[c]));
-    // Zwift run steps scale a reference race pace; pace="2" (10 km) approximates threshold pace.
     const run = workout.sport === 'running';
+    if(run && !(thresholdPace > 0)) {
+        throw new Error('Running ZWO export requires a threshold pace; follow the effort guide until one is available.');
+    }
+    const tenKmSeconds = run ? predictedRaceSeconds(thresholdPace, 10) : null;
+    const paceScale = run ? tenKmSeconds / (10 * thresholdPace) : 1;
     return `<?xml version="1.0" encoding="UTF-8"?>\n<workout_file><author>Athlima</author>` +
         `<name>${escape(workout.title)}</name><description>${escape(workout.description)}</description>` +
         `<sportType>${run ? 'run' : 'bike'}</sportType><workout>` +
-        workout.steps.map(s => `<SteadyState Duration="${s.duration}" Power="${s.power}"${run ? ' pace="2"' : ''}${Number.isFinite(s.cadence) ? ` Cadence="${s.cadence}"` : ''}/>`).join('') +
+        workout.steps.map(s => `<SteadyState Duration="${s.duration}" Power="${run ? round(s.power * paceScale) : s.power}"${run ? ' pace="2"' : ''}${Number.isFinite(s.cadence) ? ` Cadence="${s.cadence}"` : ''}/>`).join('') +
         '</workout></workout_file>';
 }

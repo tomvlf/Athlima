@@ -42,6 +42,26 @@ const routes = {
     devices: ['Devices', 'Connected and ready to ride'],
     settings: ['Settings', 'Your profile and integrations'],
 };
+const mobileTabs = [['dashboard', 'Today'], ['calendar', 'Calendar'], ['player', 'Ride'], ['coach', 'Coach']];
+const moreRoutes = ['plan', 'library', 'activities', 'progress', 'devices', 'settings'];
+// Disclosures that start open on mobile; the rest stay collapsed until the rider opens them.
+const openOnMobile = new Set(['Up next', 'workout-notes', 'calendar-month']);
+const icon = paths => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none"
+    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const dot = (x, y) => `<circle cx="${x}" cy="${y}" r="1.6" fill="currentColor" stroke="none"/>`;
+const icons = {
+    dashboard: icon('<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>'),
+    calendar: icon('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+    player: icon('<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16h5.5L9.5 9h6L18 16M6 16 9.5 9M11.5 16l4-7M9.5 9l-.4-1.5M7.6 7.5h3M15.5 9 15 6.5h2"/>'),
+    coach: icon('<path d="M4 5h16v11h-9l-4 4v-4H4z"/><path d="M8 9h8M8 12.5h5"/>'),
+    more: icon(`${dot(5.5, 12)}${dot(12, 12)}${dot(18.5, 12)}`),
+    plan: icon('<path d="M5 21V4"/><path d="M5 4.5h11.5l-2.2 3.75 2.2 3.75H5"/>'),
+    library: icon(`<path d="M9 6.5h11M9 12h11M9 17.5h11"/>${dot(4.5, 6.5)}${dot(4.5, 12)}${dot(4.5, 17.5)}`),
+    activities: icon('<path d="M3 12h4l2.5-6 5 12 2.5-6H21"/>'),
+    progress: icon('<path d="M6 19v-6M12 19V6M18 19v-9"/>'),
+    devices: icon('<path d="M7 7.5 17 16.5l-5 4.5v-18l5 4.5L7 16.5"/>'),
+    settings: icon('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
+};
 const devices = {
     controllable: 'Smart trainer', heartRateMonitor: 'Heart rate',
     powerMeter: 'Power meter', speedCadenceSensor: 'Speed / cadence',
@@ -69,10 +89,16 @@ export async function launchPlatform(root) {
     let mobile = window.innerWidth <= 700;
     document.body.classList.add('platform-app');
     document.body.classList.toggle('mobile-app', mobile);
-    const navigation = () => (mobile
-        ? ['dashboard', 'player', 'devices', 'activities', 'settings']
-        : Object.keys(routes).filter(r => r !== 'workout'))
-        .map(route => link(route, routes[route][0])).join('');
+    const navigation = () => mobile
+        ? `${mobileTabs.map(([route, label]) =>
+            `<a class="tab" data-tab="${route}" href="#/${route}">${icons[route]}<span>${label}</span></a>`).join('')}
+            <button type="button" class="tab" data-tab="more" aria-expanded="false" aria-controls="more-menu">${icons.more}<span>More</span></button>
+            <div class="more-menu" id="more-menu" hidden><div class="more-menu-panel">
+                <p class="eyebrow" id="more-menu-title">More</p>
+                <ul aria-labelledby="more-menu-title">${moreRoutes.map(route =>
+                    `<li><a href="#/${route}">${icons[route]}<span>${routes[route][0]}</span></a></li>`).join('')}</ul>
+            </div></div>`
+        : Object.keys(routes).filter(r => r !== 'workout').map(route => link(route, routes[route][0])).join('');
     root.innerHTML = `<a class="skip-link" href="#main-content">Skip to content</a>
         <aside class="sidebar"><a class="brand" href="${mobile ? '/mobile' : '/'}">Athlima<span> / training</span></a>
             <nav aria-label="Main navigation">${navigation()}</nav>
@@ -107,6 +133,24 @@ export async function launchPlatform(root) {
     let engineModels;
     const targetPower = (value, ftp) => engineModels.ftp.toAbsolute(value, ftp);
     let route = 'dashboard';
+    // Detail screens (workout, editor) keep the tab the rider came from highlighted.
+    let activeTab = 'dashboard';
+    const markNavigation = () => {
+        if(moreRoutes.includes(route)) activeTab = 'more';
+        else if(mobileTabs.some(([tab]) => tab === route)) activeTab = route;
+        root.querySelectorAll('nav a').forEach(a => a.setAttribute('aria-current',
+            a.getAttribute('href') === `#/${route}` ? 'page' : 'false'));
+        root.querySelectorAll('nav [data-tab]').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === activeTab));
+    };
+    const setMoreMenu = (open, returnFocus = false) => {
+        const menu = root.querySelector('#more-menu');
+        const button = root.querySelector('[data-tab="more"]');
+        if(!menu || !button || menu.hidden !== open) return;
+        menu.hidden = !open;
+        button.setAttribute('aria-expanded', String(open));
+        if(open) menu.querySelector('a').focus();
+        else if(returnFocus) button.focus();
+    };
     let selectedId = '';
     let integration;
     let integrationLoading = false;
@@ -117,7 +161,7 @@ export async function launchPlatform(root) {
     const updateMobileSections = () => {
         root.querySelectorAll('[data-mobile-details]').forEach(section => {
             section.open = !mobile || Boolean(section.querySelector('[role="alert"]')) ||
-                (mobileSections.get(section.dataset.mobileDetails) ?? false);
+                (mobileSections.get(section.dataset.mobileDetails) ?? openOnMobile.has(section.dataset.mobileDetails));
         });
     };
     root.addEventListener('toggle', event => {
@@ -131,8 +175,7 @@ export async function launchPlatform(root) {
         mobile = nextMobile;
         document.body.classList.toggle('mobile-app', mobile);
         root.querySelector('.sidebar nav').innerHTML = navigation();
-        root.querySelectorAll('nav a').forEach(a => a.setAttribute('aria-current',
-            a.getAttribute('href') === `#/${route}` ? 'page' : 'false'));
+        markNavigation();
         const sidebar = root.querySelector('.sidebar');
         let versions = sidebar.querySelector('.app-versions');
         if(!mobile && !versions) {
@@ -143,6 +186,7 @@ export async function launchPlatform(root) {
         if(versions) versions.hidden = mobile;
         updateMobileSections();
         if(ready && ['dashboard', 'library'].includes(route)) render();
+        if(ready && route === 'calendar') legacy.querySelector('training-calendar')?.render();
     });
     let coachingError = '';
     let profileSyncError = '';
@@ -202,7 +246,7 @@ export async function launchPlatform(root) {
             next.sort((a, b) => a.date.localeCompare(b.date));
         }
         const todayBody = sessions.length ? sessions.map(workout => `<p class="eyebrow">${escape(workout.family)} / ${minutes(workout.duration)}</p>
-            <h2 class="hero-title">${escape(workout.title)}</h2><p>${escape(workout.description)}</p>
+            <h2 class="hero-title">${escape(workout.title)}</h2><p class="today-description">${escape(workout.description)}</p>
             ${profileGraph(workout.appWorkout || toAppWorkout(workout))}${link(`workout/${encodeURIComponent(workout.id)}`,
                 workout.sport === 'running' ? 'View run' : 'Prepare to ride', 'button')}`).join('')
             : `<h2 class="hero-title">${data?.plan?.status === 'active' ? 'Space to recover.' : 'Your next ride starts here.'}</h2>
@@ -210,7 +254,7 @@ export async function launchPlatform(root) {
                 ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
         if(mobile) return `<section class="mobile-today panel hero"><p class="eyebrow">Today / ${escape(today(data))}</p>${todayBody}</section>
             ${db.elapsed > 0 ? card('Ride recovery', `<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
-            ${card('Connect & ride', `<div class="button-row">${link('player', 'Open ride controls', 'button')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
+            ${card('Connect & ride', `<div class="button-row">${link('player', 'Open ride controls', 'button secondary')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
             ${card('Up next', next.length ? `<ul class="session-list">${next.slice(0, 2).map(workoutRow).join('')}</ul>` : '<p>No upcoming sessions.</p>', '', true)}`;
         return `<div class="dashboard-grid"><section class="panel hero"><p class="eyebrow">Today / ${escape(today(data))}</p>${todayBody}</section>
             ${card('This week', `<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
@@ -232,12 +276,26 @@ export async function launchPlatform(root) {
         const external = legacy.querySelector('training-calendar')?.plannedWorkouts.find(workout => workout.id === selectedId);
         return planned ? toAppWorkout(planned) : db.workouts.find(workout => workout.id === selectedId) || external;
     }
+    function startBlocker(data, planned) {
+        if(!planned) return '';
+        if(data.plan.trainingPaused || data.safetyStatus) {
+            return 'Training is paused while pain or illness is reported. Update your symptom status in Coach before starting planned sessions.';
+        }
+        if(data.profile?.adultAthleteConfirmed !== true) {
+            return 'Confirm that the athlete is 18 or older by reconfiguring the plan in Coach before starting it.';
+        }
+        if(data.plan.status !== 'active' || planned.date !== today(data) || planned.status !== 'scheduled') {
+            return 'Coach sessions can be ridden on their scheduled date while unresolved.';
+        }
+        return '';
+    }
     function details(data) {
         const workout = selectedWorkout(data);
         if(!workout) return empty('This workout is not available on this device.');
         const planned = data?.plan?.workouts.find(w => w.id === selectedId);
         const run = planned?.sport === 'running';
-        const canStart = !run && (!planned || (data.plan.status === 'active' && planned.date === today(data) && planned.status === 'scheduled'));
+        const blocked = run ? '' : startBlocker(data, planned);
+        const canStart = !run && !blocked;
         const paces = run ? describeRunPaces(planned.steps, data.profile?.thresholdPace, data.profile?.unitSystem) : '';
         const target = step => run ? paces ? formatPace(paceForIntensity(data.profile.thresholdPace, step.power), data.profile.unitSystem)
             : `${number(step.power * 100)}% of threshold speed`
@@ -248,7 +306,7 @@ export async function launchPlatform(root) {
             ${run ? `<p>${paces ? `Pace guide: ${escape(paces)}.` : 'Set a threshold pace in Coach to see pace targets; run by effort (RPE) until then.'}</p>` : ''}
             <div class="button-row">${canStart ? '<button data-action="start-workout">Start workout</button>' : run
                 ? '<p class="muted">Run this session outdoors or on a treadmill, or export the ZWO from the calendar to your watch. Recorded runs are matched automatically.</p>'
-                : '<p class="muted">Coach sessions can be ridden on their scheduled date while unresolved.</p>'}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
+                : `<p class="muted">${escape(blocked)}</p>`}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
             ${mobileDetails('workout-notes', 'Workout notes', `<p class="description">${escape(workout.meta.description || 'No description supplied.')}</p>`)}
             ${mobileDetails('workout-intervals', 'Intervals', `<ol class="interval-list">${(workout.intervals || []).flatMap(interval => interval.steps || []).map(step => `<li>
                 ${time(step.duration)} &middot; ${escape(target(step))}${run ? '' : ` &middot; Cadence: ${escape(cadenceSummary([step]))}`}</li>`).join('')}</ol>`)}`);
@@ -405,8 +463,7 @@ export async function launchPlatform(root) {
         const [title, subtitle] = routes[route] || ['Workout editor', 'Build a session'];
         root.querySelector('#route-title').textContent = mobile && route === 'dashboard' ? 'Ready to ride?' : title;
         root.querySelector('#route-subtitle').textContent = subtitle;
-        root.querySelectorAll('nav a').forEach(a => a.setAttribute('aria-current',
-            a.getAttribute('href') === `#/${route}` ? 'page' : 'false'));
+        markNavigation();
         document.body.dataset.route = route;
         legacy.hidden = !['calendar', 'coach', 'devices', 'editor'].includes(route);
         content.innerHTML = route === 'dashboard' ? dashboard(data) : route === 'library' ? renderLibrary(db.workouts, libraryFilters,
@@ -422,6 +479,7 @@ export async function launchPlatform(root) {
         if(route === 'player') updateRide();
     }
     function navigate() {
+        setMoreMenu(false);
         const [name, id] = window.location.hash.replace(/^#\/?/, '').split('/');
         route = Object.hasOwn(routes, name) || name === 'editor' ? name : 'dashboard';
         try { selectedId = decodeURIComponent(id || ''); }
@@ -576,6 +634,25 @@ export async function launchPlatform(root) {
             root.querySelector('#main-content').focus();
             return;
         }
+        const moreButton = event.target.closest('[data-tab="more"]');
+        if(moreButton) {
+            setMoreMenu(moreButton.getAttribute('aria-expanded') !== 'true');
+            return;
+        }
+        const moreMenu = root.querySelector('#more-menu');
+        if(moreMenu && !moreMenu.hidden) {
+            if(event.target === moreMenu) {
+                setMoreMenu(false, true);
+                return;
+            }
+            const destination = event.target.closest('#more-menu a');
+            if(destination) {
+                setMoreMenu(false);
+                if(destination.getAttribute('href') === `#/${route}`) root.querySelector('#route-title').focus();
+                return;
+            }
+            if(!event.target.closest('#more-menu')) setMoreMenu(false);
+        }
         if(event.target.closest('[data-library-reset]')) {
             libraryFilters = initialLibraryFilters();
             libraryPage = 0;
@@ -699,10 +776,21 @@ export async function launchPlatform(root) {
                 if(db.watchStatus !== 'stopped' || db.elapsed > 0 || savingRide) {
                     throw new Error('Finish and save your current ride before starting another workout.');
                 }
-                const workout = selectedWorkout(coachingData());
+                const data = coachingData();
+                const workout = selectedWorkout(data);
+                if(!workout) throw new Error('This workout is not available on this device.');
                 if(workout.coachingWorkoutId) {
-                    if(coachingData().profile.ftp !== db.ftp) throw new Error('Update device FTP to match your Coach profile, or regenerate your plan.');
+                    const planned = data?.plan?.workouts.find(w => w.id === workout.coachingWorkoutId);
+                    const blocked = !planned ? 'This coach session is no longer in your plan. Open the calendar to pick a current session.'
+                        : planned.sport === 'running'
+                            ? 'Runs are not played on the trainer. Follow the pace guide in the calendar or export the ZWO to your watch.'
+                            : startBlocker(data, planned);
+                    if(blocked) throw new Error(blocked);
+                    if(data.profile.ftp !== db.ftp) throw new Error('Update device FTP to match your Coach profile, or regenerate your plan.');
+                    const previous = db.workout;
                     xf.dispatch('ui:coaching:select', workout);
+                    // The engine reports its own rejection through coaching:error; never start the previous workout instead.
+                    if(db.workout === previous || db.workout?.coachingWorkoutId !== workout.coachingWorkoutId) return;
                 } else xf.dispatch('workout', workout);
                 window.location.hash = '/player';
                 xf.dispatch('ui:watchStart');
@@ -763,6 +851,12 @@ export async function launchPlatform(root) {
         });
     });
     window.addEventListener('hashchange', navigate);
+    document.addEventListener('keydown', event => {
+        if(event.key === 'Escape' && root.querySelector('#more-menu:not([hidden])')) setMoreMenu(false, true);
+    });
+    root.addEventListener('focusin', event => {
+        if(!event.target.closest('#more-menu, [data-tab="more"]')) setMoreMenu(false);
+    });
     window.addEventListener('pwa:error', event => report(event.detail, true));
     navigator.serviceWorker?.addEventListener('message', event => {
         if(event.data?.type === 'CACHE_ERROR') report('Some app assets could not be cached for offline use. Your active ride is unaffected.', true);

@@ -59,16 +59,35 @@ test('mobile has a dedicated ride-first navigation, recovered ride controls, gla
     expect(document.body.classList.contains('mobile-app')).toBe(true);
     expect(root.querySelector('.app-versions')).toBeNull();
     expect(root.querySelector('.sidebar .app-versions')).toBeNull();
-    expect(root.querySelector('nav').textContent).not.toContain('Progress');
-    expect(root.querySelector('nav').textContent).not.toContain('Training calendar');
-    expect(root.querySelector('nav').querySelectorAll('a')).toHaveLength(5);
+    const tabLabels = () => [...root.querySelectorAll('nav > .tab')].map(tab => tab.textContent.trim());
+    const activeTab = () => root.querySelector('nav > .tab.active').textContent.trim();
+    const moreMenu = () => root.querySelector('#more-menu');
+    expect(tabLabels()).toEqual(['Today', 'Calendar', 'Ride', 'Coach', 'More']);
+    expect(moreMenu().hidden).toBe(true);
+    expect([...moreMenu().querySelectorAll('a')].map(a => a.getAttribute('href')))
+        .toEqual(['#/plan', '#/library', '#/activities', '#/progress', '#/devices', '#/settings']);
     expect(document.body.dataset.route).toBe('player');
+    expect(activeTab()).toBe('Ride');
+    expect(root.querySelector('nav [aria-current="page"]').textContent.trim()).toBe('Ride');
     expect(root.textContent).toContain('Ride recovered on this device');
     for(const id of ['power', 'target', 'cadence', 'hr', 'elapsed', 'countdown', 'next', 'remaining']) {
         expect(root.querySelector(`#ride-${id}`)).not.toBeNull();
     }
     expect(root.querySelector('#ride-toggle').textContent).toBe('Resume');
     expect(powerSwitch.closest('[data-mobile-details]').open).toBe(false);
+    const more = root.querySelector('[data-tab="more"]');
+    more.click();
+    expect(moreMenu().hidden).toBe(false);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(moreMenu().querySelector('a'));
+    document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+    expect(moreMenu().hidden).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(more);
+    more.click();
+    moreMenu().click();
+    expect(moreMenu().hidden).toBe(true);
+    expect(document.activeElement).toBe(more);
     const toggle = root.querySelector('#ride-toggle');
     const hash = window.location.hash;
     xf.dispatch.mockClear();
@@ -88,7 +107,8 @@ test('mobile has a dedicated ride-first navigation, recovered ride controls, gla
     window.innerWidth = 700;
     window.dispatchEvent(new Event('resize'));
     expect(document.body.classList.contains('mobile-app')).toBe(true);
-    expect(root.querySelector('nav').textContent).not.toContain('Progress');
+    expect(tabLabels()).toEqual(['Today', 'Calendar', 'Ride', 'Coach', 'More']);
+    expect(activeTab()).toBe('Ride');
     expect(root.querySelector('.sidebar .app-versions').hidden).toBe(true);
     expect(powerSwitch.closest('[data-mobile-details]').open).toBe(false);
     expect(root.querySelector('#ride-toggle')).toBe(toggle);
@@ -104,5 +124,12 @@ test('mobile has a dedicated ride-first navigation, recovered ride controls, gla
     expect(root.textContent).toContain('Ride saved');
     expect(root.textContent).toContain('1:30');
     expect(root.textContent).toContain('200W');
+    expect(activeTab()).toBe('More');
+    root.querySelector('[data-tab="more"]').click();
+    moreMenu().querySelector('a[href="#/devices"]').click();
+    expect(moreMenu().hidden).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    expect(document.body.dataset.route).toBe('devices');
+    expect(activeTab()).toBe('More');
     db.elapsed = 0;
 });
