@@ -276,6 +276,12 @@ Important notes:
 - Android generally works best by opening the URL directly in Chrome
 - Firefox and Safari are not supported for the trainer/Web Bluetooth path
 
+On Android, open the HTTPS app in Chrome and use the browser menu's **Install
+app** or **Add to Home screen** option. The installed app uses the Athlima
+icon, including a maskable variant for Android launchers. Chrome may take time
+to refresh the icon of an existing installation after an update; close old app
+windows so the updated offline worker can activate.
+
 ### Linux
 
 On Linux, enable the experimental web platform flag if needed:

@@ -1,7 +1,7 @@
 /**
  * Browser service worker for offline app files, not a storage server. Cache navigation pages and an
  * allowed set of same-site assets; ignore provider traffic, /api/ paths and writes. Navigation
- * tries the network first; named assets try the cache first. Updates wait for existing app windows
+ * and manifests try the network first; other named assets try the cache first. Updates wait for existing app windows
  * to close so an active ride is not switched to new code mid-session.
  */
 
@@ -69,6 +69,9 @@ self.addEventListener('fetch', event => {
         event.respondWith(fetch(event.request).then(response => cacheResponse(event.request, response))
             .catch(async () => (await caches.match(event.request)) ||
             (await caches.match('/')) || Response.error()));
+    } else if(url.pathname.endsWith('.webmanifest')) {
+        event.respondWith(fetch(event.request).then(response => cacheResponse(event.request, response))
+            .catch(async () => (await caches.match(event.request)) || Response.error()));
     } else if(isAsset(url)) {
         event.respondWith(caches.match(event.request).catch(error => {
             console.warn('Athlima offline cache unavailable; using the network.', error);

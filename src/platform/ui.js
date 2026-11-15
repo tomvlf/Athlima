@@ -99,13 +99,14 @@ export async function launchPlatform(root) {
             </div></div>`
         : Object.keys(routes).filter(r => r !== 'workout').map(route => link(route, routes[route][0])).join('');
     root.innerHTML = `<a class="skip-link" href="#main-content">Skip to content</a>
-        <aside class="sidebar"><a class="brand" href="${mobile ? '/mobile' : '/'}">Athlima<span> / training</span></a>
+        <aside class="sidebar"><a class="brand" href="${mobile ? '/mobile' : '/'}" aria-label="Athlima home">Athlima</a>
             <nav aria-label="Main navigation">${navigation()}</nav>
             <div class="sidebar-bottom"><span>Train with intention.</span></div>
             ${mobile ? '' : versionMarkup({showRevision: false})}
         </aside>
         <main id="main-content" tabindex="-1"><header class="platform-header">
-            <div><p class="eyebrow" id="route-subtitle"></p><h1 id="route-title" tabindex="-1"></h1></div>
+            <div class="platform-heading"><span class="mobile-brand-mark" aria-hidden="true"></span>
+                <div><p class="eyebrow" id="route-subtitle"></p><h1 id="route-title" tabindex="-1"></h1></div></div>
         </header><div id="platform-message" role="status" aria-live="polite"></div>
         <div id="platform-content"><p role="status">Loading your training...</p></div>
         <div id="legacy-slot"></div></main>`;

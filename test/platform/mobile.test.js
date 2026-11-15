@@ -50,6 +50,7 @@ test('mobile has a dedicated ride-first navigation, recovered ride controls, gla
     await launchPlatform(root, {email: 'rider@example.com'});
     await new Promise(resolve => setTimeout(resolve, 5));
     expect(document.body.classList.contains('mobile-app')).toBe(true);
+    expect(root.querySelector('.mobile-brand-mark').getAttribute('aria-hidden')).toBe('true');
     expect(root.querySelector('.app-versions')).toBeNull();
     expect(root.querySelector('.sidebar .app-versions')).toBeNull();
     const tabLabels = () => [...root.querySelectorAll('nav > .tab')].map(tab => tab.textContent.trim());

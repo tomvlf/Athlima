@@ -82,6 +82,8 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     await launchPlatform(root, {email: 'rider@example.com'});
     await settle();
     expect(document.body.classList.contains('mobile-app')).toBe(false);
+    expect(root.querySelector('.sidebar .brand').getAttribute('aria-label')).toBe('Athlima home');
+    expect(root.querySelector('.mobile-brand-mark').getAttribute('aria-hidden')).toBe('true');
     const versions = root.querySelector('.sidebar > .app-versions');
     expect(versions).not.toBeNull();
     expect(root.querySelector('#main-content .app-versions')).toBeNull();

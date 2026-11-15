@@ -31,15 +31,6 @@ body.platform-app {
     box-shadow: 8px 0 30px rgba(0, 0, 0, .15);
 }
 
-#platform .brand {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 28px;
-    color: var(--platform-accent);
-    letter-spacing: -.05em;
-    text-shadow: 2px 1px rgba(255, 134, 186, .4), -1px 0 rgba(120, 245, 236, .35);
-}
-
-#platform .brand span { font-family: system-ui, sans-serif; white-space: nowrap; text-shadow: none; }
 #platform .sidebar nav a { border-radius: 0; }
 #platform .sidebar nav a[aria-current="page"] {
     background: #2c2e20;
@@ -84,7 +75,6 @@ body.platform-app {
 #platform .eyebrow { color: var(--cyber-cyan); letter-spacing: .16em; }
 #platform .hero > .eyebrow { color: var(--platform-accent); }
 #platform .stat strong { color: var(--cyber-cyan); }
-#platform .brand span { color: var(--platform-muted); }
 #platform button, #platform .button { border-radius: 0 10px 0 0; }
 #platform button:not(.secondary):not(.danger), #platform .button:not(.secondary) {
     color: #09111b;

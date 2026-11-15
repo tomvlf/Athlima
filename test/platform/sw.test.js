@@ -73,6 +73,21 @@ test('PWA navigation uses network first and public cached shell when offline', a
     expect(await (await response).text()).toBe('cached shell');
 });
 
+test('PWA refreshes the install manifest online and falls back to its cached copy offline', async () => {
+    const w = worker();
+    const request = {method: 'GET', url: 'https://cycling.example/manifest.webmanifest'};
+    const fresh = new Response('fresh manifest');
+    const cached = new Response('cached manifest');
+    w.fetch.mockResolvedValueOnce(fresh).mockRejectedValueOnce(new Error('Offline'));
+    w.caches.match.mockResolvedValue(cached);
+    let response;
+    w.handlers.fetch({request, respondWith: promise => { response = promise; }});
+    expect(await response).toBe(fresh);
+    expect(w.cache.put).toHaveBeenCalledWith(request, expect.any(Response));
+    w.handlers.fetch({request, respondWith: promise => { response = promise; }});
+    expect(await response).toBe(cached);
+});
+
 test('PWA cache warming excludes API credentials, external URLs and invalid requests', async () => {
     const w = worker();
     let work;
