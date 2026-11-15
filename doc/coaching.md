@@ -1,10 +1,14 @@
 # Adaptive cycling and running coaching
 
-The **Coach** view is a deterministic training support system, not a medical
-professional. It does not diagnose illness or injury, and it does not infer a
-biological state of readiness. It uses no LLM or third-party AI account for
-planning. Calculations reuse pure coaching modules; outcomes are heuristics, not
-validated physiological predictions.
+The **Coach** helps turn a training goal into a dated schedule, then reviews
+that schedule as activities and feedback arrive. It uses repeatable rules,
+not a chatbot or external AI service. "Deterministic" means that the same
+inputs, dates and rules produce the same result.
+
+It is training support, not a medical professional. It does not diagnose illness
+or injury or measure whether your body is ready to train. Its rules include
+**heuristics**: practical estimates and limits, not validated predictions of
+what will happen to an individual athlete.
 
 Coaching, planning, the workout player and trainer engine run locally in the
 browser. No login or backend is required. See the [storage and migration
@@ -21,6 +25,48 @@ Consumer power meters, heart-rate sensors and other wearable data can be
 incomplete, noisy or inaccurate. Missing data is not evidence of rest or
 readiness. HRV is not currently used; neither HRV nor sleep quality should be
 used as an isolated verdict about whether to train.
+
+## Start here: the simple picture
+
+1. **You provide a goal and available time.** The Coach cannot know when you
+   can train unless you tell it.
+2. **It reviews the history it has.** Missing activities or measurements remain
+   missing; they do not prove rest, recovery or improved fitness.
+3. **It proposes sessions that fit the rules and calendar.** A session includes
+   its purpose, duration and available target/effort guidance.
+4. **You train and review the result.** A planned workout and a recorded
+   activity are different things. Matching links the activity to the plan.
+5. **It can adjust upcoming work and explain why.** A missed session is not
+   automatically squeezed into another day, and completed prescriptions are
+   not rewritten.
+
+For example, after you mark a session missed, nearby scheduled sessions may
+be shortened. The original plan, the changed version and the reason are kept
+as a record. A missing power reading does not become a made-up zero, and a
+similar ride duration alone does not prove that the intended hard intervals
+were completed.
+
+Read [Using the Coach](#using-the-coach) and, if relevant, [Running coach](#running-coach)
+first. The later architecture, formulas and scientific references are optional
+technical detail. [Estimation limitations](#estimation-limitations) explains
+what the numbers cannot tell you.
+
+### Words used in this guide
+
+| Term | Meaning here |
+|---|---|
+| Profile | Your declared sport, reference values, experience and available training time. |
+| FTP / threshold pace | The reference used to scale cycling power or running speed. They are not interchangeable. |
+| RPE | Your own 0-10 rating of how hard an activity felt. |
+| Session / activity | A session is planned work; an activity is a record of what happened. |
+| Family / template | A family is a kind of training, such as endurance. A template is a reusable workout recipe. |
+| Phase / taper | A phase is a period with a training purpose. A taper reduces volume before the goal event. |
+| Load / dose / budget | Estimates of how much training is involved, and how much the rules allow. Scores from different measurement systems must not be added together. |
+| Progression | A possible increase after sufficiently supported successful sessions, not simply because another week passed. |
+| Snapshot | A dated copy of derived information about the athlete, based on the available evidence. |
+| Revision / adaptation | A saved plan version / a reasoned change that produces another version. |
+| Provenance / confidence | Where a value came from / how well the available evidence supports it. Confidence is not certainty. |
+| Readiness | A labelled monitoring/caution result from software rules, not medical clearance or a direct body measurement. |
 
 ## Using the coach
 
@@ -44,9 +90,12 @@ that the athlete is an adult (18 or older); it does not collect a date of birth.
    weekly hours and experience in this sport.
 4. **Create your plan.** Recorded Athlima rides are included automatically; for
    runs and better targets connect **Settings > Intervals.icu** first, or import
-   activities later under **Training history and backup**. The existing Athlima
-   activity summaries contain only duration, and the FIT cache retains only
-   seven rides.    **More options** holds the start date, time zone, heart-rate values and equipment.
+   activities later under **Training history and backup**. Current Athlima
+   summaries retain available duration, distance, power, heart rate, cadence,
+   FTP and previews; older summaries may contain less. The recent FIT cache
+   normally holds seven recordings, with pending Coach hand-offs protected.
+   Full Coach history is stored separately and is not limited to seven rides.
+   **More options** holds the start date, time zone, heart-rate values and equipment.
    An intensity threshold over 90 days old triggers a recalibration reminder,
    not an automatic rejection: 90 days is a heuristic and not a validated
    physiological expiry date.
@@ -249,28 +298,34 @@ to running sessions and then adapt the plan as for cycling.
 
 ## Architecture and API
 
+This section is for reading or changing the code. A **module** is a focused code
+file; an **API** here means the functions other code can call, not an online
+server. Pure calculations return results without saving data themselves.
+The service coordinates those calculations with storage. The
+[beginner's code guide](code-guide.md) explains functions, classes and `async`/`await`.
+
 All calculations use seconds, watts, kilograms, kilometres for goal distances,
 metres for goal elevation and minutes for availability and weekly volume.
 Activity distance/elevation retain the source input in metres. ISO instants must
 include a time-zone offset; calendar dates are `YYYY-MM-DD` in the athlete's
 declared IANA time zone. Pure calculations take explicit dates and timestamps.
 
-| Responsibility | Module / public function |
-|---|---|
-| Activity Normalizer | `normalizer.js`: `normalizeActivity`, `fromRecordedRide` |
-| Running rules | `running.js`: run families, `runSteps`, `runWalkStage`, Riegel helpers, `describeRunPaces` |
-| Rider State Estimator | `state.js`: `estimateState`, `powerDuration`, `estimateCriticalPower`, `intensityDistribution`, `estimateDurability` |
-| Goal Demand Model | `demands.js`: `modelGoalDemand` |
-| Gap Analyzer | `demands.js`: `analyzeGaps` |
-| Periodisation Engine | `planner.js`: `periodise` |
-| Weekly Target Generator | `planner.js`: `weeklyTargets` |
-| Workout Progression Engine | `workouts.js`: `progressWorkout` |
-| Library Workout Fitter | `library.js`: `zwoTemplate`, `coachCatalogue`, `fitWorkout`, `chooseLibraryWorkout`, `prescribeWorkout` |
-| Workout Scheduler | `planner.js`: `scheduleWorkouts` |
-| Workout Matcher | `adaptation.js`: `matchWorkout` |
-| Adaptation Engine | `adaptation.js`: `adaptPlan` |
-| Explanation Engine | `explanations.js`: phase, week, workout and adaptation reasons |
-| Validation and Safety Guard | `domain.js` validators and `planner.js`: `validatePlan` |
+| Responsibility | Plain-English job | Module / public function |
+|---|---|---|
+| Activity Normalizer | Put different activity inputs into one checked format. | [normalizer.js](../src/coaching/normalizer.js): `normalizeActivity`, `fromRecordedRide` |
+| Running rules | Build run/run-walk steps and convert pace guidance. | [running.js](../src/coaching/running.js): `runSteps`, `runWalkStage`, Riegel helpers, `describeRunPaces` |
+| Rider State Estimator | Derive dated estimates from available evidence. | [state.js](../src/coaching/state.js): `estimateState`, `powerDuration`, `estimateCriticalPower`, `intensityDistribution`, `estimateDurability` |
+| Goal Demand Model | Describe the types of ability a goal emphasizes. | [demands.js](../src/coaching/demands.js): `modelGoalDemand` |
+| Gap Analyzer | Compare supported estimates with goal needs, retaining unknowns. | [demands.js](../src/coaching/demands.js): `analyzeGaps` |
+| Periodisation Engine | Divide the plan into phases such as base, build and taper. | [planner.js](../src/coaching/planner.js): `periodise` |
+| Weekly Target Generator | Set the allowed training amount for each week. | [planner.js](../src/coaching/planner.js): `weeklyTargets` |
+| Workout Progression Engine | Build the prescribed steps for a session and level. | [workouts.js](../src/coaching/workouts.js): `progressWorkout` |
+| Library Workout Fitter | Find a suitable recipe and fit it to the allowed time/dose. | [library.js](../src/coaching/library.js): `zwoTemplate`, `coachCatalogue`, `fitWorkout`, `chooseLibraryWorkout`, `prescribeWorkout` |
+| Workout Scheduler | Place eligible sessions on available days. | [planner.js](../src/coaching/planner.js): `scheduleWorkouts` |
+| Workout Matcher | Decide which planned session, if any, an activity supports. | [adaptation.js](../src/coaching/adaptation.js): `matchWorkout` |
+| Adaptation Engine | Adjust still-changeable work after new information. | [adaptation.js](../src/coaching/adaptation.js): `adaptPlan` |
+| Explanation Engine | Turn decisions into readable reasons. | [explanations.js](../src/coaching/explanations.js) |
+| Validation and Safety Guard | Reject data or plans that violate configured limits. | [domain.js](../src/coaching/domain.js) validators and [planner.js](../src/coaching/planner.js): `validatePlan` |
 
 `generatePlan({profile, goal, state, startDate, generatedAt})` composes the pure
 planning modules. Goal weights are in the extensible `GOALS` registry; callers
@@ -438,6 +493,11 @@ Weak inputs never acquire fabricated power or capability values.
 
 ## Defaults and limits
 
+These are the program's starting settings, not universal recommendations for
+athletes. A limit can make the program more conservative without being a
+scientifically proven safe boundary. "Unavailable" is a valid result when
+there is not enough evidence.
+
 Defaults are versioned in `domain.js`, not universal physiological laws.
 Historical windows, time constants, readiness limits, CP/W-prime fit gates,
 progression criteria, library dose limits and schedule caps can be supplied to
@@ -455,7 +515,7 @@ caution.
 | Weekly metrics / ramp-rate difference | Last 7 days / chronic-load difference over 7 days |
 | Recent subjective concerns | Configured 3-day window |
 | Sleep-quality signal | One point toward the default three-point caution threshold; never an isolated verdict |
-| Other subjective signals | High RPE, low leg freshness and high soreness add 2 points each; high stress adds 1. Soreness 5/5 or leg freshness 1/5 scores 3 alone (caution); extreme soreness also prompts a pain report |
+| Other subjective signals | High RPE adds 3 points; low leg freshness and high soreness add 2 each; high stress adds 1. Soreness 5/5 or leg freshness 1/5 scores 3 alone (caution); extreme soreness also prompts a pain report |
 | Supported-data threshold | At least 8 medium-window sessions in the coached sport, spread over at least 3 different weeks, at least half with power/pace intensity, heart rate or RPE (no particular sensor required); medium confidence additionally needs data level A or B for every session |
 | Return to training (`returnToTraining*`) | After >=14 days without the coached sport: 50% / 75% of the planned weekly dose for breaks up to 28 days, otherwise 33% / 50% / 75%, over as many days as the break (max 63); no hard sessions below 75% |
 | Interval evidence (`intervalEvidence*`) | Interval summary, or a 3 s smoothed power stream >=90% of the lowest hard target for >=85% of planned hard time |
@@ -474,7 +534,7 @@ caution.
 | Subjective recovery reduction | 30% for non-sleep caution signals |
 | Missed/failed/low-quality outcome reduction | 15% |
 | Short-term adaptation window (`adaptationWindowDays`) | 7 days; reductions apply only inside it, are held until it ends and never change later sessions |
-| High-RPE readiness signal (`readinessRpeMargin`) | RPE above `max(readinessHighRpe, planned expected RPE + 2)`, capped at 10 |
+| High-RPE readiness signal (`readinessRpeMargin`) | RPE at or above `min(10, planned expected RPE + 2)` when the matched session has an expected RPE; otherwise at or above `readinessHighRpe` (9 by default). The margin defaults to 2 |
 | Workout progression | One level per 3 successful sessions in that family, only within unused load budget |
 | CP fit | At least 3 explicit maximal efforts, 120-1200 s, >=3:1 span, R-squared >=0.95 |
 | CP plausibility gate | 50-600 W CP and 1-50 kJ W-prime |
@@ -636,7 +696,7 @@ change, deterministic reason, validation warnings, version and timestamp.
 Resolved outcomes update completion/success statistics in the new snapshot.
 Repeated imports, recordings and identical feedback are idempotent.
 
-In local mode, the dedicated `athlima-coaching` IndexedDB database stores the complete coaching
+The dedicated `athlima-coaching` IndexedDB database stores the complete coaching
 bundle in an atomic transaction: normalized history, versioned snapshots,
 complete plan revisions and adaptation records. It is independent of the
 seven-ride FIT cache and does not inherit localStorage's small quota.
@@ -752,6 +812,12 @@ stop for pain. Coaching support does not diagnose illness or injury.
 
 ## Verification
 
+These commands are for contributors, not a requirement before using the Coach.
+They run automated examples, including deliberately invalid inputs and failed
+storage writes. A passing software test does not validate a physiological
+prediction. See [reading and running tests](code-guide.md#reading-and-running-tests)
+for the terminology.
+
 ```sh
 npm test -- --runInBand test/coaching test/views/training-calendar.test.js test/platform/plan-view.test.js
 npm test -- --runInBand   # full suite, including IndexedDB, service-worker and backup tests
@@ -777,6 +843,9 @@ earlier rides are marked missed, overdue sessions using the weekly budget and
 legacy cycling plans without a stored longest-session reference.
 
 ### Threshold validation with representative data
+
+The figures below are previously recorded development checks, not a fresh
+measurement from this documentation update or a guarantee for another setup.
 
 The defaults were exercised with synthetic rider archetypes (beginner with RPE
 only, intermediate, advanced, time-crunched, returning, no history) across all
@@ -827,4 +896,6 @@ plausibility; they are **not** physiological validation of the thresholds.
 * A very short recorded ride matched to today's session counts as a
   low-quality completion and triggers the 15% short-term reduction.
 * The installed PWA service worker can serve outdated bundles during
-  development; unregister it and clear caches before manual testing.
+  development; unregister it and clear its app-file cache before manual testing.
+  Do not confuse that cache with training-data storage: clearing all site data
+  can remove your rides and plans, so export a backup first.

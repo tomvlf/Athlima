@@ -1,9 +1,40 @@
 
 # Athlima
 
-Athlima is a browser-based indoor cycling platform for structured workouts, trainer control, activity recording, and coaching. All application logic and training data stay in your browser. There is no login, application backend or cloud account.
+Athlima turns a compatible web browser into an indoor cycling dashboard. It can guide a workout, ask a smart trainer to change resistance, record a ride, and help plan cycling or running training.
 
-The app supports local backups and optional direct Intervals.icu history import and FIT upload using your personal API key.
+The app's calculations run in your browser, and training data is saved in that browser. There is no Athlima login or cloud account. An optional Intervals.icu connection can import activities and upload recorded rides directly to that service.
+
+## New here? Start with this
+
+You do not need programming knowledge to use Athlima. If someone already hosts it for you, open their web address in a [supported browser](#browser-and-device-support); skip the installation and Docker sections below.
+
+1. **Check Settings.** Review your units, body mass and cycling FTP. FTP is the power reference used to scale cycling workouts; see the short glossary below.
+2. **Connect equipment.** Open **Devices** and use the connection controls. Your browser asks you to choose a trainer or sensor; a website cannot simply connect without permission.
+3. **Choose a workout.** The **Library** describes what each session contains. A workout is a recipe for a ride, not a ride you have already completed.
+4. **Ride.** **Start workout** opens the ride screen. **Target** values describe the requested effort; the other readings describe what connected sensors report. `--` means unavailable, not zero.
+5. **Finish and save.** Finish the current ride before starting another. For rides under one minute, the app offers save or discard. If saving fails, use the displayed retry/download options before closing the page.
+6. **Keep a backup.** Use **Settings > Local backup** to download a copy. Saving in the browser alone does not protect against clearing site data, losing the device or browser storage being removed.
+
+The **Coach** is optional. It builds a proposed schedule from your goal, availability and recorded history; it is not medical advice. Running plans provide running guidance and exports, not treadmill or cycling-trainer execution. See [Using the Coach](doc/coaching.md#using-the-coach).
+
+### A few useful words
+
+| Word | Plain-English meaning |
+|---|---|
+| Smart trainer | Indoor cycling equipment that can report readings and accept resistance commands. |
+| Power / W | How hard you are working mechanically, measured in watts. |
+| FTP | Functional Threshold Power: the cycling reference, in watts, used to scale targets. A target of 80% with FTP 250 W is 200 W. |
+| Cadence / rpm | How many complete pedal turns you make each minute. |
+| Heart rate / bpm | Heartbeats per minute. RR intervals are the times between successive beats. |
+| ERG | Trainer mode that tries to hold a requested power by adjusting resistance. |
+| Interval / step | A section of a workout; a section can contain smaller steps with different targets. |
+| RPE | Your own rating of perceived exertion, on a 0-10 effort scale. |
+| ZWO file | A text-based workout recipe that Athlima can read. |
+| FIT file | A compact recording of activity data, suitable for downloading or uploading to compatible services. |
+| Backup / sync | A backup is a separate saved copy. Intervals.icu sync refreshes local history; it is not a backup of your complete Athlima setup. |
+
+For a guided tour of the files and code, start with the [beginner's code guide](doc/code-guide.md).
 
 ## What Athlima does
 
@@ -13,11 +44,11 @@ The app supports local backups and optional direct Intervals.icu history import 
 - controls smart trainers in ERG, resistance, and grade-simulation modes
 - records `.fit` files with power, cadence, heart rate, and RR intervals
 - supports session planning and direct launch from a multi-week calendar, with weekly ride totals and power profiles when data is available
-- reviews cycling activities with weekly and monthly totals, available training-load indicators, and recorded power previews when samples exist
+- reviews activities across sports with weekly and monthly totals, available training-load indicators, and recorded power previews when samples exist
 - imports and syncs activity history (all sports, with type icons) from Intervals.icu
 - fetches full-resolution power, heart-rate and cadence streams plus route previews on demand, with CSV export
 - uploads new FIT recordings back to Intervals.icu
-- includes an adaptive coaching engine for goal-based planning and ride review
+- includes a local, rule-based coaching engine for cycling/running planning and activity review
 - automatically switches between mobile and desktop layouts as the window width changes
 - saves coaching, plans, workouts, recordings and calendar on this device
 - downloads and restores local backup files without including integration credentials
@@ -31,7 +62,7 @@ without animation, flashing, external assets or changes to training-zone colors.
 The ride screen retains its calmer mint controls and removes
 decorative imagery and header accents to keep metrics and controls
 distraction-free. The theme is included in production builds and Docker images,
-with no external image or font requests. Styling lives in `src/css/cyberpunk.css`.
+with no external image or font requests. Styling lives in [cyberpunk.css](src/css/cyberpunk.css).
 The locally bundled backdrop uses a 1920-pixel WebP for smaller displays and a
 3840-pixel version for large or high-density desktop displays.
 
@@ -82,17 +113,25 @@ This repository is a standalone browser app. The main flow is:
 
 ## Quick start
 
+This section is for people running their own copy or editing the app. A
+**terminal** is a window for typing commands. Open one in the downloaded project
+folder; in VS Code, use **Terminal > New Terminal**.
+
 ### Local development
 
 Requirements:
-- Node.js 22.18.0 or later
+- Node.js 22.18.0 or later, with npm. Node runs development tools; npm installs
+  the packages those tools need. Riders opening an already-hosted app do not need them.
 
 ```bash
 npm install
 npm start
 ```
 
-The frontend is run through Parcel. Open the local URL it prints in the browser.
+`npm install` installs dependencies into the project; it does not install a
+training server or create an account. `npm start` runs Parcel, the tool that
+prepares the app and serves it while you edit. Open the local URL it prints.
+Keep the terminal open while using that development server; **Ctrl+C** stops it.
 
 Useful commands:
 
@@ -101,15 +140,27 @@ npm test
 npm run build
 ```
 
+`npm test` runs automated examples that check expected behavior. `npm run build`
+creates browser-ready files in `dist/`; it does not publish them or start a
+server. See [testing explained](doc/code-guide.md#reading-and-running-tests) for
+smaller test commands and the limits of what they prove.
+
 For HTTPS development, use:
 
 ```bash
 npm run starttls
 ```
 
-This expects local cert files in `dev_cert/cert.pem` and `dev_cert/key.pem`.
+This expects local certificate files at `dev_cert/cert.pem` and
+`dev_cert/key.pem`. A certificate enables an encrypted HTTPS connection; the
+private key must stay private. This command does not create or automatically
+trust those files. Plain localhost development usually does not need them.
 
 ### Docker Compose
+
+Docker runs a packaged copy of the web server in a **container**. Compose reads
+a configuration file describing how to start it. This is an alternative to
+local development, not an extra step every rider must perform.
 
 The default Compose setup serves only static frontend files. No backend or database service is needed.
 The frontend runs as UID/GID 101 on container port 8080, with a read-only
@@ -124,7 +175,7 @@ Then open:
 
 - http://localhost:8080
 
-For the existing Dockhand `bike_trainer` stack, use `compose.dockhand.yaml`.
+For the existing Dockhand `bike_trainer` stack, use [compose.dockhand.yaml](compose.dockhand.yaml).
 It preserves host port 1111 for the existing HTTPS proxy, forwarding to container
 port 8080. TLS remains handled by your existing proxy; no Caddy or backend is
 needed in this stack. Replace the stack's Compose content with this file and
@@ -148,7 +199,7 @@ To build from a local checkout instead of using published images:
 docker compose -f compose.yaml -f compose.server.yaml up --build -d
 ```
 
-For public HTTPS hosting, replace `app.example.com` in `Caddyfile` with your
+For public HTTPS hosting, replace `app.example.com` in [Caddyfile](Caddyfile) with your
 hostname and run:
 
 ```bash
@@ -185,6 +236,12 @@ browser, so reload the app after deploying a new frontend.
 
 The Coach, activity history, calendar, workout library and ride recovery use browser storage. Data is not synchronized between browsers or devices. Clearing site data or browser eviction can remove it; use Settings > Local backup regularly.
 
+The dashboard's recent-duration summary is cycling-only. The Activities page's
+week/month totals include dated activities across sports. Coach load estimates
+remain specific to the selected sport; different load scales are not added
+together. A total labelled **Known** is incomplete because some measurements
+are missing.
+
 Intervals.icu is optional and requires internet access. In Settings, enter your
 personal API key and import start date. The key is saved in this browser's local
 storage and sent only to `https://intervals.icu`. It is not encrypted against
@@ -193,11 +250,8 @@ keeps imported history. There is no Athlima server or intermediary.
 Strava and TrainingPeaks server-based OAuth connections have been removed;
 use FIT file downloads for manual upload to other providers.
 
-For details, see:
-
-- [doc/backend.md](doc/backend.md)
-- [doc/intervals-guide.md](doc/intervals-guide.md)
-- [doc/coaching.md](doc/coaching.md)
+For the practical details, see [where data lives and how backups work](doc/backend.md),
+[connecting Intervals.icu](doc/intervals-guide.md) and [using the Coach](doc/coaching.md).
 
 Older account-scoped browser data and server volumes are not deleted or silently
 merged. Export data from the previous version before upgrading; see the migration
@@ -205,7 +259,10 @@ notes in the backend guide.
 
 ## Browser and device support
 
-Athlima relies on browser APIs such as Web Bluetooth, Web Serial, and Web Components. For a supported experience, use a secure context and a compatible browser.
+Athlima relies on browser features such as Web Bluetooth (talking to nearby
+sensors), Web Serial (communicating with supported adapters) and Web Components
+(reusable interface elements). For a supported experience, use a compatible
+browser and a **secure context**: HTTPS, or localhost on your own computer.
 
 Supported browsers:
 - Chrome
@@ -245,8 +302,12 @@ Athlima supports the industry-standard trainer and sensor protocols used by indo
 Serve the built `dist/` directory over HTTPS, or use localhost for development.
 The Compose HTTPS variant adds Caddy in front of the static frontend only.
 No authentication cookie, server encryption key or server-origin configuration
-is required. Training and coaching work offline once app assets are cached;
-Intervals.icu requests require a connection and browser CORS access.
+is required. Training and coaching can work offline once the needed app files
+are cached, meaning the browser has kept copies. Offline loading is best-effort,
+not a backup: not every image/resource is cached, and browser cache removal can
+prevent a later offline launch. Check offline reopening before relying on it.
+Intervals.icu requests require a connection and permission from that service
+for cross-site browser requests (CORS).
 
 The Docker build generates a Content Security Policy from the exact built HTML,
 including hashes for Parcel's inline import map. Scripts cannot use arbitrary
@@ -258,10 +319,13 @@ the generated CSP after replacing assets without rebuilding its import-map hashe
 
 ## Documentation
 
-- [README.md](README.md)
-- [doc/backend.md](doc/backend.md)
-- [doc/intervals-guide.md](doc/intervals-guide.md)
-- [doc/coaching.md](doc/coaching.md)
+| I want to... | Read |
+|---|---|
+| Use the app and understand its terms | This README |
+| Understand the code without a programming background | [Beginner's code guide](doc/code-guide.md) |
+| Know where data lives, back it up, or host the app | [Storage, hosting and migration](doc/backend.md) |
+| Connect another training service | [Intervals.icu guide](doc/intervals-guide.md) |
+| Understand planning, feedback and scientific limitations | [Coach guide](doc/coaching.md) |
 
 ## License
 

@@ -1,4 +1,6 @@
 /**
+ * @jest-environment node
+ *
  * Local browser-backup tests kept in the historical server folder; there is no Athlima server here.
  * A simulated database and settings store exercise exact FIT-byte round trips, calendar references,
  * Coach restoration, credential exclusion and failures before/within writes. The database-file

@@ -1,4 +1,6 @@
 /**
+ * @jest-environment node
+ *
  * Tests offline-worker event handlers with controlled cache/network objects in a fresh Node
  * context. Checks page fallback, eligible asset caching, exclusion of external/API traffic and
  * visible cache failures without losing valid responses. This is a simulation, not a service-worker
