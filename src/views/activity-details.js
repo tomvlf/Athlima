@@ -3,13 +3,12 @@
  *
  * Used by the activity history and the training calendar so both show the same
  * Intervals.icu summary values. Values that were not provided are omitted.
- * Helpers return display text, not changed activity data. Before text enters
- * HTML (the browser's page format), special characters are escaped so imported
- * descriptions and device names appear as words, not as page instructions.
+ * Helpers return display text, not changed activity data. Imported
+ * descriptions and device names are interpolated as text.
  */
 
-const escapeHTML = value => String(value).replace(/[&<>"']/g, c =>
-    ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
+import { html } from '../html.js';
+
 const num = value => typeof value === 'number' && Number.isFinite(value);
 const round = (value, digits = 0) => Number(value.toFixed(digits)).toLocaleString('en', {maximumFractionDigits: digits});
 
@@ -121,10 +120,10 @@ export function renderActivityDetails(activity) {
     const rows = activityDetailRows(activity);
     const description = typeof activity?.details?.description === 'string' ? activity.details.description.trim() : '';
     if(!rows.length && !description) return '';
-    return `<details class="activity-details">
+    return html`<details class="activity-details">
         <summary>All metrics</summary>
-        ${description ? `<p class="activity-details--description">${escapeHTML(description)}</p>` : ''}
+        ${description ? html`<p class="activity-details--description">${description}</p>` : ''}
         <dl>${rows.map(([label, value]) =>
-            `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl>
+            html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
     </details>`;
 }

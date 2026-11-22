@@ -1,0 +1,18 @@
+# Keep the release pipeline and dependencies current without trusting floating
+# major-version tags. Updates arrive as reviewable pull requests.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Build tooling only; the shipped app has no runtime package imports.
+    open-pull-requests-limit: 5

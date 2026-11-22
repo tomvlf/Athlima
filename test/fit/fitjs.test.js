@@ -24,3 +24,10 @@ describe('minimal', () => {
         expect(dataviewToArray(FITjs.encode(minimalFITjs))).toEqual(array);
     });
 });
+
+describe('malformed input', () => {
+    test('a data record without a definition does not loop or throw past the caller', () => {
+        const view = new DataView(new Uint8Array([0x00, 0x00, 0x00, 0x00]).buffer);
+        expect(FITjs.decode(view).length).toBeLessThanOrEqual(4);
+    });
+});

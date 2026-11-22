@@ -53,8 +53,8 @@ test('empty training history does not invent metrics', () => {
 });
 
 test('workout profile uses real interval durations and finite power targets', () => {
-    expect(profileGraph({})).toContain('Free ride');
-    const html = profileGraph({intervals: [{steps: [{duration: 60, power: .5}, {duration: 120, power: 1.1}]}]});
+    expect(String(profileGraph({}))).toContain('Free ride');
+    const html = String(profileGraph({intervals: [{steps: [{duration: 60, power: .5}, {duration: 120, power: 1.1}]}]}));
     expect(html).toContain('flex-grow:60');
     expect(html).toContain('flex-grow:120');
     expect(html).not.toContain('undefined');
@@ -63,7 +63,7 @@ test('workout profile uses real interval durations and finite power targets', ()
 
 test('course profiles use actual elevation, handle flat tracks and cap the number of plotted points', () => {
     const points = Array.from({length: 1000}, (_, index) => ({x: index * 10, y: 50 + index % 20}));
-    const html = profileGraph({points, pointsSimplified: []});
+    const html = String(profileGraph({points, pointsSimplified: []}));
     expect(html).toContain('aria-label="Course elevation profile"');
     const coordinates = html.match(/<polyline points="([^"]+)"/)[1].split(' ');
     expect(coordinates).toHaveLength(128);
@@ -71,7 +71,7 @@ test('course profiles use actual elevation, handle flat tracks and cap the numbe
     expect(coordinates.at(-1)).toMatch(/^100\.00,/);
     expect(html).not.toContain('NaN');
     expect(html).not.toContain('Infinity');
-    const flat = profileGraph({points: [null, {x: 0, y: 25}, {x: 0, y: 25}]});
+    const flat = String(profileGraph({points: [null, {x: 0, y: 25}, {x: 0, y: 25}]}));
     expect(flat).toContain('0.00,24.00 100.00,24.00');
-    expect(profileGraph({points: [null, {x: 0, y: NaN}]})).toContain('Free ride');
+    expect(String(profileGraph({points: [null, {x: 0, y: NaN}]}))).toContain('Free ride');
 });

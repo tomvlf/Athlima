@@ -79,7 +79,7 @@ test('renders a recorded wattage profile on an activity card', () => {
         powerProfile: [100, 150, 200],
     });
 
-    expect(markup).toContain('class="power-profile--recorded"');
+    expect(String(markup)).toContain('class="power-profile--recorded"');
 });
 
 // Parse the returned HTML to prove hostile-looking text does not become tags or handlers.
@@ -117,6 +117,6 @@ test('omits unavailable current training-state values instead of rendering NaN',
     });
     const list = new ActivityList();
 
-    expect(list.summary()).not.toContain('activity-load-state');
-    expect(list.summary()).not.toContain('NaN');
+    expect(String(list.summary())).not.toContain('activity-load-state');
+    expect(String(list.summary())).not.toContain('NaN');
 });

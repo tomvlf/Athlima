@@ -5,19 +5,19 @@
  */
 
 import { addDays, localDay } from '../coaching/domain.js';
+import { html, raw, escapeHTML } from '../html.js';
 
 /**
  * Encode HTML-sensitive characters in plain text; null/undefined become empty text. This is for
- * content insertion, not a URL validator.
+ * content insertion, not a URL validator. New markup should interpolate values into `html` instead.
  */
-export const escape = value => String(value ?? '').replace(/[&<>"']/g, c =>
-    ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+export const escape = escapeHTML;
 /**
  * Wrap already-built body HTML in an expandable section. Escape its ID/title; the platform
  * separately controls whether it is open on mobile or desktop.
  */
-export const mobileDetails = (id, title, body) => `<details class="mobile-details" data-mobile-details="${escape(id)}" open>
-    <summary>${escape(title)}</summary><div class="mobile-details-body">${body}</div></details>`;
+export const mobileDetails = (id, title, body) => html`<details class="mobile-details" data-mobile-details="${id}" open>
+    <summary>${title}</summary><div class="mobile-details-body">${raw(body)}</div></details>`;
 export const minutes = seconds => `${Math.round(seconds / 60)} min`;
 /**
  * Format a finite number using the reader's locale and requested precision, or show -- for
@@ -85,7 +85,7 @@ export function profileGraph(workout) {
         const source = Array.isArray(workout.pointsSimplified) && workout.pointsSimplified.length
             ? workout.pointsSimplified : Array.isArray(workout.points) ? workout.points : [];
         const points = source.filter(point => Number.isFinite(point?.x) && Number.isFinite(point?.y));
-        if(points.length < 2) return '<p class="muted">Free ride or course-based workout</p>';
+        if(points.length < 2) return html`<p class="muted">Free ride or course-based workout</p>`;
         const bounds = points.reduce((range, point) => ({
             min: Math.min(range.min, point.y), max: Math.max(range.max, point.y),
         }), {min: points[0].y, max: points[0].y});
@@ -98,14 +98,15 @@ export function profileGraph(workout) {
             const y = bounds.max === bounds.min ? 24 : 44 - (point.y - bounds.min) / (bounds.max - bounds.min) * 36;
             return `${x.toFixed(2)},${y.toFixed(2)}`;
         }).join(' ');
-        return `<div class="course-profile" role="img" aria-label="Course elevation profile">
+        return html`<div class="course-profile" role="img" aria-label="Course elevation profile">
             <svg viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
                 <polygon points="0,48 ${coordinates} 100,48"></polygon><polyline points="${coordinates}"></polyline>
             </svg></div>`;
     }
-    return `<div class="profile-graph" role="img" aria-label="Workout target power profile">
-        ${steps.map(step => `<span style="flex-grow:${Number(step.duration) || 1};
+    const bars = steps.map(step => html`<span style="flex-grow:${Number(step.duration) || 1};
             height:${Math.max(8, Math.min(100, (Number(step.power) || 0) < 9
                 ? (Number(step.power) || 0) * 62 : Number(step.power) / 5))}%;
-            --bar:${Number(step.power) > 1 ? '#f5ad65' : Number(step.power) > 0.75 ? '#9a99ff' : '#52d9b2'}"></span>`).join('')}</div>`;
+            --bar:${Number(step.power) > 1 ? '#f5ad65' : Number(step.power) > 0.75 ? '#9a99ff' : '#52d9b2'}"></span>`);
+    return html`<div class="profile-graph" role="img" aria-label="Workout target power profile">
+        ${bars}</div>`;
 }

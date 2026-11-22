@@ -11,21 +11,21 @@
  */
 
 import { xf, exists, empty, equals, debounce } from '../functions.js';
-import { escapeHTML } from '../utils.js';
+import { html, raw, setHTML } from '../html.js';
 import { models } from '../models/models.js';
 import { intervalsToGraph, courseToGraph, renderInfo } from './workout-graph.js';
 
-const radioOff = `
+const radioOff = html`
         <svg class="radio radio-off">
             <use href="#icon--radio-off">
         </svg>`;
 
-const radioOn = `
+const radioOn = html`
         <svg class="radio radio-on">
             <use href="#icon--radio-on">
         </svg>`;
 
-const options = `
+const options = html`
         <svg class="workout--options-btn control--btn--icon">
             <use href="#icon--options">
         </svg>`;
@@ -39,21 +39,21 @@ function workoutTemplate(workout) {
     if(workout.meta.distance) {
         duration = `${(workout.meta.distance / 1000).toFixed(2)} km`;
     }
-    return `<workout-item class='workout cf' id="${escapeHTML(workout.id)}" metric="ftp">
+    return html`<workout-item class='workout cf' id="${workout.id}" metric="ftp">
                 <div class="workout--info">
                     <div class="workout--short-info">
                         <div class="workout--summary">
-                            <div class="workout--name">${escapeHTML(workout.meta.name)}</div>
-                            <div class="workout--type">${escapeHTML(workout.meta.category)}</div>
+                            <div class="workout--name">${workout.meta.name}</div>
+                            <div class="workout--type">${workout.meta.category}</div>
                             <div class="workout--duration">${duration}</div>
-                            <div class="workout--select" id="btn${escapeHTML(workout.id)}">${workout.selected ? radioOn : radioOff}
+                            <div class="workout--select" id="btn${workout.id}">${workout.selected ? radioOn : radioOff}
                             </div>
                             <div class="workout--options">${options}</div>
                         </div>
                     </div>
                     <div class="workout--full-info">
                         <div class="workout-list--graph-cont">${workout.graph}</div>
-                        <div class="workout--description">${escapeHTML(workout.meta.description)}</div>
+                        <div class="workout--description">${workout.meta.description}</div>
                     </div>
                 </div>
                 <div class="workout--actions">
@@ -139,11 +139,11 @@ class WorkoutList extends HTMLElement {
 
             const selected = equals(workout.id, selectedWorkout.id);
             workout = Object.assign(workout, {graph: graph, selected: selected});
-            return acc + workoutTemplate(workout);
+            return acc + String(workoutTemplate(workout));
         }, '');
     }
     render() {
-        this.innerHTML = this.stateToHtml(this.state, this.ftp, this.workout);
+        setHTML(this, raw(this.stateToHtml(this.state, this.ftp, this.workout)));
     }
 }
 
@@ -232,11 +232,11 @@ class WorkoutListItem extends HTMLElement {
         }
     }
     select() {
-        this.indicator.innerHTML = radioOn;
+        setHTML(this.indicator, html`${radioOn}`);
         this.isSelected = true;
     }
     diselect() {
-        this.indicator.innerHTML = radioOff;
+        setHTML(this.indicator, html`${radioOff}`);
         this.isSelected = false;
     }
     toggleOptions() {

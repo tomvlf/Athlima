@@ -24,6 +24,7 @@ import intervals from '../models/intervals.js';
 import { renderPowerProfile } from './power-profile.js';
 import { activityIcon, activityTypeLabel } from './activity-icon.js';
 import { renderActivityDetails } from './activity-details.js';
+import { html, raw, setHTML } from '../html.js';
 
 const storageKey = 'training-calendar';
 const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -788,7 +789,7 @@ class TrainingCalendar extends HTMLElement {
             ? activeElement.value
             : this.querySelector('[name="workout"]')?.value;
 
-        this.innerHTML = `${this.view === 'month' ? this.renderMonth() : this.renderWeek()}${this.renderSelectedDate()}`;
+        setHTML(this, html`${raw(this.view === 'month' ? this.renderMonth() : this.renderWeek())}${raw(this.renderSelectedDate())}`);
 
         const grid = this.querySelector('.training-calendar--grid-wrap');
         if(grid) grid.scrollLeft = gridScrollLeft;

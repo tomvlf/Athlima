@@ -241,5 +241,5 @@ test('offers on-demand route and renders full-resolution stream previews', () =>
     expect(root.querySelectorAll('.activity-stream-chart')).toHaveLength(3);
     expect(root.textContent).toContain('4 samples');
     expect(root.querySelector('[data-download-activity-csv]')).not.toBeNull();
-    expect(renderActivityStreamData({streams: {}, map: null})).toContain('No route is available');
+    expect(String(renderActivityStreamData({streams: {}, map: null}))).toContain('No route is available');
 });

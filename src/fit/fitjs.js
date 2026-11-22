@@ -158,12 +158,15 @@ function FITjsParser() {
         let definitions = new Map();
         // end state
 
-        while(i < byteLength) {
+        // A crafted file must not create an unbounded record list or stall on a zero-length record.
+        const maxRecords = 1000000;
+        while(i < byteLength && records.length < maxRecords) {
             try {
                 record = fitRecord.decode(dataview, i, definitions);
                 records.push(record);
-                // console.log(`${i} + ${record?.length ?? 0} `, record);
-                i += record?.length ?? 0;
+                const length = record?.length ?? 0;
+                if(!(length > 0)) break;
+                i += length;
             } catch(e) {
                 console.error(`:fit :decode :at ${i}/${byteLength} `, e);
                 break;

@@ -30,6 +30,10 @@ const policy = [
     "default-src 'none'",
     `script-src 'self' ${[...hashes].join(' ')}`.trim(),
     "script-src-attr 'none'",
+    // Every DOM HTML sink goes through src/html.js, which creates TrustedHTML with
+    // this policy name. A plain string assignment is rejected by the browser.
+    "require-trusted-types-for 'script'",
+    "trusted-types athlima",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
@@ -52,6 +56,10 @@ writeFileSync(destination, [
     'add_header X-Content-Type-Options "nosniff" always;',
     'add_header X-Frame-Options "DENY" always;',
     'add_header Referrer-Policy "no-referrer" always;',
+    // Keep this document from sharing a browsing-context group or being read as
+    // a cross-origin subresource. The app needs neither capability.
+    'add_header Cross-Origin-Opener-Policy "same-origin" always;',
+    'add_header Cross-Origin-Resource-Policy "same-origin" always;',
     'add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), bluetooth=(self), serial=(self), usb=(self), screen-wake-lock=(self)" always;',
     '',
 ].join('\n'));

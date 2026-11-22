@@ -3,11 +3,12 @@
  *
  * SVG describes a picture with lines and shapes rather than a photograph.
  * Icons use currentColor so they follow the surrounding Athlima theme colour.
- * The returned HTML includes a label for assistive tools; special characters
- * in that label are escaped so they cannot become unwanted page instructions.
+ * The returned HTML includes a label for assistive tools; the label is
+ * interpolated as text, and the static path markup is marked raw.
  */
 
 import { activityTypeLabel, sportForType } from '../coaching/activity-types.js';
+import { html, raw } from '../html.js';
 
 const paths = {
     cycling: '<circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/>' +
@@ -37,13 +38,10 @@ const paths = {
 export function activityIcon(activity = {}, {label = false} = {}) {
     const sport = activity.sport || (activity.activityType ? sportForType(activity.activityType) : 'cycling');
     const text = activityTypeLabel(activity.activityType, sport);
-    const svg = `<svg class="activity-icon activity-icon--${paths[sport] ? sport : 'other'}" viewBox="0 0 24 24" ` +
-        `aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" ` +
-        `stroke-linecap="round" stroke-linejoin="round">${paths[sport] || paths.other}</svg>`;
-    const safe = text.replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
+    const svg = html`<svg class="activity-icon activity-icon--${paths[sport] ? sport : 'other'}" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${raw(paths[sport] || paths.other)}</svg>`;
     return label
-        ? `<span class="activity-type" title="${safe}">${svg}<span>${safe}</span></span>`
-        : `<span class="activity-type" title="${safe}" role="img" aria-label="${safe}">${svg}</span>`;
+        ? html`<span class="activity-type" title="${text}">${svg}<span>${text}</span></span>`
+        : html`<span class="activity-type" title="${text}" role="img" aria-label="${text}">${svg}</span>`;
 }
 
 export { activityTypeLabel };

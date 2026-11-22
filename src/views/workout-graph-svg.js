@@ -12,6 +12,7 @@ import { xf, exists, first, last, } from '../functions.js';
 import { formatTime } from '../utils.js';
 import { listItemTemplate, } from './planned-list.js';
 import { models } from '../models/models.js';
+import { html, setHTML } from '../html.js';
 
 // Calculates graph coordinates and labels from intervals and FTP (reference watts).
 class WorkoutGraphViewModel {
@@ -124,7 +125,7 @@ class WorkoutGraphViewModel {
 
         // accumulators
         let accX = 0;
-        let acc = '';
+        const acc = [];
 
         for(let i = 0; i < intervals.length; i++) {
             let intervalPrev = (i === 0) ? initialInterval : intervals[i-1];
@@ -166,16 +167,16 @@ class WorkoutGraphViewModel {
 
             const info = self.intervalToInfo(interval);
 
-            acc += `<polygon points="${points}"
+            acc.push(html`<polygon points="${points}"
                              fill="${color}"
                              power="${info.power}"
                              cadence="${info.cadence}"
                              slope="${info.slope}"
-                             duration="${info.duration}" />`;
+                             duration="${info.duration}" />`);
         }
 
         // Flip the drawing vertically because higher power should rise from the bottom.
-        return `
+        return html`
             <svg
                 class="workout--graph"
                 viewBox="0 0 ${graphWidth} ${this.yOutRange.max}"
@@ -236,7 +237,7 @@ class WorkoutGraph extends HTMLElement {
         const bottom       = rect.height;
 
         this.$info.style.display = 'block';
-        this.$info.innerHTML = `<div>${power}</div><div>${cadence}</div><div>${slope}</div><div class="graph--info--time">${duration}</div>`;
+        setHTML(this.$info, html`<div>${power}</div><div>${cadence}</div><div>${slope}</div><div class="graph--info--time">${duration}</div>`);
 
         const width  = this.$info.getBoundingClientRect().width;
         const height = this.$info.getBoundingClientRect().height;

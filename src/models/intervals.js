@@ -16,11 +16,24 @@ const validAthleteId = id => /^(?:i)?\d{1,20}$/.test(String(id));
 let syncing = false;
 
 /**
+ * Find the saved connection. A remembered connection lives in localStorage; a session-only one
+ * lives in sessionStorage and disappears when the tab closes. Return the store too so progress
+ * updates stay in the same place and a remembered key is never silently recreated.
+ */
+function storedEntry() {
+    for(const store of [window.localStorage, window.sessionStorage]) {
+        const value = store.getItem(KEY);
+        if(value) return {value, store};
+    }
+    return {value: null, store: null};
+}
+
+/**
  * Read and validate the saved connection. Return null only when disconnected; malformed stored
  * settings produce an actionable error instead of pretending the user is disconnected.
  */
 function saved() {
-    const value = window.localStorage.getItem(KEY);
+    const {value} = storedEntry();
     if(!value) return null;
     const result = JSON.parse(value);
     if(typeof result.apiKey !== 'string' || !result.apiKey || !validAthleteId(result.athleteId)) {
@@ -30,6 +43,11 @@ function saved() {
     return result;
 }
 
+/** The store currently holding this tab's connection, preferring a remembered connection. */
+function connectionStore() {
+    return window.localStorage.getItem(KEY) ? window.localStorage : window.sessionStorage;
+}
+
 /**
  * Expose connection/progress information for screens without returning the API key. configured
  * means the integration is available, not that an account is connected.
@@ -37,6 +55,7 @@ function saved() {
 function status() {
     const connection = saved();
     return {configured: true, connected: Boolean(connection),
+        remembered: Boolean(window.localStorage.getItem(KEY)),
         status: syncing ? 'running' : connection?.error ? 'error' : connection ? 'connected' : 'disconnected',
         athleteId: connection?.athleteId, oldest: connection?.oldest,
         lastSuccess: connection?.lastSuccess, nextDate: connection?.nextDate,
@@ -87,7 +106,7 @@ const athletePath = (connection = saved()) => {
  * ID. With no key argument, open Settings instead. Do not overwrite a connection changed by another
  * tab during the test.
  */
-async function connect({apiKey, oldest} = {}) {
+async function connect({apiKey, oldest, remember = true} = {}) {
     if(apiKey === undefined) {
         window.location.hash = '/settings';
         xf.dispatch('ui:page-set', 'settings');
@@ -101,6 +120,9 @@ async function connect({apiKey, oldest} = {}) {
     if(oldest > isoDate() || oldest < addDays(isoDate(), -3660)) {
         throw new Error('Choose an import date within the last ten years.');
     }
+    // A remembered connection survives a tab close; a session-only one does not.
+    const target = remember ? window.localStorage : window.sessionStorage;
+    const other  = remember ? window.sessionStorage : window.localStorage;
     const previous = window.localStorage.getItem(KEY);
     const connection = {apiKey: apiKey.trim(), athleteId: '0', oldest};
     const athlete = await request('/athlete/0', {connection});
@@ -108,7 +130,8 @@ async function connect({apiKey, oldest} = {}) {
     if(!validAthleteId(id)) throw new Error('Intervals.icu returned an unexpected athlete profile.');
     if(window.localStorage.getItem(KEY) !== previous) throw new Error('The Intervals.icu connection changed in another tab. Retry.');
     connection.athleteId = String(id);
-    window.localStorage.setItem(KEY, JSON.stringify(connection));
+    target.setItem(KEY, JSON.stringify(connection));
+    other.removeItem(KEY);
     xf.dispatch('services', {intervals: true});
     return status();
 }
@@ -120,6 +143,7 @@ async function connect({apiKey, oldest} = {}) {
 function disconnect() {
     if(syncing) throw new Error('Wait for the current import before disconnecting.');
     window.localStorage.removeItem(KEY);
+    window.sessionStorage.removeItem(KEY);
     xf.dispatch('services', {intervals: false});
     return status();
 }
@@ -227,13 +251,14 @@ async function sync(service, onProgress = () => {}) {
     if(syncing) throw new Error('An Intervals.icu import is already running.');
     const connection = saved();
     if(!connection) throw new Error('Connect Intervals.icu first.');
-    let persisted = window.localStorage.getItem(KEY);
+    const store = connectionStore();
+    let persisted = store.getItem(KEY);
     /**
      * Detect another tab changing connection settings before importing or recording progress under
      * the wrong account.
      */
     const checkConnection = () => {
-        if(window.localStorage.getItem(KEY) !== persisted) {
+        if(store.getItem(KEY) !== persisted) {
             throw new Error('The Intervals.icu connection changed in another tab. Retry with the current settings.');
         }
     };
@@ -244,7 +269,7 @@ async function sync(service, onProgress = () => {}) {
     const saveProgress = () => {
         checkConnection();
         const next = JSON.stringify(connection);
-        window.localStorage.setItem(KEY, next);
+        store.setItem(KEY, next);
         persisted = next;
     };
     const through = isoDate();
@@ -314,7 +339,7 @@ async function sync(service, onProgress = () => {}) {
         saveProgress();
     } catch(error) {
         connection.error = error.message;
-        if(window.localStorage.getItem(KEY) === persisted) saveProgress();
+        if(store.getItem(KEY) === persisted) saveProgress();
         throw error;
     } finally { syncing = false; }
     return status();

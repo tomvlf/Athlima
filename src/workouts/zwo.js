@@ -10,6 +10,21 @@ import { equals, existance, exists,
          empty, first, last, repeat,
          capitalize, toFixed } from '../functions.js';
 
+/** Encode text/attribute values so imported names and descriptions cannot inject XML. */
+function escapeXML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
+    })[character]);
+}
+
+/** Convert an attribute to a number and keep it inside a sane range for the player. */
+function boundedNumber(decode, min, max) {
+    return value => {
+        const number = decode(value);
+        return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : number;
+    };
+}
+
 /**
  * Read a named setting from an XML element and apply its decoder, leaving an absent attribute
  * undefined rather than inventing a target.
@@ -35,7 +50,7 @@ function writeAttribute(args = {}) {
     const name   = existance(args.name);
     const value  = existance(args.value);
 
-    return `${name}="${encode(value)}"`;
+    return `${name}="${escapeXML(encode(value))}"`;
 }
 
 /**
@@ -311,11 +326,11 @@ function Element(args = {}) {
         content = existance(args.content, defaults.content);
 
         const attrsString = Object.keys(attributes).reduce((acc, key) => {
-            acc += ` ${key}="${args[key]}"`;
+            acc += ` ${key}="${escapeXML(args[key])}"`;
             return acc;
         }, '');
 
-        return `${tagOpen + attrsString}${content}${tagClose}`;
+        return `${tagOpen + attrsString}${escapeXML(content)}${tagClose}`;
     }
 
     function defaultCalcDuration(element) {
@@ -538,9 +553,10 @@ function Warmup(args = {}) {
         const cadenceLow  = element.CadenceLow;
         const cadenceHigh = element.CadenceHigh;
 
-        const stepsCount = parseInt(duration / timeDx);
-        const powerDx    = (powerHigh - powerLow) / (stepsCount - 1);
-        const cadenceDx  = (cadenceHigh - cadenceLow) / (stepsCount - 1);
+        const stepsCount = Math.max(0, Math.min(8640, parseInt(duration / timeDx) || 0));
+        const divisor    = Math.max(1, stepsCount - 1);
+        const powerDx    = (powerHigh - powerLow) / divisor;
+        const cadenceDx  = (cadenceHigh - cadenceLow) / divisor;
 
         let steps       = [];
         let stepPower   = powerLow;
@@ -612,8 +628,8 @@ function Cooldown(args = {}) {
         const powerLow  = element.PowerHigh;
         const powerHigh = element.PowerLow;
 
-        const stepsCount = parseInt(duration / timeDx);
-        const powerDx    = (powerHigh - powerLow) / (stepsCount - 1);
+        const stepsCount = Math.max(0, Math.min(8640, parseInt(duration / timeDx) || 0));
+        const powerDx    = (powerHigh - powerLow) / Math.max(1, stepsCount - 1);
 
         let steps     = [];
         let stepPower = powerHigh;
@@ -888,6 +904,7 @@ function Body() {
      */
     function queryElements(doc) {
         const workoutEl = doc.querySelector(parent);
+        if(!workoutEl) return [];
         const elements  = Array.from(workoutEl.children);
         return elements;
     }
@@ -998,7 +1015,8 @@ function encodeSim(arr) {
  * that do not parse as numbers.
  */
 function decodeSim(str) {
-    return str.split(',').reduce((acc, x) => {
+    // A shared file must not be able to allocate an unbounded simulation list.
+    return String(str).split(',').slice(0, 10000).reduce((acc, x) => {
         const n = parseFloat(x);
         if(!isNaN(n)) acc.push(n);
         return acc;
@@ -1009,39 +1027,47 @@ function decodeSim(str) {
  * Attribute definitions select numeric/text/list conversion once for every tag using that field.
  * Similar names such as Cadence and CadenceResting deliberately remain distinct.
  */
+// Bounds keep a shared file from producing an unbounded plan, absurd targets or a frozen tab.
+const boundedDuration = boundedNumber(parseInt, 0, 86400);
+const boundedPower    = boundedNumber(parseFloat, 0, 50);
+const boundedSlope    = boundedNumber(parseFloat, -50, 50);
+const boundedCadence  = boundedNumber(parseInt, 0, 300);
+const boundedDistance = boundedNumber(parseInt, 0, 20000000);
+const boundedRepeat   = boundedNumber(parseInt, 0, 1000);
+
 const Attrs = {
-    Duration:    Attribute({name: 'Duration', decode: parseInt}),
-    OnDuration:  Attribute({name: 'OnDuration', decode: parseInt}),
-    OffDuration: Attribute({name: 'OffDuration', decode: parseInt}),
-    Power:     Attribute({name: 'Power', decode: parseFloat}),
-    OnPower:   Attribute({name: 'OnPower', decode: parseFloat}),
-    OffPower:  Attribute({name: 'OffPower', decode: parseFloat}),
-    PowerLow:  Attribute({name: 'PowerLow', decode: parseFloat}),
-    PowerHigh: Attribute({name: 'PowerHigh', decode: parseFloat}),
+    Duration:    Attribute({name: 'Duration', decode: boundedDuration}),
+    OnDuration:  Attribute({name: 'OnDuration', decode: boundedDuration}),
+    OffDuration: Attribute({name: 'OffDuration', decode: boundedDuration}),
+    Power:     Attribute({name: 'Power', decode: boundedPower}),
+    OnPower:   Attribute({name: 'OnPower', decode: boundedPower}),
+    OffPower:  Attribute({name: 'OffPower', decode: boundedPower}),
+    PowerLow:  Attribute({name: 'PowerLow', decode: boundedPower}),
+    PowerHigh: Attribute({name: 'PowerHigh', decode: boundedPower}),
 
-    Cadence:        Attribute({name: 'Cadence', decode: parseInt}),
-    CadenceLow:     Attribute({name: 'CadenceLow', decode: parseInt}),
-    CadenceHigh:    Attribute({name: 'CadenceHigh', decode: parseInt}),
-    CadenceResting: Attribute({name: 'CadenceResting', decode: parseInt}),
+    Cadence:        Attribute({name: 'Cadence', decode: boundedCadence}),
+    CadenceLow:     Attribute({name: 'CadenceLow', decode: boundedCadence}),
+    CadenceHigh:    Attribute({name: 'CadenceHigh', decode: boundedCadence}),
+    CadenceResting: Attribute({name: 'CadenceResting', decode: boundedCadence}),
 
-    Slope:     Attribute({name: 'Slope', decode: parseFloat}),
-    OnSlope:   Attribute({name: 'OnSlope', decode: parseFloat}),
-    OffSlope:  Attribute({name: 'OffSlope', decode: parseFloat}),
-    SlopeLow:  Attribute({name: 'SlopeLow', decode: parseFloat}),
-    SlopeHigh: Attribute({name: 'SlopeHigh', decode: parseFloat}),
+    Slope:     Attribute({name: 'Slope', decode: boundedSlope}),
+    OnSlope:   Attribute({name: 'OnSlope', decode: boundedSlope}),
+    OffSlope:  Attribute({name: 'OffSlope', decode: boundedSlope}),
+    SlopeLow:  Attribute({name: 'SlopeLow', decode: boundedSlope}),
+    SlopeHigh: Attribute({name: 'SlopeHigh', decode: boundedSlope}),
 
-    Distance: Attribute({name: 'Distance', decode: parseInt}),
+    Distance: Attribute({name: 'Distance', decode: boundedDistance}),
 
     Sim:   Attribute({name: 'Sim', decode: decodeSim, encode: encodeSim}),
     Track: Attribute({name: 'Track', decode: decodeSim, encode: encodeSim}),
 
-    Repeat: Attribute({name: 'Repeat', decode: parseInt}),
+    Repeat: Attribute({name: 'Repeat', decode: boundedRepeat}),
 
-    duration:   Attribute({name: 'duration', decode: parseInt}),
-    timeoffset: Attribute({name: 'timeoffset', decode: parseInt}),
+    duration:   Attribute({name: 'duration', decode: boundedDuration}),
+    timeoffset: Attribute({name: 'timeoffset', decode: boundedNumber(parseInt, -86400, 86400)}),
     message:    Attribute({name: 'message'}),
 
-    TimeOffset: Attribute({name: 'TimeOffset', decode: parseInt}),
+    TimeOffset: Attribute({name: 'TimeOffset', decode: boundedDuration}),
     Message:    Attribute({name: 'Message'}),
 };
 
@@ -1073,15 +1099,22 @@ const body = Body();
 
 const parser    = new DOMParser();
 
+/** Parse XML and reject the browser's error document before it reaches the workout converters. */
+function parseDocument(zwo) {
+    const doc = parser.parseFromString(String(zwo ?? ''), 'text/xml');
+    if(doc.querySelector('parsererror')) throw new Error('This workout file is not valid ZWO XML.');
+    return doc;
+}
+
 /**
  * Parse the complete XML file into player metadata and intervals, adding a total duration from the
  * converted intervals.
  */
 function readToInterval(zwo) {
-    const doc       = parser.parseFromString(zwo, 'text/xml');
+    const doc       = parseDocument(zwo);
     const meta      = head.read({doc});
     const intervals = body.readToInterval({doc});
-    const duration  = intervals.reduce((acc, i) => acc + i.duration, 0);
+    const duration  = intervals.reduce((acc, i) => acc + (Number.isFinite(i.duration) ? i.duration : 0), 0);
 
     return {
         meta:      Object.assign(meta, {duration}),
@@ -1094,7 +1127,7 @@ function readToInterval(zwo) {
  * structure.
  */
 function read(zwo) {
-    const doc          = parser.parseFromString(zwo, 'text/xml');
+    const doc          = parseDocument(zwo);
     const headElements = head.read({doc});
     const bodyElements = body.read({doc});
 

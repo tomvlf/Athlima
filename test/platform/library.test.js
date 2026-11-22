@@ -76,8 +76,8 @@ test('renders accessible cards, actual profiles and safe user-supplied names and
 });
 
 test('distinguishes an empty library from no matching results', () => {
-    expect(renderLibrary([], initialLibraryFilters())).toContain('Your workout library is empty.');
-    expect(renderLibrary(workouts, {...initialLibraryFilters(), search: 'unmatched'}))
+    expect(String(renderLibrary([], initialLibraryFilters()))).toContain('Your workout library is empty.');
+    expect(String(renderLibrary(workouts, {...initialLibraryFilters(), search: 'unmatched'})))
         .toContain('No workouts match your search.');
 });
 

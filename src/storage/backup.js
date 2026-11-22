@@ -10,6 +10,26 @@ import { openCoachingStorage } from '../coaching/storage.js';
 
 const SETTINGS = ['ftp', 'weight', 'theme', 'dockMode', 'measurement', 'volume', 'dataTileSwitch'];
 
+// Bounds keep a hand-edited or hostile backup from exhausting memory before validation finishes.
+const MAX_RECORDS = 10000;
+const MAX_ACTIVITY_BYTES = 50 * 1024 * 1024;
+const MAX_TOTAL_ACTIVITY_BYTES = 250 * 1024 * 1024;
+
+const isPlainObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/** Decode one base64 activity recording with format and size checks before allocating the blob. */
+function decodeActivity(record) {
+    const text = record?.blob;
+    if(typeof text !== 'string' || text.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(text)) {
+        throw new Error('Invalid activity data in local backup.');
+    }
+    let bytes;
+    try { bytes = Uint8Array.from(atob(text), character => character.charCodeAt(0)); }
+    catch { throw new Error('Invalid activity data in local backup.'); }
+    if(bytes.byteLength > MAX_ACTIVITY_BYTES) throw new Error('An activity in this backup is too large.');
+    return bytes;
+}
+
 /**
  * Open the existing ride/workout database, refusing to back up an uninitialized or blocked store
  * rather than presenting an empty backup as success.
@@ -91,10 +111,12 @@ export async function createBackup(library = []) {
  */
 export async function restoreBackup(backup) {
     if(![1, 2].includes(backup?.version) || !Array.isArray(backup.workouts) || !Array.isArray(backup.activities) ||
-       !Array.isArray(backup.calendar) || !backup.settings || typeof backup.settings !== 'object' ||
+       !Array.isArray(backup.calendar) || !isPlainObject(backup.settings) ||
+       backup.workouts.length > MAX_RECORDS || backup.activities.length > MAX_RECORDS ||
+       backup.calendar.length > MAX_RECORDS ||
        Object.entries(backup.settings).some(([key, value]) => !SETTINGS.includes(key) ||
            (value !== null && typeof value !== 'string')) ||
-       backup.workouts.some(w => !w?.id || !w.meta || !Array.isArray(w.intervals)) ||
+       backup.workouts.some(w => !w?.id || !isPlainObject(w.meta) || !Array.isArray(w.intervals)) ||
        backup.calendar.some(e => !e?.id || !e.workoutId || !/^\d{4}-\d{2}-\d{2}$/.test(e.date))) {
         throw new Error('Invalid local backup. No data was restored.');
     }
@@ -102,16 +124,19 @@ export async function restoreBackup(backup) {
         if(!backup.coaching || typeof backup.coaching !== 'object') throw new Error('Invalid coaching backup.');
         new CoachingService({getItem: () => JSON.stringify(backup.coaching)});
         if(backup.planned && (!Array.isArray(backup.planned.workouts) ||
-            backup.planned.workouts.some(workout => !workout?.id || !workout.meta || !Array.isArray(workout.intervals)))) {
+            backup.planned.workouts.some(workout => !workout?.id || !isPlainObject(workout.meta) || !Array.isArray(workout.intervals)))) {
             throw new Error('Invalid planned workout backup.');
         }
     }
+    let totalBytes = 0;
     const activities = backup.activities.map(record => {
-        if(!record?.id || record.summary?.id !== record.id || typeof record.blob !== 'string') {
+        if(!record?.id || record.summary?.id !== record.id) {
             throw new Error('Invalid activity in local backup.');
         }
-        return {...record, blob: new Blob([Uint8Array.from(atob(record.blob), c => c.charCodeAt(0))],
-            {type: 'application/octet-stream'})};
+        const bytes = decodeActivity(record);
+        totalBytes += bytes.byteLength;
+        if(totalBytes > MAX_TOTAL_ACTIVITY_BYTES) throw new Error('This backup contains too much activity data.');
+        return {...record, blob: new Blob([bytes], {type: 'application/octet-stream'})};
     });
     const database = await openDatabase();
     try {

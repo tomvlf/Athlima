@@ -26,6 +26,7 @@ const seed = oldest => localStorage.setItem(KEY, JSON.stringify({
 
 beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     global.fetch = jest.fn();
 });
 
@@ -40,6 +41,17 @@ test('connection resolves the athlete, persists only locally, and never sends th
     }));
     intervals.disconnect();
     expect(localStorage.getItem(KEY)).toBeNull();
+});
+
+test('a session-only connection stays out of long-term storage and is removed on disconnect', async () => {
+    fetch.mockResolvedValue(response({id: 123}));
+    const status = await intervals.connect({apiKey: 'test-key', oldest: '2026-01-01', remember: false});
+    expect(status).toEqual(expect.objectContaining({connected: true, remembered: false}));
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem(KEY))).toEqual({apiKey: 'test-key', athleteId: '123', oldest: '2026-01-01'});
+    intervals.disconnect();
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(sessionStorage.getItem(KEY)).toBeNull();
 });
 
 test('planned workouts use the resolved athlete and keep errors explicit', async () => {

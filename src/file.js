@@ -9,6 +9,18 @@
 //
 import { dateToDashString } from './utils.js';
 
+// Reject files that would force the tab to parse unbounded text or bytes.
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
+/** Keep a download name inside one filename: no path separators, control characters or dotfiles. */
+function safeDownloadName(name) {
+    const cleaned = String(name ?? 'download')
+        .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+        .replace(/^\.+/, '')
+        .slice(0, 180);
+    return cleaned || 'download';
+}
+
 /**
  * Share file-reading and download operations between workouts and activities. Format interpretation
  * happens in the workout/FIT modules, not in this class.
@@ -65,6 +77,9 @@ class FileHandler {
      */
     read(file) {
         const self = this;
+        if(file.size > MAX_FILE_SIZE) {
+            return Promise.reject(new Error('This file is too large to import. Choose a file under 25 MB.'));
+        }
         let ext = file.name.split('.').pop();
         switch(ext) {
             case 'zwo': return self.readTextFile(file); break;
@@ -91,7 +106,7 @@ class FileHandler {
         return function (buffer, name, type) {
             let url = window.URL.createObjectURL(self.toBlob(buffer, type));
             a.href = url;
-            a.download = name;
+            a.download = safeDownloadName(name);
             a.click();
             window.URL.revokeObjectURL(url);
         };

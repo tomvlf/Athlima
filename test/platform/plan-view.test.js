@@ -40,13 +40,13 @@ const data = {
 };
 
 test('shows an inviting empty state when there is no plan', () => {
-    const html = renderPlan({plan: null}, '2026-11-12');
+    const html = String(renderPlan({plan: null}, '2026-11-12'));
     expect(html).toContain('No training plan yet');
     expect(html).toContain('Create your training plan');
 });
 
 test('leads with goal progress, current phase and the next session in plain language', () => {
-    const html = renderPlan(data, '2026-11-12');
+    const html = String(renderPlan(data, '2026-11-12'));
     expect(html).toContain('Spring sportive');
     expect(html).toContain('Gran fondo');
     expect(html).toContain('Days to go');
@@ -59,7 +59,7 @@ test('leads with goal progress, current phase and the next session in plain lang
 });
 
 test('groups sessions by week with this week open and older weeks folded away', () => {
-    const html = renderPlan(data, '2026-11-12');
+    const html = String(renderPlan(data, '2026-11-12'));
     const thisWeek = html.match(/<details class="plan-week current" open>[\s\S]*?<\/details>/)[0];
     expect(thisWeek).toContain('This week');
     expect(thisWeek).toContain('Threshold intervals');
@@ -74,14 +74,14 @@ test('groups sessions by week with this week open and older weeks folded away', 
 });
 
 test('archived plans point the rider back to the Coach', () => {
-    const html = renderPlan({...data, plan: {...data.plan, status: 'archived'}}, '2026-11-12');
+    const html = String(renderPlan({...data, plan: {...data.plan, status: 'archived'}}, '2026-11-12'));
     expect(html).toContain('This plan has been archived');
     expect(html).not.toContain('Prepare to ride');
 });
 
 test('running plans use running words and session names', () => {
-    const html = renderPlan({goal: {name: 'Spring 10 km', type: 'run_10k', priority: 'A'},
-        plan: {...data.plan, sport: 'running', adaptations: []}}, '2026-11-12');
+    const html = String(renderPlan({goal: {name: 'Spring 10 km', type: 'run_10k', priority: 'A'},
+        plan: {...data.plan, sport: 'running', adaptations: []}}, '2026-11-12'));
     const thisWeek = html.match(/<details class="plan-week current" open>[\s\S]*?<\/details>/)[0];
     expect(html).toContain('10 km race');
     expect(thisWeek).toContain('Threshold run');

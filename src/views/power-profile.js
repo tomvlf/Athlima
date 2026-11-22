@@ -2,18 +2,10 @@
  * Builds the small power chart shown on workout and activity cards.
  * SVG is a picture described by lines and shapes. These helpers return its HTML
  * text for a caller to place on the page; they do not change the page themselves.
+ * The accessible label is interpolated as text.
  */
 
-// Keep a workout name inside its quoted label, even if it contains quotes or "<".
-function escapeAttribute(value) {
-    return String(value).replace(/[&<>"']/g, character => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-    })[character]);
-}
+import { html } from '../html.js';
 
 /**
  * Prefer planned interval targets; otherwise draw recorded watt samples.
@@ -58,10 +50,10 @@ function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power p
         }
         points.push(`L ${right} ${bottom}`, 'Z');
         const ftpY = scale(threshold);
-        return `<figure class="power-profile">
+        return html`<figure class="power-profile">
             <figcaption>Power profile</figcaption>
             <svg viewBox="0 0 ${width} ${height}" role="img"
-                 aria-label="${escapeAttribute(`${label}: target power from 0 to ${Math.round(maxWatts)} watts`)}"
+                 aria-label="${label}: target power from 0 to ${Math.round(maxWatts)} watts"
                  preserveAspectRatio="none">
                 <line class="power-profile--ftp" x1="${left}" y1="${ftpY}" x2="${right}" y2="${ftpY}"></line>
                 <path class="power-profile--target" d="${points.join(' ')}"></path>
@@ -89,12 +81,12 @@ function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power p
     const area = `${line} L ${right} ${bottom} L ${left} ${bottom} Z`;
     const ftpY = bottom - (threshold / maxWatts) * (bottom - top);
 
-    return `<figure class="power-profile">
+    return html`<figure class="power-profile">
         <figcaption>Power profile</figcaption>
         <svg viewBox="0 0 ${width} ${height}" role="img"
-             aria-label="${escapeAttribute(`${label}: recorded power from 0 to ${Math.round(maxWatts)} watts`)}"
+             aria-label="${label}: recorded power from 0 to ${Math.round(maxWatts)} watts"
              preserveAspectRatio="none">
-            ${hasThreshold ? `<line class="power-profile--ftp" x1="${left}" y1="${ftpY}" x2="${right}" y2="${ftpY}"></line>` : ''}
+            ${hasThreshold ? html`<line class="power-profile--ftp" x1="${left}" y1="${ftpY}" x2="${right}" y2="${ftpY}"></line>` : ''}
             <path class="power-profile--recorded-area" d="${area}"></path>
             <path class="power-profile--recorded" d="${line}"></path>
         </svg>

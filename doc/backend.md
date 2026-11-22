@@ -32,13 +32,25 @@ storage. For the code behind this flow, see the [code guide](code-guide.md).
 | Live page memory | Temporary working data while the page is open | Current readings, unsaved work and detailed charts fetched on demand. It is lost when the page closes. |
 | IndexedDB `store` | A browser database for larger records | Saved workouts, recent FIT recordings and ride-recovery checkpoints. |
 | IndexedDB `athlima-coaching` | A separate browser database for the Coach | Full activity history, profile, goal, plans, dated estimates and revisions. |
-| Local storage | A browser cupboard for small named settings | Profile/device preferences, calendar entries and the optional Intervals.icu connection/key. |
+| Local storage | A browser cupboard for small named settings | Profile/device preferences, calendar entries and (by default) the optional Intervals.icu connection/key. A session-only connection is kept in per-tab session storage instead. |
 | Offline cache | Browser-held copies of website files | Eligible app files for later loading; not a backup of training data. |
 | Downloaded backup | A file you keep separately | The exported data listed below, without the integration key. |
 
 The recent FIT cache normally holds seven recordings, but recordings still
 awaiting the local Coach hand-off are protected from removal. Full Coach
 history is separate; it is not limited to seven activities.
+
+### Keeping or erasing local data
+
+Athlima asks the browser to keep its storage when available, but persistence is
+a request: the browser can still remove site data to free space, and you can
+clear it yourself. A downloaded backup remains the only copy that survives that.
+
+**Settings > This device** shows an estimate of space used and whether the
+browser agreed to keep the data. **Settings > Delete local data** erases
+workouts, rides, coaching history, settings, calendar, offline files and any
+saved Intervals.icu key after you type `DELETE` to confirm. Finish and save the
+current ride first. Deletion is local and immediate; it cannot be undone.
 
 ### Why a different address can look empty
 

@@ -1,9 +1,11 @@
 /**
  * Filters and displays the workout library already loaded in the browser. The same results serve
  * desktop and mobile; mobile receives a page-size limit from the platform. Rendering changes no
- * workout data and makes no network request.
+ * workout data and makes no network request. Imported names/descriptions are interpolated into
+ * `html` templates so they are displayed as text.
  */
-import { cadenceSummary, escape, minutes, number, profileGraph, mobileDetails } from './format.js';
+import { cadenceSummary, minutes, number, profileGraph, mobileDetails } from './format.js';
+import { html } from '../html.js';
 
 export const initialLibraryFilters = () => ({
     search: '', category: '', type: 'all', duration: 'all', sort: 'original',
@@ -50,11 +52,10 @@ export function filterWorkouts(workouts, filters) {
 }
 
 const option = (value, label, selected) =>
-    `<option value="${escape(value)}"${value === selected ? ' selected' : ''}>${escape(label)}</option>`;
+    html`<option value="${value}"${value === selected ? ' selected' : ''}>${label}</option>`;
 
 /**
- * Build one selectable workout/course preview, displaying only known metrics and escaping imported
- * text.
+ * Build one selectable workout/course preview, displaying only known metrics.
  */
 function workoutCard(workout) {
     const {name, category, duration, distance} = workout.meta;
@@ -66,13 +67,13 @@ function workoutCard(workout) {
     if(type === 'Workout') metrics.push(['Cadence', cadenceSummary((workout.intervals || []).flatMap(interval => interval.steps || []))]);
     metrics.push(['Type', type]);
 
-    return `<article class="workout-card">
+    return html`<article class="workout-card">
         <div class="workout-card-content">
-            <h2><a class="workout-card-link" href="#/workout/${escape(encodeURIComponent(workout.id))}"
-                aria-label="View workout: ${escape(name)}">${escape(name)}</a></h2>
-            <p class="workout-card-category">${escape(category || type)}</p>
+            <h2><a class="workout-card-link" href="#/workout/${encodeURIComponent(workout.id)}"
+                aria-label="View workout: ${name}">${name}</a></h2>
+            <p class="workout-card-category">${category || type}</p>
             <dl class="workout-card-metrics">${metrics.map(([label, value]) =>
-                `<div><dt>${label}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>
+                html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
         </div>
         <div class="workout-card-profile">${profileGraph(workout)}</div>
     </article>`;
@@ -89,11 +90,11 @@ export function renderLibrary(workouts, filters, {page = 0, pageSize = Infinity}
     const visible = Number.isFinite(pageSize) ? filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize) : filtered;
     const categories = [...new Set(workouts.map(workout => workout.meta.category)
         .filter(category => typeof category === 'string' && category.trim()))].sort((a, b) => a.localeCompare(b));
-    const results = filtered.length ? visible.map(workoutCard).join('') :
-        `<div class="library-empty">${workouts.length ? 'No workouts match your search.' :
+    const results = filtered.length ? visible.map(workoutCard) :
+        html`<div class="library-empty">${workouts.length ? 'No workouts match your search.' :
             'Your workout library is empty. Import a workout to get started.'}</div>`;
 
-    return `<section class="library">
+    return html`<section class="library">
         <div class="library-toolbar">
             <p class="library-count" role="status" aria-live="polite" aria-atomic="true">Showing ${filtered.length} of ${workouts.length} ${workouts.length === 1 ? 'workout' : 'workouts'}</p>
             <div class="library-actions">
@@ -105,11 +106,11 @@ export function renderLibrary(workouts, filters, {page = 0, pageSize = Infinity}
             <aside class="panel library-filters" aria-labelledby="library-filters-heading">
                 <p class="eyebrow">Explore your library</p>
                 <h2 id="library-filters-heading">Find a workout</h2>
-                <label class="library-keywords">Keywords<input type="search" id="workout-search" aria-controls="library-results" placeholder="Name or category" value="${escape(filters.search)}"></label>
-                ${mobileDetails('library-filters', 'Filters & sorting', `
+                <label class="library-keywords">Keywords<input type="search" id="workout-search" aria-controls="library-results" placeholder="Name or category" value="${filters.search}"></label>
+                ${mobileDetails('library-filters', 'Filters & sorting', html`
                 <div class="library-filter-fields">
                     <label>Category<select id="workout-category" aria-controls="library-results">
-                        ${option('', 'All categories', filters.category)}${categories.map(category => option(category, category, filters.category)).join('')}
+                        ${option('', 'All categories', filters.category)}${categories.map(category => option(category, category, filters.category))}
                     </select></label>
                     <label>Type<select id="workout-type" aria-controls="library-results">
                         ${option('all', 'All types', filters.type)}${option('workout', 'Workouts', filters.type)}${option('course', 'Courses', filters.type)}
@@ -126,7 +127,7 @@ export function renderLibrary(workouts, filters, {page = 0, pageSize = Infinity}
                 <button class="secondary library-reset" type="button" data-library-reset>Clear filters</button>`)}
             </aside>
             <div class="library-results" id="library-results"><div class="workout-grid">${results}</div>
-                ${pages > 1 ? `<nav class="library-pages" aria-label="Workout pages">
+                ${pages > 1 ? html`<nav class="library-pages" aria-label="Workout pages">
                     <button class="secondary" data-library-page="${currentPage - 1}" ${currentPage === 0 ? 'disabled' : ''}>Previous</button>
                     <span role="status">Page ${currentPage + 1} of ${pages}</span>
                     <button class="secondary" data-library-page="${currentPage + 1}" ${currentPage + 1 === pages ? 'disabled' : ''}>Next</button>

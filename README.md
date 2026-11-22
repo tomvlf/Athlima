@@ -232,6 +232,31 @@ Local development and local image builds show `development` unless build metadat
 is supplied. The frontend label identifies the code currently loaded in the
 browser, so reload the app after deploying a new frontend.
 
+### Verifying a published image
+
+Published images carry build provenance and a software bill of materials, and
+are signed with the release workflow's short-lived GitHub identity. The example
+Compose files use the moving `latest` tag for convenience. To deploy exactly
+one reviewed build, resolve the digest and pin it:
+
+```bash
+docker buildx imagetools inspect ghcr.io/tomvlf/athlima:latest
+# then in compose.yaml:
+#   image: ghcr.io/tomvlf/athlima@sha256:<digest>
+```
+
+With [cosign](https://docs.sigstore.dev/cosign/overview/) installed, check the
+signature before pulling:
+
+```bash
+cosign verify ghcr.io/tomvlf/athlima:latest \
+  --certificate-identity-regexp 'https://github.com/tomvlf/Athlima/.github/workflows/publish-image.yml@refs/(heads/master|tags/v.*)' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+A digest-pinned deployment only changes when you update the digest; the
+`pull_policy: always` setting then confirms the pinned image is present.
+
 ## Local data and integrations
 
 The Coach, activity history, calendar, workout library and ride recovery use browser storage. Data is not synchronized between browsers or devices. Clearing site data or browser eviction can remove it; use Settings > Local backup regularly.
@@ -243,10 +268,13 @@ together. A total labelled **Known** is incomplete because some measurements
 are missing.
 
 Intervals.icu is optional and requires internet access. In Settings, enter your
-personal API key and import start date. The key is saved in this browser's local
-storage and sent only to `https://intervals.icu`. It is not encrypted against
-someone with access to your browser profile. Disconnect removes the key but
-keeps imported history. There is no Athlima server or intermediary.
+personal API key and import start date. By default the key is saved in this
+browser's local storage so the connection survives a tab close; clear **Keep
+this connection on this device** to keep it only for the current tab. It is
+sent only to `https://intervals.icu` and is not encrypted against someone with
+access to your browser profile. Disconnect removes the key but keeps imported
+history. **Settings > Delete local data** also erases it, along with all other
+Athlima data on this device. There is no Athlima server or intermediary.
 Strava and TrainingPeaks server-based OAuth connections have been removed;
 use FIT file downloads for manual upload to other providers.
 
@@ -318,10 +346,13 @@ for cross-site browser requests (CORS).
 The Docker build generates a Content Security Policy from the exact built HTML,
 including hashes for Parcel's inline import map. Scripts cannot use arbitrary
 inline code or `eval`; connections are limited to this origin and Intervals.icu.
-Inline styles remain allowed for the existing dynamic UI. Anti-framing,
-MIME-sniffing, referrer and device-permission headers also apply to error pages.
-Other static hosts must configure equivalent headers themselves. Do not reuse
-the generated CSP after replacing assets without rebuilding its import-map hashes.
+Trusted Types (`require-trusted-types-for 'script'`) requires every HTML update
+to pass through the app's single `athlima` policy, so a plain string cannot be
+assigned to an HTML sink. Inline styles remain allowed for the existing dynamic
+UI. Anti-framing, cross-origin isolation, MIME-sniffing, referrer and
+device-permission headers also apply to error pages. Other static hosts must
+configure equivalent headers themselves. Do not reuse the generated CSP after
+replacing assets without rebuilding its import-map hashes.
 
 ## Documentation
 

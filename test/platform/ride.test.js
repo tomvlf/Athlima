@@ -17,7 +17,7 @@ test('power timeline uses exact timed steps, absolute watts and cadence rather t
     expect(timeline.maximumPower).toBe(300);
     expect(timeline.intervals.map(interval => interval.start)).toEqual([0, 120]);
     expect(timeline.intervals.flatMap(interval => interval.steps.map(step => step.power))).toEqual([100, 150, 300]);
-    const graph = rideProfile(timeline);
+    const graph = String(rideProfile(timeline));
     expect(graph).toContain('1:00 / 150 W / 90 rpm');
     expect(graph).toContain('id="ride-profile-cursor"');
     expect(graph).not.toMatch(/NaN|Infinity|undefined/);
@@ -39,9 +39,9 @@ test('free rides and distance-based courses do not invent a timed power profile'
     expect(rideTimeline({intervals: [{steps: [{distance: 100, slope: 3}]}]}, 200, watts)).toBeNull();
     expect(rideTimeline({intervals: [{steps: [{duration: NaN, power: 1}]}]}, 200, watts)).toBeNull();
     expect(ridePosition(null, {})).toBe(0);
-    expect(rideProfile(null)).toContain('No timed power profile');
+    expect(String(rideProfile(null))).toContain('No timed power profile');
     const withoutPower = rideTimeline({intervals: [{steps: [{duration: 60, slope: 3}]}]}, 200, watts);
-    expect(rideProfile(withoutPower)).toContain('No power target');
+    expect(String(rideProfile(withoutPower))).toContain('No power target');
     const unavailableFtp = rideTimeline({intervals: [{steps: [{duration: 60, power: .5}]}]}, undefined, watts);
-    expect(rideProfile(unavailableFtp)).not.toMatch(/NaN|Infinity|undefined/);
+    expect(String(rideProfile(unavailableFtp))).not.toMatch(/NaN|Infinity|undefined/);
 });

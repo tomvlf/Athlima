@@ -31,11 +31,15 @@ these two values and makes local editing read-only.
 
 ### How the key is handled
 
-The key is stored in local storage in this browser profile. Requests use HTTPS
-Basic authentication with username `API_KEY`; the key never appears in a URL
-or local backup. It is not encrypted against someone with access to your browser
-profile, and same-origin scripts can read it. Use a trusted browser profile and
-revoke the key in Intervals.icu if it is exposed.
+The key is stored in local storage in this browser profile by default, so the
+connection survives closing the tab. Clear **Keep this connection on this
+device** when connecting to keep it only until the tab closes (it then uses
+per-tab session storage instead). Requests use HTTPS Basic authentication with
+username `API_KEY`; the key never appears in a URL or local backup. It is not
+encrypted against someone with access to your browser profile, and same-origin
+scripts can read it. Use a trusted browser profile, avoid remembering the key
+on shared devices, and revoke the key in Intervals.icu if it is exposed.
+**Settings > Delete local data** also removes the key from both stores.
 
 For developers: requests use `https://intervals.icu/api/v1`; `/athlete/0`
 resolves the real athlete ID for later calls. The key is sent in the
@@ -114,8 +118,9 @@ browser. It is not a password setting you can fix by changing your API key.
 An offline launch also depends on the browser having cached the necessary app
 files; see [storage and offline-cache distinctions](backend.md#where-your-data-lives).
 
-**Disconnect** removes the locally stored key and connection settings but retains
-imported coaching history and re-enables local FTP/body-mass editing.
+**Disconnect** removes the locally stored key and connection settings (from both
+long-term and per-tab storage) but retains imported coaching history and
+re-enables local FTP/body-mass editing.
 Reconnect separately on another browser or device;
 backup files intentionally do not include API keys.
 

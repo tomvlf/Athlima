@@ -8,6 +8,7 @@
  */
 
 import { xf, empty, last } from '../functions.js';
+import { html, insertHTML } from '../html.js';
 import { models } from '../models/models.js';
 import { utils } from '../ant/message.js';
 
@@ -95,10 +96,10 @@ class Request extends HTMLElement {
         this.style.display = 'none';
     }
     clear() {
-        this.list.innerHTML = ``;
+        this.list.replaceChildren();
     }
     add(device) {
-        this.list.insertAdjacentHTML('beforeend', item(device));
+        insertHTML(this.list, 'beforeend', item(device));
     }
 }
 
@@ -107,7 +108,7 @@ class Request extends HTMLElement {
 function item(args) {
     let deviceType = utils.deviceTypeToString(args.deviceType);
 
-    return `<div class="device-chooser-item" id="${args.deviceNumber}">
+    return html`<div class="device-chooser-item" id="${args.deviceNumber}">
             <div class="device-connection-type t2">ANT+</div>
             <div class="device-number t3">${args.deviceNumber}</div>
             <div class="device-type t2">${deviceType}</div>

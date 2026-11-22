@@ -2,8 +2,8 @@
  * Assembles the main interface around the ride engine and existing custom screen elements. A route
  * is the page name after #/ in the address; rendering builds that page's HTML, while ride readings
  * update in place to avoid rebuilding controls each second. Mobile layout is selected at 700 pixels
- * or less and can change without restarting a ride. User/provider text must be escaped before
- * insertion into HTML.
+ * or less and can change without restarting a ride. Markup is built with `html`, so user/provider
+ * text is inserted as text, and every DOM sink goes through `setHTML`/`insertHTML`.
  */
 
 import { xf } from '../functions.js';
@@ -12,12 +12,14 @@ import { coachingData, coachingService } from '../coaching/service.js';
 import { toAppWorkout } from '../coaching/workouts.js';
 import { addDays } from '../coaching/domain.js';
 import { describeRunPaces, formatPace, paceForIntensity } from '../coaching/running.js';
-import { cadenceSummary, escape, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
+import { cadenceSummary, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
+import { html, raw, setHTML, insertHTML } from '../html.js';
 import { activityLists, historyActivityRow, localActivityRow, renderActivityOverview, renderActivityStreamData } from './activities.js';
 import { initialLibraryFilters, renderLibrary } from './library.js';
 import { renderPlan } from './plan-view.js';
 import { rideTimeline, ridePosition, rideProfile } from './ride.js';
 import { mountVersions, versionMarkup } from './version.js';
+import { requestPersistentStorage, storageStatus } from '../storage/persist.js';
 
 const routes = {
     dashboard: ['Overview', 'Your training, in focus'],
@@ -36,9 +38,9 @@ const mobileTabs = [['dashboard', 'Today'], ['calendar', 'Calendar'], ['player',
 const moreRoutes = ['plan', 'library', 'activities', 'progress', 'devices', 'settings'];
 // Disclosures that start open on mobile; the rest stay collapsed until the rider opens them.
 const openOnMobile = new Set(['Up next', 'workout-notes', 'calendar-month']);
-const icon = paths => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none"
-    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-const dot = (x, y) => `<circle cx="${x}" cy="${y}" r="1.6" fill="currentColor" stroke="none"/>`;
+const icon = paths => html`<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none"
+    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${raw(paths)}</svg>`;
+const dot = (x, y) => html`<circle cx="${x}" cy="${y}" r="1.6" fill="currentColor" stroke="none"/>`;
 const icons = {
     dashboard: icon('<path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>'),
     calendar: icon('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
@@ -58,16 +60,15 @@ const devices = {
 };
 /**
  * These small helpers assemble repeated HTML fragments such as cards, links and statistics.
- * body/text values that contain user data must already be escaped; intentional HTML fragments are
- * kept as markup.
+ * Callers pass fragments produced by `html`; text is escaped automatically.
  */
-const card = (title, body, className = '', compact = false) => `<section class="panel ${className}">${compact
-    ? mobileDetails(title, title, `<h2 class="desktop-section-title">${title}</h2>${body}`)
-    : `<h2>${title}</h2>${body}`}</section>`;
-const link = (route, text, className = '') => `<a class="${className}" href="#/${route}">${text}</a>`;
+const card = (title, body, className = '', compact = false) => html`<section class="panel ${className}">${compact
+    ? mobileDetails(title, title, html`<h2 class="desktop-section-title">${title}</h2>${body}`)
+    : html`<h2>${title}</h2>${body}`}</section>`;
+const link = (route, text, className = '') => html`<a class="${className}" href="#/${route}">${text}</a>`;
 const empty = (text, route = 'library', action = 'Browse workouts') =>
-    `<div class="empty-state"><p>${text}</p>${link(route, action, 'button secondary')}</div>`;
-const stat = (label, value, unit = '') => `<div class="stat"><span>${label}</span><strong>${value}<small>${unit}</small></strong></div>`;
+    html`<div class="empty-state"><p>${text}</p>${link(route, action, 'button secondary')}</div>`;
+const stat = (label, value, unit = '') => html`<div class="stat"><span>${label}</span><strong>${value}<small>${unit}</small></strong></div>`;
 
 /**
  * Launches the main training platform shell and hosts the navigation routing logic.
@@ -89,16 +90,16 @@ export async function launchPlatform(root) {
      * this navigation, not the ride engine.
      */
     const navigation = () => mobile
-        ? `${mobileTabs.map(([route, label]) =>
-            `<a class="tab" data-tab="${route}" href="#/${route}">${icons[route]}<span>${label}</span></a>`).join('')}
+        ? html`${mobileTabs.map(([route, label]) =>
+            html`<a class="tab" data-tab="${route}" href="#/${route}">${icons[route]}<span>${label}</span></a>`)}
             <button type="button" class="tab" data-tab="more" aria-expanded="false" aria-controls="more-menu">${icons.more}<span>More</span></button>
             <div class="more-menu" id="more-menu" hidden><div class="more-menu-panel">
                 <p class="eyebrow" id="more-menu-title">More</p>
                 <ul aria-labelledby="more-menu-title">${moreRoutes.map(route =>
-                    `<li><a href="#/${route}">${icons[route]}<span>${routes[route][0]}</span></a></li>`).join('')}</ul>
+                    html`<li><a href="#/${route}">${icons[route]}<span>${routes[route][0]}</span></a></li>`)}</ul>
             </div></div>`
-        : Object.keys(routes).filter(r => r !== 'workout').map(route => link(route, routes[route][0])).join('');
-    root.innerHTML = `<a class="skip-link" href="#main-content">Skip to content</a>
+        : Object.keys(routes).filter(r => r !== 'workout').map(route => link(route, routes[route][0]));
+    setHTML(root, html`<a class="skip-link" href="#main-content">Skip to content</a>
         <aside class="sidebar"><a class="brand" href="${mobile ? '/mobile' : '/'}" aria-label="Athlima home">Athlima</a>
             <nav aria-label="Main navigation">${navigation()}</nav>
             <div class="sidebar-bottom"><span>Train with intention.</span></div>
@@ -109,7 +110,7 @@ export async function launchPlatform(root) {
                 <div><p class="eyebrow" id="route-subtitle"></p><h1 id="route-title" tabindex="-1"></h1></div></div>
         </header><div id="platform-message" role="status" aria-live="polite"></div>
         <div id="platform-content"><p role="status">Loading your training...</p></div>
-        <div id="legacy-slot"></div></main>`;
+        <div id="legacy-slot"></div></main>`);
     if(!mobile) mountVersions(root);
     const legacy = document.querySelector('.wrapper');
     root.querySelector('#legacy-slot').append(legacy);
@@ -121,7 +122,7 @@ export async function launchPlatform(root) {
         for(const [index, section] of [...secondaryDevices, options, about].filter(Boolean).entries()) {
             const title = section.querySelector('.device-card--header--label, h2')?.textContent.trim();
             if(!title) continue;
-            section.insertAdjacentHTML('beforebegin', mobileDetails(`device-options-${index}`, title, ''));
+            insertHTML(section, 'beforebegin', mobileDetails(`device-options-${index}`, title, ''));
             const disclosure = section.previousElementSibling;
             disclosure.open = !mobile;
             disclosure.querySelector('.mobile-details-body').append(section);
@@ -183,12 +184,12 @@ export async function launchPlatform(root) {
         if(nextMobile === mobile) return;
         mobile = nextMobile;
         document.body.classList.toggle('mobile-app', mobile);
-        root.querySelector('.sidebar nav').innerHTML = navigation();
+        setHTML(root.querySelector('.sidebar nav'), html`${navigation()}`);
         markNavigation();
         const sidebar = root.querySelector('.sidebar');
         let versions = sidebar.querySelector('.app-versions');
         if(!mobile && !versions) {
-            sidebar.insertAdjacentHTML('beforeend', versionMarkup({showRevision: false}));
+            insertHTML(sidebar, 'beforeend', versionMarkup({showRevision: false}));
             versions = sidebar.querySelector('.app-versions');
             mountVersions(sidebar);
         }
@@ -236,10 +237,10 @@ export async function launchPlatform(root) {
         await coachingService().advance();
         xf.dispatch('coaching:changed');
     };
-    const deviceButtons = () => `<div class="device-buttons">${Object.entries(devices).map(([id, name]) =>
-        `<button class="secondary" data-device="${id}">${name}<span data-sensor="${id}">${escape(sensorStatus[id] || 'Not connected')}</span></button>`).join('')}</div>`;
-    const workoutRow = workout => `<li class="session-row"><div><span class="eyebrow">${escape(workout.date)} / ${escape(workout.family)}</span>
-        <strong>${escape(workout.title)}</strong><span>${minutes(workout.duration)} &middot; ${escape(workout.status)}</span></div>
+    const deviceButtons = () => html`<div class="device-buttons">${Object.entries(devices).map(([id, name]) =>
+        html`<button class="secondary" data-device="${id}">${name}<span data-sensor="${id}">${sensorStatus[id] || 'Not connected'}</span></button>`)}</div>`;
+    const workoutRow = workout => html`<li class="session-row"><div><span class="eyebrow">${workout.date} / ${workout.family}</span>
+        <strong>${workout.title}</strong><span>${minutes(workout.duration)} · ${workout.status}</span></div>
         ${link(`workout/${encodeURIComponent(workout.id)}`, 'View session', 'button secondary')}</li>`;
     /**
      * Choose the latest available plan-change or state explanation; without one, show setup
@@ -254,7 +255,7 @@ export async function launchPlatform(root) {
      * missing Coach shows a recovery message while local riding remains available.
      */
     function dashboard(data) {
-        if(!data) return card('Training data unavailable', `<p>${escape(coachingError || 'Your local training data has not loaded.')}</p>
+        if(!data) return card('Training data unavailable', html`<p>${coachingError || 'Your local training data has not loaded.'}</p>
             <button data-action="reload">Reload training data</button><p class="muted">Your local workout library and ride controls remain available.</p>`);
         const summary = trainingSummary(data);
         const calendar = legacy.querySelector('training-calendar');
@@ -274,24 +275,24 @@ export async function launchPlatform(root) {
             }
             next.sort((a, b) => a.date.localeCompare(b.date));
         }
-        const todayBody = sessions.length ? sessions.map(workout => `<p class="eyebrow">${escape(workout.family)} / ${minutes(workout.duration)}</p>
-            <h2 class="hero-title">${escape(workout.title)}</h2><p class="today-description">${escape(workout.description)}</p>
+        const todayBody = sessions.length ? sessions.map(workout => html`<p class="eyebrow">${workout.family} / ${minutes(workout.duration)}</p>
+            <h2 class="hero-title">${workout.title}</h2><p class="today-description">${workout.description}</p>
             ${profileGraph(workout.appWorkout || toAppWorkout(workout))}${link(`workout/${encodeURIComponent(workout.id)}`,
-                workout.sport === 'running' ? 'View run' : 'Prepare to ride', 'button')}`).join('')
-            : `<h2 class="hero-title">${data?.plan?.status === 'active' ? 'Space to recover.' : 'Your next ride starts here.'}</h2>
+                workout.sport === 'running' ? 'View run' : 'Prepare to ride', 'button')}`)
+            : html`<h2 class="hero-title">${data?.plan?.status === 'active' ? 'Space to recover.' : 'Your next ride starts here.'}</h2>
                 <p>${data?.plan?.status === 'active' ? 'No Coach session scheduled today. Follow your recovery guidance, or choose a ride.' : 'Build a training plan or choose a session from your library.'}</p>
                 ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
-        if(mobile) return `<section class="mobile-today panel hero"><p class="eyebrow">Today / ${escape(today(data))}</p>${todayBody}</section>
-            ${db.elapsed > 0 ? card('Ride recovery', `<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
-            ${card('Connect & ride', `<div class="button-row">${link('player', 'Open ride controls', 'button secondary')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
-            ${card('Up next', next.length ? `<ul class="session-list">${next.slice(0, 2).map(workoutRow).join('')}</ul>` : '<p>No upcoming sessions.</p>', '', true)}`;
-        return `<div class="dashboard-grid"><section class="panel hero"><p class="eyebrow">Today / ${escape(today(data))}</p>${todayBody}</section>
-            ${card('This week', `<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
+        if(mobile) return html`<section class="mobile-today panel hero"><p class="eyebrow">Today / ${today(data)}</p>${todayBody}</section>
+            ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
+            ${card('Connect & ride', html`<div class="button-row">${link('player', 'Open ride controls', 'button secondary')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
+            ${card('Up next', next.length ? html`<ul class="session-list">${next.slice(0, 2).map(workoutRow)}</ul>` : html`<p>No upcoming sessions.</p>`, '', true)}`;
+        return html`<div class="dashboard-grid"><section class="panel hero"><p class="eyebrow">Today / ${today(data)}</p>${todayBody}</section>
+            ${card('This week', html`<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
                 ${stat('Plan completed to date', summary.adherence == null ? '--' : `${Math.round(summary.adherence * 100)}%`)}</div>
                 <p class="muted">${summary.due ? `${summary.completed} of ${summary.due} scheduled sessions through today completed or substituted.` : 'No plan sessions due yet.'}</p>
                 ${weekChart(summary)}${link('progress', 'Explore your progress')}`)}
-            ${card('From your Coach', `<p class="coach-note">${escape(recommendation(data))}</p><p class="muted">Conservative, deterministic guidance. Not medical advice.</p>${link('coach', 'Review guidance')}`)}
-            ${card('Coming next', next.length ? `<ul class="session-list">${next.slice(0, 3).map(workoutRow).join('')}</ul>${link('calendar', 'Open calendar')}` :
+            ${card('From your Coach', html`<p class="coach-note">${recommendation(data)}</p><p class="muted">Conservative, deterministic guidance. Not medical advice.</p>${link('coach', 'Review guidance')}`)}
+            ${card('Coming next', next.length ? html`<ul class="session-list">${next.slice(0, 3).map(workoutRow)}</ul>${link('calendar', 'Open calendar')}` :
                 empty('No future Coach sessions scheduled.', 'coach', 'Build a plan'))}</div>`;
     }
     /**
@@ -300,9 +301,9 @@ export async function launchPlatform(root) {
      */
     function weekChart(summary) {
         const maximum = Math.max(3600, ...summary.days.map(day => day.seconds));
-        return `<div class="week-chart" role="img" aria-label="Ride duration in minutes for the last seven days">${summary.days.map(day =>
-            `<div><span>${Math.round(day.seconds / 60)}</span><i style="height:${Math.max(2, day.seconds / maximum * 100)}px"></i>
-                <small>${escape(new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, {weekday: 'short'}))}</small></div>`).join('')}</div>`;
+        return html`<div class="week-chart" role="img" aria-label="Ride duration in minutes for the last seven days">${summary.days.map(day =>
+            html`<div><span>${Math.round(day.seconds / 60)}</span><i style="height:${Math.max(2, day.seconds / maximum * 100)}px"></i>
+                <small>${new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, {weekday: 'short'})}</small></div>`)}</div>`;
     }
     /**
      * Resolve a detail-screen ID against the active plan, local library or cached provider
@@ -345,16 +346,16 @@ export async function launchPlatform(root) {
         const target = step => run ? paces ? formatPace(paceForIntensity(data.profile.thresholdPace, step.power), data.profile.unitSystem)
             : `${number(step.power * 100)}% of threshold speed`
             : step.power == null ? `Slope ${number(step.slope, 1)}%` : `${number(targetPower(step.power, db.ftp))} W`;
-        return card(escape(workout.meta.name), `<p class="eyebrow">${escape(workout.meta.category)} / ${minutes(workout.meta.duration || 0)}</p>
+        return card(workout.meta.name, html`<p class="eyebrow">${workout.meta.category} / ${minutes(workout.meta.duration || 0)}</p>
             ${profileGraph(workout)}
-            ${planned ? `<p>${escape(planned.date)} &middot; ${escape(planned.status)} &middot; Expected RPE ${planned.expectedRpe}/10</p>` : ''}
-            ${run ? `<p>${paces ? `Pace guide: ${escape(paces)}.` : 'Set a threshold pace in Coach to see pace targets; run by effort (RPE) until then.'}</p>` : ''}
-            <div class="button-row">${canStart ? '<button data-action="start-workout">Start workout</button>' : run
-                ? '<p class="muted">Run this session outdoors or on a treadmill, or export the ZWO from the calendar to your watch. Recorded runs are matched automatically.</p>'
-                : `<p class="muted">${escape(blocked)}</p>`}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
-            ${mobileDetails('workout-notes', 'Workout notes', `<p class="description">${escape(workout.meta.description || 'No description supplied.')}</p>`)}
-            ${mobileDetails('workout-intervals', 'Intervals', `<ol class="interval-list">${(workout.intervals || []).flatMap(interval => interval.steps || []).map(step => `<li>
-                ${time(step.duration)} &middot; ${escape(target(step))}${run ? '' : ` &middot; Cadence: ${escape(cadenceSummary([step]))}`}</li>`).join('')}</ol>`)}`);
+            ${planned ? html`<p>${planned.date} · ${planned.status} · Expected RPE ${planned.expectedRpe}/10</p>` : ''}
+            ${run ? html`<p>${paces ? `Pace guide: ${paces}.` : 'Set a threshold pace in Coach to see pace targets; run by effort (RPE) until then.'}</p>` : ''}
+            <div class="button-row">${canStart ? html`<button data-action="start-workout">Start workout</button>` : run
+                ? html`<p class="muted">Run this session outdoors or on a treadmill, or export the ZWO from the calendar to your watch. Recorded runs are matched automatically.</p>`
+                : html`<p class="muted">${blocked}</p>`}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
+            ${mobileDetails('workout-notes', 'Workout notes', html`<p class="description">${workout.meta.description || 'No description supplied.'}</p>`)}
+            ${mobileDetails('workout-intervals', 'Intervals', html`<ol class="interval-list">${(workout.intervals || []).flatMap(interval => interval.steps || []).map(step => html`<li>
+                ${time(step.duration)} · ${target(step)}${run ? '' : ` · Cadence: ${cadenceSummary([step])}`}</li>`)}</ol>`)}`);
     }
     function plan(data) {
         return renderPlan(data, today(data));
@@ -366,19 +367,19 @@ export async function launchPlatform(root) {
     function activities(data) {
         const lists = activityLists(data, db.activity, false);
         const timeZone = data?.profile?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-        return `${lastRide ? card('Ride saved', `<div class="stats">${stat('Duration', time(lastRide.duration))}
+        return html`${lastRide ? card('Ride saved', html`<div class="stats">${stat('Duration', time(lastRide.duration))}
             ${stat('Average power', number(lastRide.averagePower), 'W')}${stat('Average HR', number(lastRide.averageHeartRate), 'bpm')}</div>
             <p>Saved on this device. No account or upload is required.
             Add session feedback in Coach to inform your next session.</p>${link('coach', 'Add feedback', 'button secondary')}`) : ''}
             ${renderActivityOverview(data, lists, state)}
-            ${lists.pending.length ? card('Awaiting local coaching update', `<p>Your recordings are safely stored on this device.</p>
-                <ul class="session-list">${lists.pending.map(activity => localActivityRow(activity, timeZone)).join('')}</ul><button data-action="retry-rides">Retry synchronization</button>`) : ''}
-            ${lists.cached.length ? card('Device recordings', `<p>Earlier recordings are still available on this device.</p>
-                <ul class="session-list">${lists.cached.map(activity => localActivityRow(activity, timeZone)).join('')}</ul>`) : ''}
-            ${card('Activity history', !lists.historyAvailable ? '<p role="status">Activity history is currently unavailable.</p>' :
-                lists.history.length ? `<div class="table-scroll"><table><thead><tr><th>Activity</th><th>Duration</th><th>Distance</th>
+            ${lists.pending.length ? card('Awaiting local coaching update', html`<p>Your recordings are safely stored on this device.</p>
+                <ul class="session-list">${lists.pending.map(activity => localActivityRow(activity, timeZone))}</ul><button data-action="retry-rides">Retry synchronization</button>`) : ''}
+            ${lists.cached.length ? card('Device recordings', html`<p>Earlier recordings are still available on this device.</p>
+                <ul class="session-list">${lists.cached.map(activity => localActivityRow(activity, timeZone))}</ul>`) : ''}
+            ${card('Activity history', !lists.historyAvailable ? html`<p role="status">Activity history is currently unavailable.</p>` :
+                lists.history.length ? html`<div class="table-scroll"><table><thead><tr><th>Activity</th><th>Duration</th><th>Distance</th>
                 <th>Avg power</th><th>Avg HR</th><th>Load / feedback</th><th>Source</th><th>File</th></tr></thead><tbody>${lists.history.map(activity =>
-                historyActivityRow(activity, lists.localById.get(String(activity.id)), integration?.connected)).join('')}</tbody></table></div>` :
+                historyActivityRow(activity, lists.localById.get(String(activity.id)), integration?.connected))}</tbody></table></div>` :
                 empty('Your activities will appear here after you finish a workout or connect Intervals.icu.', 'settings', 'Connect an integration'), 'activity-history')}
             <p class="muted">Missing measurements are shown as --, not estimated. FIT downloads are retained locally for the most recent seven rides.</p>`;
     }
@@ -388,16 +389,16 @@ export async function launchPlatform(root) {
      */
     function progress(data) {
         const summary = trainingSummary(data);
-        return `${card('Last seven days', `<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}
+        return html`${card('Last seven days', html`<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}
             ${stat('Cycling activities', summary.week.length)}${stat('Plan completion to date', summary.adherence == null ? '--' : `${Math.round(summary.adherence * 100)}%`)}</div>
             ${weekChart(summary)}<p class="muted">Duration includes cycling activities in your normalized history. Plan completion is completed/substituted sessions divided by all sessions scheduled through today.</p>`)}
-            ${state ? `<div class="dashboard-grid">${card('Training load', `<p class="eyebrow">Scale: ${escape(state.loadSource)} / confidence: ${escape(state.loadConfidence)}</p>
+            ${state ? html`<div class="dashboard-grid">${card('Training load', html`<p class="eyebrow">Scale: ${state.loadSource} / confidence: ${state.loadConfidence}</p>
                 <div class="stats">${stat('Weekly load', number(state.weeklyLoad, 1))}${stat('Chronic load', number(state.chronicLoad, 1))}
-                ${stat('Acute load', number(state.acuteLoad, 1))}</div><p class="muted">${escape(state.loadExplanation)}</p>`)}
-                ${card('Power profile', `<p class="muted">Best observed efforts, not necessarily maximal. Missing efforts are not evidence of decline.</p>
+                ${stat('Acute load', number(state.acuteLoad, 1))}</div><p class="muted">${state.loadExplanation}</p>`)}
+                ${card('Power profile', html`<p class="muted">Best observed efforts, not necessarily maximal. Missing efforts are not evidence of decline.</p>
                 <div class="table-scroll"><table><thead><tr><th>Duration</th><th>Watts</th><th>W/kg</th></tr></thead><tbody>
-                ${state.powerDuration.map(effort => `<tr><td>${time(effort.seconds)}</td><td>${number(effort.watts)}</td><td>${number(effort.wKg, 2)}</td></tr>`).join('')}</tbody></table></div>`, '', true)}</div>` :
-                card('Training metrics', '<p>Configure your Coach profile to calculate training-load and power metrics from your history. No inferred fitness score is shown without sufficient data.</p>')}`;
+                ${state.powerDuration.map(effort => html`<tr><td>${time(effort.seconds)}</td><td>${number(effort.watts)}</td><td>${number(effort.wKg, 2)}</td></tr>`)}</tbody></table></div>`, '', true)}</div>` :
+                card('Training metrics', html`<p>Configure your Coach profile to calculate training-load and power metrics from your history. No inferred fitness score is shown without sufficient data.</p>`)}`;
     }
     /**
      * Build the ride screen once with target/actual readings, the timed profile and save-recovery
@@ -405,7 +406,7 @@ export async function launchPlatform(root) {
      */
     function player() {
         timeline = rideTimeline(db.workout, db.ftp, targetPower);
-        return `<section class="ride-panel"><div class="ride-heading"><div><p class="eyebrow">Workout player</p><h2>${escape(db.workout?.meta?.name || 'Free ride')}</h2></div>
+        return html`<section class="ride-panel"><div class="ride-heading"><div><p class="eyebrow">Workout player</p><h2>${db.workout?.meta?.name || 'Free ride'}</h2></div>
             <span id="ride-status" role="status"></span></div>
             <div class="ride-metrics">
                 <div class="ride-metric primary"><span>Target power</span><div><strong id="ride-target">--</strong><small>W</small></div>
@@ -420,7 +421,7 @@ export async function launchPlatform(root) {
                 <div class="ride-profile-heading"><h3 id="ride-profile-heading">Workout power profile</h3><span id="ride-position-label"></span></div>
                 <div id="ride-profile" class="ride-profile" role="img" aria-label="Workout target power profile">${rideProfile(timeline)}</div>
                 <progress id="ride-progress" max="1" value="0" aria-label="Workout progress" ${timeline ? '' : 'hidden'}></progress>
-                <div class="interval-context"><span class="muted">Blocks: target power &middot; marker: your position</span><strong id="ride-next"></strong></div>
+                <div class="interval-context"><span class="muted">Blocks: target power · marker: your position</span><strong id="ride-next"></strong></div>
             </section>
             <p id="ride-instruction" class="ride-instruction" hidden></p>
             <div class="ride-actions"><button data-action="ride-toggle" id="ride-toggle">Start workout</button>
@@ -445,41 +446,46 @@ export async function launchPlatform(root) {
      */
     function settings() {
         const locked = integration?.connected;
-        return `<div class="dashboard-grid">${card('Rider profile', `<p>Settings, workouts, recordings, calendar and coaching are stored only on this device.</p>
+        return html`<div class="dashboard-grid">${card('Rider profile', html`<p>Settings, workouts, recordings, calendar and coaching are stored only on this device.</p>
             <form id="profile-form"><label>FTP (W)<input name="ftp" type="number" min="1" max="1500" value="${db.ftp}" required ${locked ? 'disabled' : ''}></label>
                 <label>Body mass (kg)<input name="weight" type="number" min="1" max="500" step="0.1" value="${db.weight}" required ${locked ? 'disabled' : ''}></label>
-                <button ${locked ? 'disabled' : ''}>Save profile</button></form>${locked ? '<p class="muted">FTP and body mass are managed by Intervals.icu and refreshed each time this app opens. Change them in Intervals.icu, or disconnect to edit locally.</p><button class="secondary" data-action="import-profile">Refresh Intervals.icu profile</button>' : ''}
+                <button ${locked ? 'disabled' : ''}>Save profile</button></form>${locked ? html`<p class="muted">FTP and body mass are managed by Intervals.icu and refreshed each time this app opens. Change them in Intervals.icu, or disconnect to edit locally.</p><button class="secondary" data-action="import-profile">Refresh Intervals.icu profile</button>` : ''}
                 <p class="muted">After changing FTP, archive and regenerate an active plan before riding it.</p>`)}
             ${card('Intervals.icu', integrationView(), '', true)}
-            ${card('Local backup', `<p>Download your coaching history, plans, workout files, recent FIT recordings, settings and calendar. Keep a backup before clearing browser data or changing devices.</p>
+            ${card('Local backup', html`<p>Download your coaching history, plans, workout files, recent FIT recordings, settings and calendar. Keep a backup before clearing browser data or changing devices.</p>
                 <div class="button-row"><button class="secondary" data-action="backup">Download backup</button>
                 <label>Restore backup<input id="restore-backup" type="file" accept=".json,application/json"></label></div>
                 <p class="muted">Restore merges workout/recording files and replaces local coaching, settings and calendar. Integration API keys are not included.</p>
-                <button class="secondary" data-action="export">Export local training history</button>`, '', true)}</div>`;
+                <button class="secondary" data-action="export">Export local training history</button>`, '', true)}
+            ${card('This device', html`<p id="storage-status">Checking local storage...</p>
+                <p class="muted">The browser may remove local data to free space. Download a backup before clearing site data or changing devices.</p>`)}
+            ${card('Delete local data', html`<p>Erase workouts, rides, coaching history, settings, calendar, offline files and any saved Intervals.icu key from this browser. This cannot be undone.</p>
+                <button class="secondary" data-action="delete-all">Delete all local data</button>`)}</div>`;
     }
     /**
      * Present connection setup or import progress without displaying the saved API key. Imported
      * history is separate from the connection credentials.
      */
     function integrationView() {
-        if(!integration) return '<p role="status">Loading integration status...</p>';
-        if(!integration.connected) return `<p>Import history directly from Intervals.icu into your local Activities, analytics and Coach. Your personal API key is stored in this browser and sent only to Intervals.icu. Anyone with access to this browser profile can use it.</p>
+        if(!integration) return html`<p role="status">Loading integration status...</p>`;
+        if(!integration.connected) return html`<p>Import history directly from Intervals.icu into your local Activities, analytics and Coach. Your personal API key is stored in this browser and sent only to Intervals.icu. Anyone with access to this browser profile can use it.</p>
             <form id="intervals-connect"><label>Personal API key<input name="apiKey" type="password" required autocomplete="off" maxlength="1024"></label>
                 <label>Import from<input name="oldest" type="date" value="${addDays(today(), -365)}" max="${today()}" required></label>
+                <label class="check"><input type="checkbox" name="remember" checked> Keep this connection on this device</label>
                 <button>Test & connect</button></form><p class="muted">Personal/self-hosted connections only. Strava-origin data is not available through the Intervals.icu API.</p>`;
         const athleteIdText = integration.athleteId && integration.athleteId !== '0'
-            ? `Athlete ID: ${escape(integration.athleteId)}`
+            ? `Athlete ID: ${integration.athleteId}`
             : 'Athlete ID: auto-resolved from your Intervals.icu account';
-        return `<p class="eyebrow">${escape(integration.status)}</p><p>Last successful sync: ${integration.lastSuccess ? escape(new Date(integration.lastSuccess).toLocaleString()) : 'Not yet synced'}</p>
-            ${integration.nextDate ? `<p>Importing ${escape(integration.nextDate)} through ${escape(integration.through)} in 31-day batches.</p>` : ''}
-            ${integration.error ? `<p role="alert">${escape(integration.error)}</p>` : ''}
-            ${integration.skipped?.length ? `<details class="muted"><summary>${integration.skipped.length} activit${integration.skipped.length === 1 ? 'y' : 'ies'} skipped (missing ID, start time or duration)</summary><ul>${integration.skipped.map(label => `<li>${escape(label)}</li>`).join('')}</ul></details>` : ''}
-            ${integration.retryAt && integration.status === 'queued' ? `<p>Retry after ${escape(new Date(integration.retryAt).toLocaleString())}</p>` : ''}
+        return html`<p class="eyebrow">${integration.status}</p><p>Last successful sync: ${integration.lastSuccess ? new Date(integration.lastSuccess).toLocaleString() : 'Not yet synced'}</p>
+            ${integration.nextDate ? html`<p>Importing ${integration.nextDate} through ${integration.through} in 31-day batches.</p>` : ''}
+            ${integration.error ? html`<p role="alert">${integration.error}</p>` : ''}
+            ${integration.skipped?.length ? html`<details class="muted"><summary>${integration.skipped.length} activit${integration.skipped.length === 1 ? 'y' : 'ies'} skipped (missing ID, start time or duration)</summary><ul>${integration.skipped.map(label => html`<li>${label}</li>`)}</ul></details>` : ''}
+            ${integration.retryAt && integration.status === 'queued' ? html`<p>Retry after ${new Date(integration.retryAt).toLocaleString()}</p>` : ''}
             <p class="muted">${athleteIdText}</p>
             <div class="button-row"><button data-action="sync" ${['running', 'queued'].includes(integration.status) ? 'disabled' : ''}>${integration.lastSuccess ? 'Sync now' : 'Import history'}</button>
                 <button class="secondary" data-action="test-connection">Test connection</button>
                 <button class="secondary" data-action="disconnect">Disconnect</button></div>
-            <p class="muted">Your API key is stored in this browser, not on an Athlima server. Disconnect removes it; imported history is retained. Sync runs while this app is open and rechecks the last seven days for updates.</p>`;
+            <p class="muted">Your API key is stored in this browser, not on an Athlima server. Disconnect removes it; imported history is retained. Sync runs while this app is open and rechecks the last seven days for updates.${integration.remembered === false ? ' This connection is kept only until you close this tab.' : ''}</p>`;
     }
     /**
      * Refresh connection status without overlapping another status load or overwriting a focused
@@ -528,6 +534,23 @@ export async function launchPlatform(root) {
         }
         report('Intervals.icu sync completed. Local Coach and training plan are up to date.');
     }
+    /**
+     * Report persistence and space use in Settings. Failure to read an estimate is not an error the
+     * rider needs to act on, so the text stays factual and the controls remain available.
+     */
+    async function refreshStorageStatus() {
+        const element = root.querySelector('#storage-status');
+        if(!element) return;
+        const status = await storageStatus();
+        const size = bytes => Number.isFinite(bytes)
+            ? `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB` : 'unknown';
+        const usage = status.usage == null ? 'Training data is stored on this device.'
+            : `Using about ${size(status.usage)}${status.quota ? ` of ${size(status.quota)} available` : ''}.`;
+        element.textContent = `${usage} ${status.persisted
+            ? 'The browser has agreed to keep this data unless you clear it.'
+            : 'The browser may remove this data when space is low; keep a downloaded backup.'}`;
+    }
+
     let libraryFilters = initialLibraryFilters();
     let libraryPage = 0;
     /**
@@ -543,16 +566,17 @@ export async function launchPlatform(root) {
         markNavigation();
         document.body.dataset.route = route;
         legacy.hidden = !['calendar', 'coach', 'devices', 'editor'].includes(route);
-        content.innerHTML = route === 'dashboard' ? dashboard(data) : route === 'library' ? renderLibrary(db.workouts, libraryFilters,
+        setHTML(content, route === 'dashboard' ? dashboard(data) : route === 'library' ? renderLibrary(db.workouts, libraryFilters,
             {page: libraryPage, pageSize: mobile ? 6 : Infinity})
             : route === 'workout' ? details(data) : route === 'plan' ? plan(data)
                 : route === 'activities' ? activities(data) : route === 'progress' ? progress(data)
                     : route === 'player' ? player() : route === 'settings' ? settings()
-                        : route === 'devices' ? `<p class="muted">Select your trainer and sensors below, then choose which device supplies each measurement.
+                        : route === 'devices' ? html`<p class="muted">Select your trainer and sensors below, then choose which device supplies each measurement.
                             Connections and controls use the existing BLE / ANT+ engine.</p>
-                            ${!navigator.bluetooth ? '<p role="alert">Web Bluetooth is unavailable in this browser. Use Chrome/Edge on a supported platform and HTTPS or localhost. ANT+ requires Web Serial or WebUSB.</p>' : ''}`
-                            : route === 'coach' ? `<p class="muted">Your on-device Coach plans around your goal, schedule and ride history.</p>` : '';
+                            ${!navigator.bluetooth ? html`<p role="alert">Web Bluetooth is unavailable in this browser. Use Chrome/Edge on a supported platform and HTTPS or localhost. ANT+ requires Web Serial or WebUSB.</p>` : ''}`
+                            : route === 'coach' ? html`<p class="muted">Your on-device Coach plans around your goal, schedule and ride history.</p>` : html``);
         updateMobileSections();
+        if(route === 'settings') void refreshStorageStatus();
         if(route === 'player') updateRide();
     }
     /**
@@ -673,6 +697,7 @@ export async function launchPlatform(root) {
             if(!file) return;
             void run(async () => {
                 if(db.watchStatus !== 'stopped') throw new Error('Finish your current ride before restoring data.');
+                if(file.size > 25 * 1024 * 1024) throw new Error('This backup is too large to restore. Choose a file under 25 MB.');
                 if(!confirm('Merge backup files and replace local coaching, settings and calendar?')) return;
                 const {restoreBackup} = await import('../storage/backup.js');
                 await restoreBackup(JSON.parse(await file.text()));
@@ -709,8 +734,9 @@ export async function launchPlatform(root) {
                 report('Device profile saved.');
             } else {
                 const apiKey = values.get('apiKey');
+                const remember = values.get('remember') !== null;
                 form.reset();
-                integration = await intervals.connect({apiKey, oldest: values.get('oldest')});
+                integration = await intervals.connect({apiKey, oldest: values.get('oldest'), remember});
                 render();
                 await intervals.syncProfile();
                 profileSyncError = '';
@@ -830,12 +856,12 @@ export async function launchPlatform(root) {
                         await intervals.activityData(activityId);
                     activityDataCache.set(activityId, data);
                     if(!panel.isConnected) return;
-                    panel.innerHTML = renderActivityStreamData(data);
+                    setHTML(panel, renderActivityStreamData(data));
                     panel.hidden = false;
                     activityButton.setAttribute('aria-expanded', 'true');
                 } finally {
                     activityButton.disabled = false;
-                    activityButton.innerHTML = 'Route &amp; data';
+                    activityButton.textContent = 'Route & data';
                 }
             });
             return;
@@ -934,6 +960,14 @@ export async function launchPlatform(root) {
                 profileSyncError = '';
                 render();
                 report('FTP and body mass synced from Intervals.icu. Regenerate an active plan if FTP changed.');
+            } else if(action === 'delete-all') {
+                if(db.watchStatus !== 'stopped') throw new Error('Finish your current ride before deleting local data.');
+                const confirmation = window.prompt('This erases all Athlima data on this device, including any saved Intervals.icu key. Type DELETE to continue.');
+                if(confirmation !== 'DELETE') return;
+                const {eraseLocalData} = await import('../storage/erase.js');
+                await eraseLocalData();
+                window.location.replace('/');
+                return;
             } else if(action === 'reload') window.location.reload();
             else if(action === 'retry-rides') {
                 await refresh();
@@ -1012,6 +1046,7 @@ export async function launchPlatform(root) {
     xf.sub('activity:save:success', ride => {
         savingRide = false;
         lastRide = ride;
+        void requestPersistentStorage();
         if(route === 'player') window.location.hash = '/activities';
     });
     xf.sub('activity:save:fail', () => {
@@ -1055,7 +1090,7 @@ export async function launchPlatform(root) {
     await started;
     try {
         if(intervals.status().connected) {
-            content.innerHTML = '<p role="status">Syncing FTP and body mass from Intervals.icu...</p>';
+            setHTML(content, html`<p role="status">Syncing FTP and body mass from Intervals.icu...</p>`);
             await intervals.syncProfile();
         }
     } catch(error) {

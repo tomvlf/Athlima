@@ -665,7 +665,7 @@ class DockMode extends Model {
         let self = this;
         let { width, height, top } = self.calcSize();
 
-        window.open(`${href}`, '', `width=${width},height=${height},left=0,top=${top}`);
+        window.open(`${href}`, '_blank', `noopener,width=${width},height=${height},left=0,top=${top}`);
         window.close();
     }
 }

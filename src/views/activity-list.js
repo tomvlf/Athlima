@@ -9,7 +9,7 @@
  */
 
 import { xf, formatDate, } from '../functions.js';
-import { escapeHTML } from '../utils.js';
+import { html, setHTML } from '../html.js';
 import { models } from '../models/models.js';
 import { formatTime, } from '../utils.js';
 import { coachingData } from '../coaching/service.js';
@@ -74,7 +74,7 @@ class ActivityList extends HTMLElement {
             this.render();
         } catch(error) {
             console.error('Unable to restore the activity list:', error);
-            this.innerHTML = '<p class="activity-list--error">Activities could not be loaded from this browser.</p>';
+            setHTML(this, html`<p class="activity-list--error">Activities could not be loaded from this browser.</p>`);
         }
     }
     id(data) {
@@ -168,20 +168,20 @@ class ActivityList extends HTMLElement {
                 sum + (ride.loadMetrics[state.loadSource]?.value ?? 0), 0));
         };
         const loadLabel = state?.loadSource === 'duration' ? 'min' : 'load';
-        const stats = (label, values, count, load) => `
+        const stats = (label, values, count, load) => html`
             <section class="activity-period" aria-label="${label} activity totals">
                 <h3>${label}</h3>
                 <span>${count} ride${count === 1 ? '' : 's'}</span>
                 <span>${formatDuration(values.minutes)}</span>
-                ${values.distance ? `<span>${values.distance.toFixed(1)} km</span>` : ''}
-                ${load == null ? '' : `<span>${load} ${loadLabel}</span>`}
+                ${values.distance ? html`<span>${values.distance.toFixed(1)} km</span>` : ''}
+                ${load == null ? '' : html`<span>${load} ${loadLabel}</span>`}
             </section>`;
-        return `
+        return html`
             <div class="activity-periods">
                 ${stats('This week', week, weekly.length, loadFor(weekly))}
                 ${stats('This month', month, monthly.length, loadFor(monthly))}
             </div>
-            ${hasStateMetrics ? `<div class="activity-load-state" aria-label="Current training load">
+            ${hasStateMetrics ? html`<div class="activity-load-state" aria-label="Current training load">
                 <span>Fitness <strong>${Math.round(state.chronicLoad)}</strong></span>
                 <span>Fatigue <strong>${Math.round(state.acuteLoad)}</strong></span>
                 <span>Form <strong>${Math.round(state.formBalance)}</strong></span>
@@ -201,19 +201,19 @@ class ActivityList extends HTMLElement {
             label: data.name,
         });
 
-        return `
-            <activity-item id="i${i}--activity--item" class="some" data-id="${escapeHTML(this.id(data))}">
+        return html`
+            <activity-item id="i${i}--activity--item" class="some" data-id="${this.id(data)}">
                     <div class="activity--cont list--row--outer">
                         <div class="list--row--inner activity--info">
                             <div class="activity--info--short">
                                 <view-action
                                     class="info"
                                     action=":toggleExpand"
-                                    topic=":activity:${escapeHTML(this.id(data))}">
+                                    topic=":activity:${this.id(data)}">
                                     <div class="activity--summary-row">
                                         <div>
                                             <div id="i${i}--activity--date" class="activity--name">
-                                                ${escapeHTML(this.name(data))}
+                                                ${this.name(data)}
                                             </div>
                                             <div class="activity--date">
                                                 ${this.date(data)}
@@ -224,14 +224,14 @@ class ActivityList extends HTMLElement {
                                         </div>
                                     </div>
                                     <div class="activity--stats">
-                                        ${metrics.map((metric) => `<span>${escapeHTML(metric)}</span>`).join('')}
+                                        ${metrics.map((metric) => html`<span>${metric}</span>`)}
                                     </div>
                                     ${profile}
                                 </view-action>
                                 <view-action
                                     class=""
                                     action=":options"
-                                    topic=":activity:${escapeHTML(this.id(data))}">
+                                    topic=":activity:${this.id(data)}">
                                     <svg class="control--btn--icon" width="24" height="24">
                                         <use href="#icon--options" />
                                     </svg>
@@ -245,17 +245,17 @@ class ActivityList extends HTMLElement {
                                     <view-action
                                         class="activity--action action--intervals"
                                         action=":intervals:upload"
-                                        topic=":activity:${escapeHTML(this.id(data))}">
+                                        topic=":activity:${this.id(data)}">
                                         <svg class="activity--icon intervals--icon" width="24" height="24">
                                             <use href="#icon--intervals" />
                                         </svg>
-                                        <div class="connection-icon-switch--indicator ${escapeHTML(status.intervals ?? 'none')} intervals"></div>
+                                        <div class="connection-icon-switch--indicator ${status.intervals ?? 'none'} intervals"></div>
                                     </view-action>
 
                                     <view-action
                                         class="activity--action action--download"
                                         action=":download"
-                                        topic=":activity:${escapeHTML(this.id(data))}">
+                                        topic=":activity:${this.id(data)}">
                                         <svg class="activity--icon">
                                             <use href="#icon--save-btn" />
                                         </svg>
@@ -263,7 +263,7 @@ class ActivityList extends HTMLElement {
                                     <view-action
                                         class="activity--action action--image"
                                         action=":image"
-                                        topic=":activity:${escapeHTML(this.id(data))}">
+                                        topic=":activity:${this.id(data)}">
                                         <svg class="activity--icon">
                                             <use href="#icon--image" />
                                         </svg>
@@ -275,7 +275,7 @@ class ActivityList extends HTMLElement {
                     <view-action
                         class="activity--options"
                         action=":remove"
-                        topic=":activity:${escapeHTML(this.id(data))}">
+                        topic=":activity:${this.id(data)}">
                         <span class="activity--remove">Delete</span>
                     </view-action>
             </activity-item>
@@ -283,9 +283,9 @@ class ActivityList extends HTMLElement {
     }
     render() {
         const items = this.activities.slice(0, this.capacity);
-        this.innerHTML = `${this.summary()}<div class="activity-list--items">
-            ${items.map((activity, index) => this.template(index, activity)).join('')}
-        </div>`;
+        setHTML(this, html`${this.summary()}<div class="activity-list--items">
+            ${items.map((activity, index) => this.template(index, activity))}
+        </div>`);
     }
 }
 

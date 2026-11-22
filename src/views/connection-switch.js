@@ -10,6 +10,7 @@
 
 import { xf, equals, exists, existance, } from '../functions.js';
 import { models } from '../models/models.js';
+import { html, insertHTML } from '../html.js';
 
 /**
  * A reusable connect/disconnect control; its for attribute names the device topic.
@@ -105,7 +106,6 @@ class ProtocolSwitch extends ConnectionSwitch {
         };
     }
     onEffect(e) {
-        console.log(this.status);
         if(equals(this.status, 'on') || equals(this.status, 'loading')) {
             const proceed = confirm(this.confirmMsg);
             if(proceed) {
@@ -199,7 +199,6 @@ class ANTDeviceRequest extends HTMLElement {
     }
     set status(value) {
         this._status = value;
-        console.log(this._status);
     }
     connectedCallback() {
         const self = this;
@@ -284,7 +283,7 @@ class ANTDeviceRequest extends HTMLElement {
     }
     // Display the search result's device number and type in a selectable row.
     deviceItemTemplate(args = { deviceNumber: '--', deviceType: '--'}) {
-        return `<div class="device-request--item" id="${args.deviceNumber}">
+        return html`<div class="device-request--item" id="${args.deviceNumber}">
         <div class="device-request--item--protocol">ANT+</div>
         <div class="device-request--item--number">${args.deviceNumber}</div>
         <div class="device-request--item--type">${args.deviceType}</div>
@@ -296,14 +295,14 @@ class ANTDeviceRequest extends HTMLElement {
 
         this.devices.set(channelId.deviceNumber, channelId);
         const item = this.deviceItemTemplate(channelId);
-        this.$list.insertAdjacentHTML('beforeend', item);
+        insertHTML(this.$list, 'beforeend', item);
     }
     remove(device) {
         const item = this.$list.querySelector(`#${device.deviceNumber}`);
         item?.remove();
     }
     clear() {
-        this.$list.innerHTML = '';
+        this.$list.replaceChildren();
         this.devices = new Map();
         this.selected = undefined;
     }

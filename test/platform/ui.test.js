@@ -380,7 +380,7 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     intervals.status.mockReturnValue(connectionStatus);
     form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await settle();
-    expect(intervals.connect).toHaveBeenCalledWith({apiKey: 'local-only-key', oldest: '2026-01-01'});
+    expect(intervals.connect).toHaveBeenCalledWith({apiKey: 'local-only-key', oldest: '2026-01-01', remember: true});
     expect(intervals.syncProfile).toHaveBeenCalledTimes(1);
     expect(root.innerHTML).not.toContain('local-only-key');
     expect(root.textContent).toContain('Import history');

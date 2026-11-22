@@ -15,6 +15,7 @@ import { formatTime } from '../utils.js';
 import { models } from '../models/models.js';
 import { DialogMsg } from '../models/enums.js';
 import { webBle } from '../ble/web-ble.js';
+import { html, insertHTML, setHTML } from '../html.js';
 
 
 //
@@ -1111,7 +1112,7 @@ class LapsList extends DataView {
             0,
         );
 
-        return `<div class="lap--item">
+        return html`<div class="lap--item">
                     <div class="lap--item--inner">
                         <div class="lap--value lap--index">${index}</div>
                         <div class="lap--value lap--duration">${formatTime({value: duration, format: 'mm:ss'})}</div>
@@ -1143,7 +1144,7 @@ class LapsList extends DataView {
 
     }
     render(lap, i) {
-        this.$lapsCont.insertAdjacentHTML('afterbegin', this.toLap(lap, i));
+        insertHTML(this.$lapsCont, 'afterbegin', this.toLap(lap, i));
     }
 }
 
@@ -1208,7 +1209,7 @@ class InstantPowerGraph extends HTMLElement {
         this.scaleMax = this.metricValue * this.scaleFactor;
     }
     bar(zone = 'one', height = 80, width = 1) {
-        return `<div class="graph-bar zone-${zone}" style="height: ${height}%; width: ${width}px;"></div>`;
+        return html`<div class="graph-bar zone-${zone}" style="height: ${height}%; width: ${width}px;"></div>`;
     }
     shift() {
         this.removeChild(this.childNodes[0]);
@@ -1220,7 +1221,7 @@ class InstantPowerGraph extends HTMLElement {
         if(this.barsCount >= this.graphWidth) {
             this.shift();
         }
-        this.insertAdjacentHTML('beforeend', this.bar(zone, barHeight, 1));
+        insertHTML(this, 'beforeend', this.bar(zone, barHeight, 1));
         this.barsCount += 1;
     }
 }
@@ -1967,16 +1968,16 @@ class CompatibilityCheck extends HTMLElement {
     show() {
         let guidance;
         if(window.isSecureContext === false) {
-            guidance = `<p>Bluetooth requires a secure connection. Open this app over <b>HTTPS</b>,
+            guidance = html`<p>Bluetooth requires a secure connection. Open this app over <b>HTTPS</b>,
                 or use <b>http://localhost</b> on the same device as the browser.</p>
                 <p>An HTTP LAN address (such as http://192.168.x.x) will not work,
                 including when opening a self-hosted app from Android. Serve the app
                 over HTTPS with a certificate trusted by your device.</p>`;
         } else {
-            guidance = `<p>Web Bluetooth is not available on this page. Use a browser with
+            guidance = html`<p>Web Bluetooth is not available on this page. Use a browser with
                 Web Bluetooth support, such as
-                <a href="https://www.google.com/chrome/" target="_blank">Chrome</a> or
-                <a href="https://www.microsoft.com/edge" target="_blank">Edge</a>,
+                <a href="https://www.google.com/chrome/" target="_blank" rel="noopener noreferrer">Chrome</a> or
+                <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer">Edge</a>,
                 and check that Bluetooth access is allowed in browser settings.</p>
                 <p>On Android, open the app directly in Chrome, not an in-app browser.</p>
                 <p>On Linux Chrome, you may need to enable
@@ -1984,15 +1985,13 @@ class CompatibilityCheck extends HTMLElement {
                 and relaunch Chrome.</p>
                 <p>On iOS, Chrome and other browsers may not provide Web Bluetooth.</p>`;
         }
-        this.innerHTML =
-        `<div id="compatibility--cont">
+        setHTML(this, html`<div id="compatibility--cont">
              <p><b>Bluetooth unavailable</b></p>
              ${guidance}
-         </div>`;
+         </div>`);
     }
     hide() {
-        const self = this;
-        this.innerHTML = '';
+        this.replaceChildren();
     }
 }
 

@@ -10,7 +10,8 @@
  */
 
 import { xf, empty, } from '../functions.js';
-import { escapeHTML, isoDate, isoDateToWeekDay } from '../utils.js';
+import { isoDate, isoDateToWeekDay } from '../utils.js';
+import { html, raw, setHTML } from '../html.js';
 import { models } from '../models/models.js';
 import { WorkoutGraphViewModel, } from './workout-graph-svg.js';
 
@@ -116,12 +117,12 @@ class PlannedList extends HTMLElement {
 
         const id = workout.id;
         const weekDay = isoDateToWeekDay(workout.meta.startDateLocal ?? isoDate());
-        const weekDayTemplate = `
+        const weekDayTemplate = html`
             <div class="weekday">${weekDay.weekDay}</div>
             <div class="date">${`${weekDay.day}`.padStart(2, "0")}</div>`;
-        const name = escapeHTML(workout.meta.name);
-        const category = escapeHTML(workout.meta.category);
-        const description = escapeHTML(workout.meta.description);
+        const name = workout.meta.name;
+        const category = workout.meta.category;
+        const description = workout.meta.description;
 
         let duration = '';
         if(workout.meta.duration) {
@@ -131,19 +132,19 @@ class PlannedList extends HTMLElement {
             duration = `${(workout.meta.distance / 1000).toFixed(2)} km`;
         }
 
-        const summary = `
+        const summary = html`
         <div class="workout--date">${weekDayTemplate}</div>
         <div class="workout--name">${name}</div>
         <div class="workout--type">${category}</div>
         <div class="workout--duration">${duration}</div>`;
 
-        const graph = `
+        const graph = html`
             <workout-graph-svg>
                 <div class="graph--info--cont"></div>
                 ${self.viewModel.toSVG(workout, ftp, size)}
             </workout-graph-svg>`;
 
-        const details = `
+        const details = html`
         ${graph}
         <div class="workout--description">${description}</div>`;
 
@@ -151,15 +152,10 @@ class PlannedList extends HTMLElement {
     }
     toList() {
         const self = this;
-        let list = '';
-        const planned = this.model.list();
-        for(let workout of planned) {
-            list += self.toListItem(workout, self.ftp, self.size);
-        }
-        return list;
+        return this.model.list().map(workout => self.toListItem(workout, self.ftp, self.size));
     }
     toEmpty() {
-        return `<div class="planned--empty">
+        return html`<div class="planned--empty">
                     <p>You have no planned workouts for today.</p>
                 </div>`;
     }
@@ -172,9 +168,9 @@ class PlannedList extends HTMLElement {
         };
 
         if(empty(models.planned.data)) {
-            self.innerHTML = self.toEmpty();
+            setHTML(self, self.toEmpty());
         } else {
-            self.innerHTML = self.toList();
+            setHTML(self, html`${self.toList()}`);
         }
     }
     onLoading($el) {
@@ -313,18 +309,19 @@ function listItemTemplate(
     topic = 'li',
     element = "planned-list-item",
 ) {
-    return `<${element} class="active-list-item" data-wid="${escapeHTML(id)}">
+    const tag = /^[a-z][a-z0-9-]*$/i.test(element) ? element : 'div';
+    return html`<${raw(tag)} class="active-list-item" data-wid="${id}">
                 <div class="item--cont optional">
                     <div class="summary">
-                        <view-action action=":toggle" topic=":${escapeHTML(topic)}:${escapeHTML(id)}" class="summary--data">
+                        <view-action action=":toggle" topic=":${topic}:${id}" class="summary--data">
                             ${summary}
-                            <view-action class="selectable" action=":select" topic=":${escapeHTML(topic)}:${escapeHTML(id)}" stoppropagation class="item--select" id="btn${escapeHTML(id)}">
+                            <view-action class="selectable" action=":select" topic=":${topic}:${id}" stoppropagation class="item--select" id="btn${id}">
                                 <svg class="radio">
                                     <use class="off" href="#icon--radio-off" />
                                     <use class="on" href="#icon--radio-on" />
                                 </svg>
                             </view-action>
-                            <view-action action=":options" topic=":${escapeHTML(topic)}:${escapeHTML(id)}" stoppropagation class="item--options">
+                            <view-action action=":options" topic=":${topic}:${id}" stoppropagation class="item--options">
                                 <svg class="control--btn--icon">
                                     <use href="#icon--options" />
                                 </svg>
@@ -334,11 +331,11 @@ function listItemTemplate(
                     <div class="details expandable">${details}</div>
                 </div>
                 <div>
-                    <view-action action=":remove" topic=":${escapeHTML(topic)}:${escapeHTML(id)}" class="optional--actions">
+                    <view-action action=":remove" topic=":${topic}:${id}" class="optional--actions">
                         <span class="remove">Delete</span>
                     </view-action>
                 </div>
-            </${element}>`;
+            </${raw(tag)}>`;
 }
 
 export {

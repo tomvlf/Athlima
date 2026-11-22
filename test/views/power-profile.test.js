@@ -16,18 +16,18 @@ test('renders planned interval steps as a wattage profile', () => {
         ]}],
     });
 
-    expect(markup).toContain('class="power-profile--target"');
-    expect(markup).toContain('Threshold &lt;ride&gt;');
-    expect(markup).toContain('role="img"');
+    expect(String(markup)).toContain('class="power-profile--target"');
+    expect(String(markup)).toContain('Threshold &lt;ride&gt;');
+    expect(String(markup)).toContain('role="img"');
 });
 
 test('renders sampled ride power and omits unavailable profiles', () => {
-    expect(renderPowerProfile({samples: [100, 120, 180], ftp: 200}))
+    expect(String(renderPowerProfile({samples: [100, 120, 180], ftp: 200})))
         .toContain('class="power-profile--recorded"');
     expect(renderPowerProfile({samples: [0, NaN, -1]})).toBe('');
 });
 
 test('does not show an invented FTP reference on recorded profiles', () => {
-    expect(renderPowerProfile({samples: [100, 120, 180]})).not.toContain('power-profile--ftp');
-    expect(renderPowerProfile({samples: [100, 120, 180], ftp: 250})).toContain('power-profile--ftp');
+    expect(String(renderPowerProfile({samples: [100, 120, 180]}))).not.toContain('power-profile--ftp');
+    expect(String(renderPowerProfile({samples: [100, 120, 180], ftp: 250}))).toContain('power-profile--ftp');
 });

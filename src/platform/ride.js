@@ -4,6 +4,7 @@
  * intervals or free-ride. These helpers do not control the trainer.
  */
 import { time } from './format.js';
+import { html } from '../html.js';
 
 /**
  * Flatten valid timed steps into cumulative starting seconds and absolute power targets. Return
@@ -50,17 +51,17 @@ export function ridePosition(timeline, {intervalIndex = 0, lapTime, workoutStatu
  * interval. The platform updates those placeholders during the ride.
  */
 export function rideProfile(timeline) {
-    if(!timeline) return '<p class="muted">No timed power profile for this ride. Ride at your own pace.</p>';
+    if(!timeline) return html`<p class="muted">No timed power profile for this ride. Ride at your own pace.</p>`;
     const {duration, intervals, maximumPower} = timeline;
     const bars = intervals.flatMap(interval => interval.steps.map(step => {
         const height = step.power == null ? 3 : Math.max(3, step.power / maximumPower * 180);
         const share = (step.power || 0) / (timeline.ftp || maximumPower);
         const color = share > 1.05 ? '#f5ad65' : share > 0.75 ? '#9a99ff' : '#52d9b2';
-        return `<rect x="${step.start / duration * 1000}" y="${180 - height}"
+        return html`<rect x="${step.start / duration * 1000}" y="${180 - height}"
             width="${step.duration / duration * 1000}" height="${height}" fill="${color}">
             <title>${time(step.start)} / ${step.power == null ? 'No power target' : `${step.power} W`}${step.cadence > 0 ? ` / ${step.cadence} rpm` : ''}</title></rect>`;
-    })).join('');
-    return `<div class="ride-profile-axis" aria-hidden="true"><span>${maximumPower} W</span><span>${maximumPower / 2} W</span><span>0 W</span></div>
+    }));
+    return html`<div class="ride-profile-axis" aria-hidden="true"><span>${maximumPower} W</span><span>${maximumPower / 2} W</span><span>0 W</span></div>
         <div class="ride-profile-plot">
             <svg viewBox="0 0 1000 180" preserveAspectRatio="none" aria-hidden="true">
                 <line class="ride-profile-grid" x1="0" x2="1000" y1="90" y2="90"/>
@@ -70,6 +71,6 @@ export function rideProfile(timeline) {
             </svg>
             <div id="ride-profile-cursor" class="ride-profile-cursor" style="left:0%"><span>Now</span></div>
             <div class="ride-profile-times" aria-hidden="true">${[0, .25, .5, .75, 1]
-                .map(share => `<span>${time(duration * share)}</span>`).join('')}</div>
+                .map(share => html`<span>${time(duration * share)}</span>`)}</div>
         </div>`;
 }

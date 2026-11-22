@@ -13,6 +13,7 @@ import { xf, exists, existance, equals, clamp, debounce, toFixed  } from '../fun
 import { formatTime, translate } from '../utils.js';
 import { models } from '../models/models.js';
 import { g } from './graph.js';
+import { html, setHTML } from '../html.js';
 
 
 
@@ -55,28 +56,24 @@ function intervalsToMaxPower(intervals, ftp) {
     }, ftp * 1.6);
 }
 
-// Append one interval's HTML group, using equal-width steps and stored tooltip values.
-function Interval(acc, interval, width, ftp, powerMax, viewPort) {
+// Build one interval's bar group, using equal-width steps and stored tooltip values.
+function Interval(interval, width, ftp, powerMax, viewPort) {
     const stepsLength = interval.steps.length;
 
-    return acc + interval.steps.reduce((a, step) => {
+    const bars = interval.steps.map(step => {
         const power    = models.ftp.toAbsolute(step.power, ftp) ?? 0;
         const cadence  = step.cadence;
         const slope    = step.slope;
         const duration = step.duration;
-        const width    = 100 / stepsLength;
+        const stepWidth = 100 / stepsLength;
         const height   = powerToHeight(power, powerMax, viewPort);
         const zone     = (models.ftp.powerToZone(power, ftp)).name;
         const infoTime = formatTime({value: duration, format: 'mm:ss'});
 
-        const powerAttr    = exists(power)    ? `power="${power}"` : '';
-        const cadenceAttr  = exists(cadence)  ? `cadence="${cadence}"` : '';
-        const slopeAttr    = exists(slope)    ? `slope="${slope}"` : '';
-        const durationAttr = exists(duration) ? `duration="${infoTime}"` : '';
+        return html`<div class="graph--bar zone-${zone}" style="height: ${height}px; width: ${stepWidth}%"${exists(power) ? html` power="${power}"` : ''}${exists(cadence) ? html` cadence="${cadence}"` : ''}${exists(slope) ? html` slope="${slope}"` : ''}${exists(duration) ? html` duration="${infoTime}"` : ''}></div>`;
+    });
 
-        return a +
-            `<div class="graph--bar zone-${zone}" style="height: ${height}px; width: ${width}%" ${powerAttr} ${cadenceAttr} ${slopeAttr} ${durationAttr}></div>`;
-    }, `<div class="graph--bar-group" style="width: ${width}px;">`) + `</div>`;
+    return html`<div class="graph--bar-group" style="width: ${width}px;">${bars}</div>`;
 }
 
 // Convert timed intervals and FTP (reference watts) into bar HTML sized for this screen.
@@ -86,16 +83,13 @@ function intervalsToGraph(workout, ftp, viewPort) {
     const totalDuration = workout.meta.duration;
     const maxPower      = intervalsToMaxPower(intervals, ftp);
 
-    return intervals.reduce((acc, interval) => {
-        let width = 1;
+    const groups = intervals.map(interval => {
+        if(!exists(interval.duration)) return '';
+        const width = intervalToWidth(interval.duration, totalDuration, totalWidth);
+        return Interval(interval, width, ftp, maxPower, viewPort);
+    });
 
-        if(exists(interval.duration)) {
-            width = intervalToWidth(interval.duration, totalDuration, totalWidth);
-            return Interval(acc, interval, width, ftp, maxPower, viewPort);
-        }
-
-        return '';
-    }, '<div class="graph--info--cont"></div>');
+    return html`<div class="graph--info--cont"></div>${groups}`;
 }
 
 // Show a hovered bar's targets and position the tooltip near it, adjusting for space.
@@ -115,7 +109,7 @@ function renderInfo(args = {}) {
     const bottom       = args.intervalRect.height;
 
     dom.info.style.display = 'block';
-    dom.info.innerHTML = `<div>${power}</div><div>${cadence}</div><div>${slope}</div><div class="graph--info--time">${duration}</div>`;
+    setHTML(dom.info, html`<div>${power}</div><div>${cadence}</div><div>${slope}</div><div class="graph--info--time">${duration}</div>`);
 
     const width  = dom.info.getBoundingClientRect().width;
     const height = dom.info.getBoundingClientRect().height;
@@ -303,11 +297,10 @@ class WorkoutGraph extends HTMLElement {
     render() {
         const self = this;
         if(!this.workout.intervals && !this.workout.points) return;
-        const progress = `<div id="progress" class="progress"></div><div id="progress-active"></div>`;
+        const progress = html`<div id="progress" class="progress"></div><div id="progress-active"></div>`;
 
         if(equals(this.type, 'workout')) {
-            this.innerHTML = progress +
-                intervalsToGraph(this.workout, this.ftp, this.viewPort);
+            setHTML(this, html`${progress}${intervalsToGraph(this.workout, this.ftp, this.viewPort)}`);
 
             this.dom.info      = this.querySelector('.graph--info--cont');
             this.dom.progress  = this.querySelector('#progress');
@@ -319,8 +312,7 @@ class WorkoutGraph extends HTMLElement {
         }
 
         if(equals(this.type, 'course')) {
-            this.innerHTML = progress +
-                courseToGraph(this.workout, this.viewPort);
+            setHTML(this, html`${progress}${courseToGraph(this.workout, this.viewPort)}`);
 
             this.dom.info     = this.querySelector('.graph--info--cont');
             this.dom.progress = this.querySelector('#progress');
@@ -373,7 +365,7 @@ function courseToGraph(course, viewPort) {
 
     // console.table({distanceTotal, yMax, aspectRatio, yScale, flatness, altitudeScale, altitudeSpec});
 
-    const track = course.pointsSimplified.reduce((acc, p, i, xs) => {
+    const track = course.pointsSimplified.map((p, i, xs) => {
         const color = g.slopeToColor(p.slope);
 
         const px1 = p.x;
@@ -390,15 +382,14 @@ function courseToGraph(course, viewPort) {
         const x4 = px2;
         const y4 = yMax;
 
-        return acc + `<polygon points="${x1},${y1} ${x2},${y2} ${x3},${y3} ${x4},${y4}" stroke="none" fill="${color}" class="graph--bar" index="${i}" slope="${p.slope}" />`;
-
-    }, ``);
+        return html`<polygon points="${x1},${y1} ${x2},${y2} ${x3},${y3} ${x4},${y4}" stroke="none" fill="${color}" class="graph--bar" index="${i}" slope="${p.slope}" />`;
+    });
 
     const display =
-          `<altitude-value class="elevation--value altitude--value">${altitudeSpec.start ?? '--'}</altitude-value>
+          html`<altitude-value class="elevation--value altitude--value">${altitudeSpec.start ?? '--'}</altitude-value>
         <ascent-value class="elevation--value ascent--value">0.0</ascent-value>`;
 
-    return `${display}<div class="graph--info--cont"></div><svg class="graph--bar-group" width="100%" height="100%" viewBox="0 0 ${viewBox.width} ${viewBox.height}" preserveAspectRatio="xMinYMax meet">${track}</svg>`;
+    return html`${display}<div class="graph--info--cont"></div><svg class="graph--bar-group" width="100%" height="100%" viewBox="0 0 ${viewBox.width} ${viewBox.height}" preserveAspectRatio="xMinYMax meet">${track}</svg>`;
 }
 
 export {

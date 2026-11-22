@@ -287,4 +287,42 @@ describe('Zwo', () => {
 
         expect(res).toStrictEqual(expected);
     });
+
+    test('export escapes metadata and attributes instead of injecting XML', () => {
+        const source = {
+            meta: {
+                author: 'A & B', name: 'Bad </name><script>alert(1)</script>',
+                category: 'Test', subcategory: '', description: '5 > 4 & "quoted"',
+                sportType: 'bike', tags: '',
+            },
+            intervals: [{duration: 60, steps: [{duration: 60, power: 0.5, cadence: 90}]}],
+        };
+        const xml = zwo.write(zwo.fromInterval(source));
+        expect(xml).not.toContain('</name><script>');
+        expect(xml).toContain('&lt;/name&gt;&lt;script&gt;');
+        expect(xml).toContain('5 &gt; 4 &amp; &quot;quoted&quot;');
+    });
+
+    test('rejects malformed XML before reading workout children', () => {
+        expect(() => zwo.readToInterval('<workout_file><name>broken</workout_file>'))
+            .toThrow(/not valid ZWO XML/);
+        expect(() => zwo.read('<workout_file><name>broken</workout_file>'))
+            .toThrow(/not valid ZWO XML/);
+    });
+
+    test('a file without a workout element produces no intervals', () => {
+        expect(zwo.readToInterval('<workout_file><name>Empty</name></workout_file>').intervals).toEqual([]);
+    });
+
+    test('clamps absurd durations and repeats instead of freezing the tab', () => {
+        const warmup = zwo.readToInterval(`<workout_file><name>Huge</name><workout>
+            <Warmup Duration="10000000000" PowerLow="0.5" PowerHigh="0.7"/>
+        </workout></workout_file>`);
+        expect(warmup.intervals[0].steps.length).toBeLessThanOrEqual(8640);
+
+        const repeats = zwo.readToInterval(`<workout_file><name>Huge</name><workout>
+            <IntervalsT Repeat="999999" OnDuration="60" OffDuration="60" OnPower="1" OffPower="0.5"/>
+        </workout></workout_file>`);
+        expect(repeats.intervals.length).toBeLessThanOrEqual(2000);
+    });
 });

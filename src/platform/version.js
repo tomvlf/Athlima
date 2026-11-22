@@ -4,7 +4,7 @@
  * check. A development build may have no revision.
  */
 import frontendBuildInfo from './build-info.json';
-import { escape } from './format.js';
+import { html } from '../html.js';
 
 const frontendVersion = frontendBuildInfo.version?.trim() || 'development';
 const frontendRevision = frontendBuildInfo.revision?.trim() || '';
@@ -16,8 +16,8 @@ const fullLabel = (version, revision) => revision ? `${version} / ${revision}` :
  * revision in the hover text.
  */
 export function versionMarkup({showRevision = true} = {}) {
-    return `<div class="app-versions" role="group" aria-label="Deployed versions" data-show-revision="${showRevision}">
-        <span>Frontend: <strong data-frontend-version title="${escape(fullLabel(frontendVersion, frontendRevision))}">${escape(label(frontendVersion, showRevision ? frontendRevision : ''))}</strong></span>
+    return html`<div class="app-versions" role="group" aria-label="Deployed versions" data-show-revision="${showRevision}">
+        <span>Frontend: <strong data-frontend-version title="${fullLabel(frontendVersion, frontendRevision)}">${label(frontendVersion, showRevision ? frontendRevision : '')}</strong></span>
         <span>Storage: on this device</span>
     </div>`;
 }

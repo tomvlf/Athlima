@@ -33,6 +33,15 @@ jest.mock('../../src/functions.js', () => {
     return {...actual, xf: {...actual.xf, dispatch: jest.fn(actual.xf.dispatch)}};
 });
 
+/** Wait for an asynchronous route render without assuming a fixed delay under test-suite load. */
+async function waitFor(predicate, timeout = 1500) {
+    const start = Date.now();
+    while(!predicate() && Date.now() - start < timeout) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    return predicate();
+}
+
 test('mobile has a dedicated ride-first navigation, recovered ride controls, glanceable metrics and finish summary', async () => {
     window.innerWidth = 390;
     window.history.replaceState({}, '', '/');
@@ -113,7 +122,7 @@ test('mobile has a dedicated ride-first navigation, recovered ride controls, gla
     await Promise.resolve();
     expect(dispatch).toHaveBeenCalledWith('ui:watchStop');
     xf.dispatch('activity:save:success', {id: 'saved', duration: 90, averagePower: 200, averageHeartRate: 145});
-    await new Promise(resolve => setTimeout(resolve, 5));
+    await waitFor(() => document.body.dataset.route === 'activities');
     expect(document.body.dataset.route).toBe('activities');
     expect(root.textContent).toContain('Ride saved');
     expect(root.textContent).toContain('1:30');
@@ -122,7 +131,7 @@ test('mobile has a dedicated ride-first navigation, recovered ride controls, gla
     root.querySelector('[data-tab="more"]').click();
     moreMenu().querySelector('a[href="#/devices"]').click();
     expect(moreMenu().hidden).toBe(true);
-    await new Promise(resolve => setTimeout(resolve, 5));
+    await waitFor(() => document.body.dataset.route === 'devices');
     expect(document.body.dataset.route).toBe('devices');
     expect(activeTab()).toBe('More');
     db.elapsed = 0;

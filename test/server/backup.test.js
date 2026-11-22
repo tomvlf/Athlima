@@ -102,6 +102,16 @@ test('invalid backups fail before changing stored data', async () => {
     expect((await createBackup()).workouts).toEqual([workout]);
 });
 
+test('rejects invalid base64, non-object metadata and excessive record counts', async () => {
+    const backup = await createBackup();
+    await expect(restoreBackup({...backup, activities: [{id: 'a', summary: {id: 'a'}, blob: '!!!!'}]}))
+        .rejects.toThrow('Invalid activity data');
+    await expect(restoreBackup({...backup, workouts: [{id: 'w', meta: [], intervals: []}]}))
+        .rejects.toThrow('Invalid local backup');
+    await expect(restoreBackup({...backup, workouts: Array.from({length: 10001}, () => null)}))
+        .rejects.toThrow('Invalid local backup');
+});
+
 test('calendar backups retain referenced built-in workout IDs across devices', async () => {
     localStorage.setItem('training-calendar', JSON.stringify(calendar));
     const backup = await createBackup([workout, {...workout, id: 'unused-built-in'}]);

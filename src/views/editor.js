@@ -15,6 +15,7 @@ import { formatTime } from '../utils.js';
 import { zwo } from '../workouts/zwo.js';
 import { fileHandler } from '../file.js';
 import { uuid } from '../storage/uuid.js';
+import { html, insertHTML } from '../html.js';
 
 // Read the editor's minutes:seconds input as a total number of seconds.
 function stringToSeconds(str) {
@@ -554,7 +555,7 @@ function RowView(args = {}) {
     }
     // Build inputs from the field helpers' numeric display strings, not raw descriptions.
     function template(data) {
-        return `<div class="editor--row">
+        return html`<div class="editor--row">
             <div class="editor--td select">
                 <svg class="editor--radio editor--radio-off selected"
                         xmlns="http://www.w3.org/2000/svg"
@@ -677,7 +678,7 @@ class WorkoutEditor extends HTMLElement {
         // const rowModel = this.editor.add();
         // const rowView = RowView({model: rowModel});
         // this.rows.set(this.rows.size, rowView);
-        // this.$body.insertAdjacentHTML('beforeend', rowView.build());
+        // insertHTML(this.$body, 'beforeend', rowView.build());
         // const $row = this.$body.lastChild;
         // rowView.connect($row);
 
@@ -689,7 +690,7 @@ class WorkoutEditor extends HTMLElement {
         rowModels.forEach(rowModel => {
             const rowView = RowView({model: rowModel});
             this.rows.set(this.rows.size, rowView);
-            this.$body.insertAdjacentHTML('beforeend', rowView.build());
+            insertHTML(this.$body, 'beforeend', rowView.build());
             const $row = this.$body.lastChild;
             rowView.connect($row);
 

@@ -5,8 +5,11 @@ FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# Install the exact dependency versions recorded in the lockfile.
-RUN npm ci --no-audit --no-fund
+# Install the exact dependency versions recorded in the lockfile. Install
+# scripts are skipped: the build tooling ships prebuilt native binaries through
+# optional dependencies, and a compromised package should not run code during
+# the image build. Verify `npm run build` after changing dependencies.
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 ARG ATHLIMA_BUILD_VERSION=development

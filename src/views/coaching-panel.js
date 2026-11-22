@@ -15,6 +15,7 @@ import { coachingService, coachingData } from '../coaching/service.js';
 import { GOALS, RUN_GOALS, DEFAULTS, localDay, addDays, sportOf, sportForGoalType } from '../coaching/domain.js';
 import { parsePace, thresholdPaceFromRace, formatPace } from '../coaching/running.js';
 import { fileHandler } from '../file.js';
+import { html, raw, setHTML } from '../html.js';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -94,17 +95,17 @@ class CoachingPanel extends HTMLElement {
         try {
             const data = coachingData();
             if(!data) {
-                this.innerHTML = `<p role="${this.error ? 'alert' : 'status'}">${escape(this.error || 'Loading coaching history...')}</p>`;
+                setHTML(this, html`<p role="${this.error ? 'alert' : 'status'}">${this.error || 'Loading coaching history...'}</p>`);
                 return;
             }
             const plan = data.plan?.status === 'active' ? data.plan : null;
-            this.innerHTML = `
-                ${this.error ? `<p class="coach-alert" role="alert">${escape(this.error)}</p>` : ''}
-                ${this.notice ? `<p class="coach-notice" role="status">${escape(this.notice)}</p>` : ''}
-                ${data.profile ? this.safetyForm(data) : ''}
-                ${plan ? this.planView(data, plan) : this.setupForm(data)}
+            setHTML(this, html`
+                ${this.error ? html`<p class="coach-alert" role="alert">${this.error}</p>` : ''}
+                ${this.notice ? html`<p class="coach-notice" role="status">${this.notice}</p>` : ''}
+                ${data.profile ? raw(this.safetyForm(data)) : ''}
+                ${plan ? raw(this.planView(data, plan)) : raw(this.setupForm(data))}
                 <p class="coach-disclaimer">Training decision support, not medical advice. Recommendations are
-                    conservative, deterministic rules, not guarantees.</p>`;
+                    conservative, deterministic rules, not guarantees.</p>`);
             this.notice = '';
             for(const [form, name, value] of fields) {
                 const el = this.querySelector(`[data-coach-form="${form}"] [name="${name}"]`);
@@ -116,7 +117,7 @@ class CoachingPanel extends HTMLElement {
             this.syncSport();
         } catch(error) {
             console.error('Unable to render coaching:', error);
-            this.innerHTML = `<p role="alert">Coaching unavailable: ${escape(error.message)}</p>`;
+            setHTML(this, html`<p role="alert">Coaching unavailable: ${error.message}</p>`);
         }
     }
     /** Shows only the setup fields of the sport of the selected goal type. */

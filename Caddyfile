@@ -4,8 +4,20 @@ app.example.com {
     reverse_proxy athlima:8080
     encode gzip
     header {
-        # Tell browsers to keep using HTTPS for this hostname for the next year.
-        Strict-Transport-Security "max-age=31536000"
+        # Tell browsers to keep using HTTPS for this hostname and its subdomains.
+        # Add "preload" only when every subdomain is HTTPS-only as well.
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         -Server
+    }
+    # Caddy's own error responses (for example an unreachable upstream) do not
+    # pass through the frontend container's headers, so repeat the essentials.
+    handle_errors {
+        header {
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            X-Content-Type-Options "nosniff"
+            Referrer-Policy "no-referrer"
+            -Server
+        }
+        respond "{err.status_code} {err.status_text}" {err.status_code}
     }
 }

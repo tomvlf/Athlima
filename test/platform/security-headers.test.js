@@ -36,7 +36,11 @@ test('authorizes the exact generated import map without allowing arbitrary inlin
     expect(result).not.toMatch(/script-src[^;]*'unsafe-(inline|eval)'/);
     expect(result).toContain("connect-src 'self' https://intervals.icu");
     expect(result).toContain("worker-src 'self'");
+    expect(result).toContain("require-trusted-types-for 'script'");
+    expect(result).toContain("trusted-types athlima");
     expect(result).toContain('bluetooth=(self), serial=(self), usb=(self), screen-wake-lock=(self)');
+    expect(result).toContain('add_header Cross-Origin-Opener-Policy "same-origin" always;');
+    expect(result).toContain('add_header Cross-Origin-Resource-Policy "same-origin" always;');
     expect(headers(`<script type=importmap>${content.replace('app.12345678', 'app.87654321')}</script>`))
         .not.toContain(`'sha256-${hash}'`);
 });
