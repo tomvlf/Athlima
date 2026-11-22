@@ -9,6 +9,7 @@
 import { equals, existance, exists,
          empty, first, last, repeat,
          capitalize, toFixed } from '../functions.js';
+import { parseXML } from '../html.js';
 
 /** Encode text/attribute values so imported names and descriptions cannot inject XML. */
 function escapeXML(value) {
@@ -1097,11 +1098,9 @@ const Elements = {
 const head = Head();
 const body = Body();
 
-const parser    = new DOMParser();
-
 /** Parse XML and reject the browser's error document before it reaches the workout converters. */
 function parseDocument(zwo) {
-    const doc = parser.parseFromString(String(zwo ?? ''), 'text/xml');
+    const doc = parseXML(zwo);
     if(doc.querySelector('parsererror')) throw new Error('This workout file is not valid ZWO XML.');
     return doc;
 }

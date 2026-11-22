@@ -1,9 +1,9 @@
 /**
  * Safe HTML construction for the interface. `html` interpolates values as text unless they are
  * fragments created by `html`/`raw`, so imported names, descriptions and provider values cannot
- * become page instructions. `setHTML`/`insertHTML` are the only places that hand markup to the
- * browser; they create TrustedHTML through the `athlima` policy, which lets the Content Security
- * Policy enforce that every assignment goes through this module.
+ * become page instructions. `setHTML`/`insertHTML` and `parseXML` are the only places that hand
+ * markup to the browser; they create TrustedHTML through the `athlima` policy, which lets the
+ * Content Security Policy enforce that every assignment goes through this module.
  *
  * Use `raw` only for markup that is already safe by construction, such as numeric-only charts.
  * It is an explicit trust decision, not a general escape hatch.
@@ -75,15 +75,14 @@ function trusted(value) {
     const factory = globalThis.trustedTypes;
     if(!factory || typeof factory.createPolicy !== 'function') return value.toString();
     if(!policy) {
-        try {
-            policy = factory.createPolicy('athlima', {createHTML: input => input});
-        } catch(error) {
-            // A policy name can only be created once per document. Fall back to the string when
-            // another module already created it (tests, hot reload); enforcement still applies.
-            return value.toString();
-        }
+        policy = factory.createPolicy('athlima', {createHTML: input => input});
     }
     return policy.createHTML(value.toString());
+}
+
+/** Parse XML through the same Trusted Types policy used by the interface's HTML sinks. */
+export function parseXML(value) {
+    return new DOMParser().parseFromString(trusted(raw(value)), 'text/xml');
 }
 
 /** Replace an element's children with a trusted fragment. */

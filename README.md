@@ -347,8 +347,9 @@ The Docker build generates a Content Security Policy from the exact built HTML,
 including hashes for Parcel's inline import map. Scripts cannot use arbitrary
 inline code or `eval`; connections are limited to this origin and Intervals.icu.
 Trusted Types (`require-trusted-types-for 'script'`) requires every HTML update
-to pass through the app's single `athlima` policy, so a plain string cannot be
-assigned to an HTML sink. Inline styles remain allowed for the existing dynamic
+and XML parser input to pass through the app's single `athlima` policy, so a
+plain string cannot be assigned to an enforced sink. XML remains parsed as inert
+XML rather than HTML. Inline styles remain allowed for the existing dynamic
 UI. Anti-framing, cross-origin isolation, MIME-sniffing, referrer and
 device-permission headers also apply to error pages. Other static hosts must
 configure equivalent headers themselves. Do not reuse the generated CSP after

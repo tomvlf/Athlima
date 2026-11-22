@@ -3,7 +3,7 @@
  * Exercises the shared safe-HTML helpers: text escaping, fragment pass-through, array rendering,
  * the explicit raw escape hatch and the refusal to accept unmarked strings at a DOM sink.
  */
-import { html, raw, setHTML, insertHTML, escapeHTML, isHTML, textOf } from '../src/html.js';
+import { html, raw, setHTML, insertHTML, parseXML, escapeHTML, isHTML, textOf } from '../src/html.js';
 
 test('escapes interpolated text but keeps markup fragments intact', () => {
     const name = '<img src=x onerror=alert(1)> & "friends"';
@@ -48,17 +48,27 @@ test('DOM sinks refuse plain strings', () => {
     expect(() => insertHTML(element, 'beforeend', '<b>plain</b>')).toThrow(TypeError);
 });
 
-test('creates the named Trusted Types policy when the browser supports it', () => {
-    const createHTML = jest.fn(input => input);
+test('uses the named Trusted Types policy for HTML sinks and XML parsing', () => {
+    const trustedValue = {trusted: true};
+    const createHTML = jest.fn(() => trustedValue);
     const createPolicy = jest.fn(() => ({createHTML}));
     const previous = globalThis.trustedTypes;
+    const previousDOMParser = globalThis.DOMParser;
+    const parseFromString = jest.fn(() => 'parsed');
     globalThis.trustedTypes = {createPolicy};
+    globalThis.DOMParser = class {
+        parseFromString = parseFromString;
+    };
     try {
         const element = document.createElement('div');
         setHTML(element, html`<b>${'safe'}</b>`);
+        expect(parseXML('<workout_file />')).toBe('parsed');
         expect(createPolicy).toHaveBeenCalledWith('athlima', {createHTML: expect.any(Function)});
         expect(createHTML).toHaveBeenCalledWith('<b>safe</b>');
+        expect(createHTML).toHaveBeenCalledWith('<workout_file />');
+        expect(parseFromString).toHaveBeenCalledWith(trustedValue, 'text/xml');
     } finally {
         globalThis.trustedTypes = previous;
+        globalThis.DOMParser = previousDOMParser;
     }
 });
