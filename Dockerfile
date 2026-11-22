@@ -14,9 +14,10 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
 ARG ATHLIMA_BUILD_VERSION=development
 ARG ATHLIMA_BUILD_REVISION=
-# Embed the release label, build the app, then authorize its exact inline scripts.
+# Require passing tests before embedding the release label and building the app.
 # Security-header hashes must be regenerated whenever the built HTML changes.
-RUN node scripts/write-build-info.mjs src/platform/build-info.json \
+RUN npm test -- --runInBand \
+    && node scripts/write-build-info.mjs src/platform/build-info.json \
     && npm run build \
     && node scripts/write-security-headers.mjs dist/index.html /app/security-headers.conf
 

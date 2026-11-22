@@ -20,12 +20,20 @@ function javascriptFiles(directory) {
 
 const files = javascriptFiles(root).map(path => ({path, relative: relative(process.cwd(), path)}));
 
-test('no application module assigns HTML strings to DOM sinks', () => {
-    const sinks = /(?:\.innerHTML\s*=|insertAdjacentHTML\s*\(|\.outerHTML\s*=|document\.write\s*\()/;
+test('no application module bypasses the shared HTML and XML sinks', () => {
+    const sinks = /(?:\.innerHTML\s*=|insertAdjacentHTML\s*\(|\.outerHTML\s*=|document\.write\s*\(|\.parseFromString\s*\()/;
     const offenders = files
         .filter(file => !allowed.has(file.relative))
         .filter(file => sinks.test(readFileSync(file.path, 'utf8')))
         .map(file => file.relative);
+    expect(offenders).toEqual([]);
+});
+
+test('worker and service-worker entry points use trustedScriptURL', () => {
+    const workerSink = /(?:new\s+(?:Worker|SharedWorker)\s*\(|serviceWorker\s*\.\s*register\s*\()(?!\s*trustedScriptURL\s*\()/;
+    const offenders = files.filter(file => workerSink.test(
+        readFileSync(file.path, 'utf8').replace(/^\s*\/\/.*$/gm, ''),
+    )).map(file => file.relative);
     expect(offenders).toEqual([]);
 });
 

@@ -145,6 +145,12 @@ creates browser-ready files in `dist/`; it does not publish them or start a
 server. See [testing explained](doc/code-guide.md#reading-and-running-tests) for
 smaller test commands and the limits of what they prove.
 
+The regular test suite includes enforcing Trusted Types regressions for ZWO
+parsing, timer-worker startup, service-worker registration and policy reuse across
+separately loaded modules. Source guards also reject unwrapped XML and worker
+sinks. These simulate enforcement; they do not replace an Android browser check.
+Docker builds run the suite before packaging, so failing tests block publication.
+
 For HTTPS development, use:
 
 ```bash
