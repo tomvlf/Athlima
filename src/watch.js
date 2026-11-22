@@ -12,9 +12,10 @@ import { idb } from './storage/idb.js';
 import { ControlMode, } from './ble/enums.js';
 import { TimerStatus, EventType, } from './activity/enums.js';
 import { stopRide } from './activity/stop.js';
+import { trustedScriptURL } from './html.js';
 
 // const timer = new Worker('./timer.js');
-const timer = new Worker(new URL('./timer.js', import.meta.url), {type: 'module'});
+const timer = new Worker(trustedScriptURL(new URL('./timer.js', import.meta.url)), {type: 'module'});
 
 /**
  * Keep the current ride clock, interval position and automatic pause/start counters. Constructor

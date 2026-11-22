@@ -3,7 +3,8 @@
  * Exercises the shared safe-HTML helpers: text escaping, fragment pass-through, array rendering,
  * the explicit raw escape hatch and the refusal to accept unmarked strings at a DOM sink.
  */
-import { html, raw, setHTML, insertHTML, parseXML, escapeHTML, isHTML, textOf } from '../src/html.js';
+import { html, raw, setHTML, insertHTML, parseXML, trustedScriptURL,
+         escapeHTML, isHTML, textOf } from '../src/html.js';
 
 test('escapes interpolated text but keeps markup fragments intact', () => {
     const name = '<img src=x onerror=alert(1)> & "friends"';
@@ -48,12 +49,16 @@ test('DOM sinks refuse plain strings', () => {
     expect(() => insertHTML(element, 'beforeend', '<b>plain</b>')).toThrow(TypeError);
 });
 
-test('uses the named Trusted Types policy for HTML sinks and XML parsing', () => {
+test('uses the named Trusted Types policy for HTML, XML and worker URL sinks', () => {
     const trustedValue = {trusted: true};
+    const trustedURL = {trustedURL: true};
     const createHTML = jest.fn(() => trustedValue);
-    const createPolicy = jest.fn(() => ({createHTML}));
+    const createScriptURL = jest.fn(() => trustedURL);
+    const createPolicy = jest.fn(() => ({createHTML, createScriptURL}));
     const previous = globalThis.trustedTypes;
     const previousDOMParser = globalThis.DOMParser;
+    const policyKey = Symbol.for('athlima.trusted-types-policy');
+    const previousPolicy = globalThis[policyKey];
     const parseFromString = jest.fn(() => 'parsed');
     globalThis.trustedTypes = {createPolicy};
     globalThis.DOMParser = class {
@@ -63,12 +68,23 @@ test('uses the named Trusted Types policy for HTML sinks and XML parsing', () =>
         const element = document.createElement('div');
         setHTML(element, html`<b>${'safe'}</b>`);
         expect(parseXML('<workout_file />')).toBe('parsed');
-        expect(createPolicy).toHaveBeenCalledWith('athlima', {createHTML: expect.any(Function)});
+        const workerURL = new URL('/timer.js', window.location.href);
+        expect(trustedScriptURL(workerURL)).toBe(trustedURL);
+        expect(() => trustedScriptURL('https://third-party.example/timer.js')).toThrow(TypeError);
+        expect(createPolicy).toHaveBeenCalledWith('athlima', {
+            createHTML: expect.any(Function),
+            createScriptURL: expect.any(Function),
+        });
         expect(createHTML).toHaveBeenCalledWith('<b>safe</b>');
         expect(createHTML).toHaveBeenCalledWith('<workout_file />');
         expect(parseFromString).toHaveBeenCalledWith(trustedValue, 'text/xml');
+        expect(createScriptURL).toHaveBeenCalledWith(workerURL.href);
     } finally {
         globalThis.trustedTypes = previous;
         globalThis.DOMParser = previousDOMParser;
+        if(previousPolicy) {
+            Object.defineProperty(globalThis, policyKey, {value: previousPolicy, configurable: true});
+        }
+        else delete globalThis[policyKey];
     }
 });

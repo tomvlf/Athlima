@@ -30,8 +30,8 @@ const policy = [
     "default-src 'none'",
     `script-src 'self' ${[...hashes].join(' ')}`.trim(),
     "script-src-attr 'none'",
-    // Every DOM HTML sink goes through src/html.js, which creates TrustedHTML with
-    // this policy name. A plain string assignment is rejected by the browser.
+    // Every enforced markup and script-URL sink goes through src/html.js, which
+    // creates trusted values with this policy name. Plain strings are rejected.
     "require-trusted-types-for 'script'",
     "trusted-types athlima",
     "style-src 'self' 'unsafe-inline'",

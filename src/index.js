@@ -14,6 +14,7 @@ import './ant/ant.js';
 import './watch.js';
 import './course.js';
 import './lock.js';
+import { trustedScriptURL } from './html.js';
 
 /**
  * Registers the app service worker when the browser supports it.
@@ -28,7 +29,7 @@ function startServiceWorker() {
             // const reg = navigator.serviceWorker.register('./sw.js');
 
             const reg = navigator.serviceWorker.register(
-                new URL('./sw.js', import.meta.url),
+                trustedScriptURL(new URL('./sw.js', import.meta.url)),
                 {type: 'module'}
             );
 

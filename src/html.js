@@ -1,9 +1,10 @@
 /**
  * Safe HTML construction for the interface. `html` interpolates values as text unless they are
  * fragments created by `html`/`raw`, so imported names, descriptions and provider values cannot
- * become page instructions. `setHTML`/`insertHTML` and `parseXML` are the only places that hand
- * markup to the browser; they create TrustedHTML through the `athlima` policy, which lets the
- * Content Security Policy enforce that every assignment goes through this module.
+ * become page instructions. `setHTML`/`insertHTML`, `parseXML` and `trustedScriptURL` are the only
+ * places that hand markup or script URLs to the browser. They create trusted values through the
+ * `athlima` policy, which lets the Content Security Policy enforce that every assignment goes
+ * through this module.
  *
  * Use `raw` only for markup that is already safe by construction, such as numeric-only charts.
  * It is an explicit trust decision, not a general escape hatch.
@@ -62,7 +63,20 @@ export function html(strings, ...values) {
 /** Fragment text for tests and for composing with DOM APIs that accept text. */
 export const textOf = value => render(value);
 
-let policy;
+const policyKey = Symbol.for('athlima.trusted-types-policy');
+let policy = globalThis[policyKey];
+
+/** Reuse one policy across Parcel chunks; browsers allow a Trusted Types policy name only once. */
+function getPolicy(factory) {
+    policy = policy || globalThis[policyKey];
+    if(policy) return policy;
+    policy = factory.createPolicy('athlima', {
+        createHTML: input => input,
+        createScriptURL: input => input,
+    });
+    Object.defineProperty(globalThis, policyKey, {value: policy, configurable: true});
+    return policy;
+}
 
 /**
  * Convert a fragment to TrustedHTML when the browser supports Trusted Types. Without support (for
@@ -74,10 +88,18 @@ function trusted(value) {
     }
     const factory = globalThis.trustedTypes;
     if(!factory || typeof factory.createPolicy !== 'function') return value.toString();
-    if(!policy) {
-        policy = factory.createPolicy('athlima', {createHTML: input => input});
+    return getPolicy(factory).createHTML(value.toString());
+}
+
+/** Create a same-origin TrustedScriptURL for workers and service workers. */
+export function trustedScriptURL(value) {
+    const url = new URL(value, globalThis.location?.href);
+    if(!globalThis.location || url.origin !== globalThis.location.origin) {
+        throw new TypeError('Worker scripts must use same-origin URLs.');
     }
-    return policy.createHTML(value.toString());
+    const factory = globalThis.trustedTypes;
+    if(!factory || typeof factory.createPolicy !== 'function') return url.href;
+    return getPolicy(factory).createScriptURL(url.href);
 }
 
 /** Parse XML through the same Trusted Types policy used by the interface's HTML sinks. */
