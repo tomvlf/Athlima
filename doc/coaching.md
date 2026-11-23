@@ -206,6 +206,11 @@ saved to the workout library. The recorded ride still enters training history
 and load estimates, but it is treated as unplanned and does not trigger plan
 adaptation or revision changes.
 
+When Intervals.icu is linked, the athlete profile and activity history are
+refreshed before the selector reads the local coaching state. If a provider
+refresh is already running, Train Now waits for it. If refresh fails, the rider
+can cancel or explicitly continue using the last known local Coach data.
+
 Inputs are the athlete profile, goal, completed sessions before today, recent
 hard-session spacing, acute/chronic load, readiness signals, data sufficiency
 and the configured `coachingConfig`. The selector prefers a recovery ride when

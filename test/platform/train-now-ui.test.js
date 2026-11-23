@@ -11,6 +11,7 @@ import { db } from '../../src/db.js';
 import { coachingData } from '../../src/coaching/service.js';
 import { profile } from '../coaching/fixtures.js';
 import { trainNowWorkout } from '../../src/coaching/train-now.js';
+import intervals from '../../src/models/intervals.js';
 
 jest.mock('../../src/index.js', () => {
     queueMicrotask(() => globalThis.window.dispatchEvent(new CustomEvent('app:ready')));
@@ -85,4 +86,49 @@ test('Train Now refuses an unfinished ride, then generates and starts an ad-hoc 
     expect(xf.dispatch).toHaveBeenCalledWith('ui:watchStart');
     expect(xf.dispatch).toHaveBeenCalledWith('ui:workoutStart');
     expect(window.location.hash).toBe('#/player');
+
+    const syncedData = {
+        profile,
+        goal: null,
+        plan: null,
+        activities: [{id: 'latest-intervals-ride', day: '2026-01-01'}],
+        snapshots: [],
+    };
+    intervals.status.mockReturnValue({configured: true, connected: true, status: 'connected'});
+    intervals.syncProfile.mockResolvedValue({ftp: profile.ftp, weight: profile.weight});
+    intervals.sync.mockResolvedValue({connected: true, status: 'connected'});
+    coachingData.mockReturnValue(syncedData);
+    trainNowWorkout.mockClear();
+    intervals.syncProfile.mockClear();
+    intervals.sync.mockClear();
+    xf.dispatch.mockClear();
+    button.click();
+    await settle();
+    expect(intervals.syncProfile).toHaveBeenCalledTimes(1);
+    expect(intervals.sync).toHaveBeenCalledTimes(1);
+    expect(intervals.syncProfile.mock.invocationCallOrder[0])
+        .toBeLessThan(intervals.sync.mock.invocationCallOrder[0]);
+    expect(intervals.sync.mock.invocationCallOrder[0])
+        .toBeLessThan(trainNowWorkout.mock.invocationCallOrder[0]);
+    expect(trainNowWorkout).toHaveBeenCalledWith(expect.objectContaining({data: syncedData}));
+
+    window.location.hash = '/';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await settle();
+    trainNowWorkout.mockClear();
+    intervals.syncProfile.mockRejectedValueOnce(new Error('Intervals.icu unavailable'));
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValueOnce(false);
+    root.querySelector('[data-action="train-now"]').click();
+    await settle();
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('last known Coach data'));
+    expect(trainNowWorkout).not.toHaveBeenCalled();
+    expect(root.querySelector('#platform-message').textContent).toMatch(/cancelled/i);
+
+    intervals.syncProfile.mockRejectedValueOnce(new Error('Intervals.icu unavailable'));
+    confirm.mockReturnValueOnce(true);
+    root.querySelector('[data-action="train-now"]').click();
+    await settle();
+    expect(trainNowWorkout).toHaveBeenCalledWith(expect.objectContaining({data: syncedData}));
+    expect(root.querySelector('#platform-message').textContent).toMatch(/last known Coach data/i);
+    confirm.mockRestore();
 });

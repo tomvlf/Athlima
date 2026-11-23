@@ -167,6 +167,7 @@ export async function launchPlatform(root) {
     let selectedId = '';
     let integration;
     let integrationLoading = false;
+    let integrationSync = null;
     const activityDataCache = new Map();
     let busy = false;
     let ready = false;
@@ -521,28 +522,35 @@ export async function launchPlatform(root) {
      * detailed-data caches after success and restore visible integration status even on failure.
      */
     async function syncIntegration({profileSynced = false} = {}) {
-        if(integration?.status === 'running') return;
-        integration = {...intervals.status(), status: 'running'};
-        if(route === 'settings') render();
-        try {
-            if(!profileSynced) {
-                await intervals.syncProfile();
-                profileSyncError = '';
-                if(route === 'settings') render();
+        if(integrationSync) return integrationSync;
+        integrationSync = (async () => {
+            integration = {...intervals.status(), status: 'running'};
+            if(route === 'settings') render();
+            try {
+                if(!profileSynced) {
+                    await intervals.syncProfile();
+                    profileSyncError = '';
+                    if(route === 'settings') render();
+                }
+                await intervals.sync(coachingService(), current => {
+                    integration = current;
+                    if(route === 'settings') render();
+                    xf.dispatch('coaching:changed');
+                });
+                coachingService().syncPending = false;
+                activityDataCache.clear();
+                await refresh();
+            } finally {
+                integration = intervals.status();
+                render();
             }
-            await intervals.sync(coachingService(), current => {
-                integration = current;
-                if(route === 'settings') render();
-                xf.dispatch('coaching:changed');
-            });
-            coachingService().syncPending = false;
-            activityDataCache.clear();
-            await refresh();
+            report('Intervals.icu sync completed. Local Coach and training plan are up to date.');
+        })();
+        try {
+            return await integrationSync;
         } finally {
-            integration = intervals.status();
-            render();
+            integrationSync = null;
         }
-        report('Intervals.icu sync completed. Local Coach and training plan are up to date.');
     }
     /**
      * Report persistence and space use in Settings. Failure to read an estimate is not an error the
@@ -908,6 +916,19 @@ export async function launchPlatform(root) {
                 if(db.watchStatus !== 'stopped' || db.elapsed > 0) {
                     throw new Error('Finish and save your current ride before starting another workout.');
                 }
+                if(intervals.status().connected) {
+                    report('Syncing the latest Intervals.icu profile and activity history before Train Now...');
+                    try {
+                        await syncIntegration();
+                    } catch(error) {
+                        const continueWithKnown = confirm(`${error.message}\n\nContinue Train Now using the last known Coach data?`);
+                        if(!continueWithKnown) {
+                            report('Train Now cancelled because Intervals.icu could not be refreshed.', true);
+                            return;
+                        }
+                        report('Using the last known Coach data because Intervals.icu could not be refreshed.');
+                    }
+                }
                 const data = coachingData();
                 const {trainNowWorkout} = await import('../coaching/train-now.js');
                 const result = trainNowWorkout({data, asOf: today(data)});
@@ -1000,10 +1021,9 @@ export async function launchPlatform(root) {
                 return;
             } else if(action === 'reload') window.location.reload();
             else if(action === 'retry-rides') {
-                await refresh();
                 const {syncRecordedRides} = await import('../storage/ride-sync.js');
-                await syncRecordedRides(coachingService());
-                await refresh();
+                const sync = await syncRecordedRides(coachingService());
+                if(sync.planReviewRequired) await refresh();
                 db.activity = await engineModels.activity.restore();
                 render();
                 report('Local coaching history updated.');

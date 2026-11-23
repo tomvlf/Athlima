@@ -16,9 +16,29 @@ test('retries persisted pending recordings by stable identity and clears outbox 
     const pending = {id: 'ride', pendingSync: true, ride: {id: 'ride', duration: 123}, coachingWorkoutId: 'session'};
     idb.getAll.mockResolvedValue([pending, {id: 'old', pendingSync: false}]);
     const service = {recordRide: jest.fn().mockResolvedValue(null)};
-    expect(await syncRecordedRides(service)).toBe(1);
+    expect(await syncRecordedRides(service)).toEqual({synced: 1, planReviewRequired: true});
     expect(service.recordRide).toHaveBeenCalledWith(pending.ride, 'session');
     expect(idb.putChecked).toHaveBeenCalledWith('activity', {...pending, pendingSync: false, summary: {pendingSync: false}});
+});
+
+test('Train Now hand-off is saved without requesting plan review', async () => {
+    const pending = {
+        id: 'train-now', pendingSync: true,
+        ride: {id: 'train-now', duration: 1800, trainNow: true}, summary: {},
+    };
+    idb.getAll.mockResolvedValue([pending]);
+    const service = {recordRide: jest.fn().mockResolvedValue(null)};
+    expect(await syncRecordedRides(service)).toEqual({synced: 1, planReviewRequired: false});
+    expect(service.recordRide).toHaveBeenCalledWith(pending.ride, undefined);
+});
+
+test('mixed pending hand-offs still request plan review for a normal ride', async () => {
+    idb.getAll.mockResolvedValue([
+        {id: 'train-now', pendingSync: true, ride: {trainNow: true}, summary: {}},
+        {id: 'normal', pendingSync: true, ride: {trainNow: false}, summary: {}},
+    ]);
+    const service = {recordRide: jest.fn().mockResolvedValue(null)};
+    expect(await syncRecordedRides(service)).toEqual({synced: 2, planReviewRequired: true});
 });
 
 test('failed remote write leaves local outbox pending and surfaces the error', async () => {

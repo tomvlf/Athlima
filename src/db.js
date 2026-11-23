@@ -437,9 +437,9 @@ async function saveStoppedRide(_, db) {
         const record = await recording;
         try {
             const coach = coachingService();
-            await syncRecordedRides(coach);
+            const sync = await syncRecordedRides(coach);
             db.activity = await models.activity.restore();
-            if(!coach.syncPending) await coach.advance();
+            if(!coach.syncPending && sync.planReviewRequired) await coach.advance();
             xf.dispatch('coaching:changed');
         } catch(error) {
             console.error('Ride saved, but coaching could not be updated:', error);
@@ -550,9 +550,9 @@ xf.reg('app:start', async function(_, db) {
     db.activity = await models.activity.restore();
     try {
         await initializeCoaching();
-        await syncRecordedRides(coachingService());
+        const sync = await syncRecordedRides(coachingService());
         coachingService().syncPending = intervals.status().connected;
-        if(!coachingService().syncPending) await coachingService().advance();
+        if(!coachingService().syncPending && sync.planReviewRequired) await coachingService().advance();
         xf.dispatch('coaching:changed');
     } catch(error) {
         console.error('Unable to review coaching plan:', error);

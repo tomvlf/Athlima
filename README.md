@@ -109,7 +109,10 @@ moment and opens it in the ride screen. It ignores today's planned workout and
 the calendar: no planned session is replaced, moved or marked, and the generated
 session is not added to the library. It chooses from your Coach profile, goal,
 recent completed sessions, load, readiness signals and the Coach's configured
-rules. Recovery is preferred when subjective readiness reaches the caution
+rules. When Intervals.icu is linked, Train Now first refreshes the provider
+profile and activity history. If refresh fails, you can cancel or explicitly
+continue using the last known local Coach data.
+Recovery is preferred when subjective readiness reaches the caution
 threshold or recent load is well above baseline; quality work is considered only
 when history and recovery support it, and the Coach avoids repeating the same
 hard focus too often. The ride screen shows **Why this workout?** with the

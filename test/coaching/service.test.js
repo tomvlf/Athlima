@@ -200,6 +200,24 @@ describe('persistent coaching loop', () => {
         expect(service.data.activities.filter(a => a.id === 'same')).toHaveLength(1);
         expect(service.data.plan.revision).toBe(revision);
     });
+    test('Train Now rides enter history without adapting the plan or resolving a planned session', async () => {
+        const {service, setDate} = await setup();
+        const workout = service.data.plan.workouts[0];
+        const plan = JSON.parse(JSON.stringify(service.data.plan));
+        const revisions = JSON.parse(JSON.stringify(service.data.revisions));
+        setDate(workout.date);
+        await service.recordRide({
+            id: 'train-now', start: `${workout.date}T10:00:00Z`, duration: workout.duration,
+            normalizedPower: workout.targetIntensity * profile.ftp, trainNow: true,
+            trainNowReasoning: 'Readiness supported a hard session.',
+        }, workout.id);
+        expect(service.data.activities.find(activity => activity.id === 'train-now')).toMatchObject({
+            trainNow: true,
+            trainNowReasoning: 'Readiness supported a hard session.',
+        });
+        expect(service.data.plan).toEqual(plan);
+        expect(service.data.revisions).toEqual(revisions);
+    });
     test('batch imports are atomic and storage failures are explicit', async () => {
         const {service, storage, clock} = await setup();
         const before = JSON.parse(JSON.stringify(service.data));
