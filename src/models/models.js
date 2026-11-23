@@ -765,6 +765,8 @@ class Activity extends Model {
             averageCadence: ride.averageCadence,
             ftp: ride.ftp,
             powerProfile: summarizePowerProfile(ride.streams?.power),
+            trainNow: Boolean(db.workout?.trainNow),
+            trainNowReasoning: db.workout?.trainNow?.reasoning ?? null,
             pendingSync: true,
             status: {strava: 'none', intervals: 'none', trainingPeaks: 'none'},
         };

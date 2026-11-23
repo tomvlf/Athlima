@@ -256,7 +256,9 @@ export class CoachingService {
         const activity = normalizeActivity(raw, this.data.profile || undefined);
         const next = JSON.parse(JSON.stringify(this.data));
         next.activities.push(activity);
-        if(next.plan?.status === 'active') {
+        // A Train Now ride is ad-hoc by design: keep it in history and load, but never let it
+        // reschedule or adapt the active plan.
+        if(next.plan?.status === 'active' && raw.trainNow !== true) {
             const asOf = localDay(this.clock(), next.profile.timeZone);
             if(asOf >= next.plan.startDate && asOf <= next.plan.endDate) this.applyActivity(next, activity, asOf, explicitId);
         }

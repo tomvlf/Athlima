@@ -49,6 +49,7 @@ For a guided tour of the files and code, start with the [beginner's code guide](
 - fetches full-resolution power, heart-rate and cadence streams plus route previews on demand, with CSV export
 - uploads new FIT recordings back to Intervals.icu
 - includes a local, rule-based coaching engine for cycling/running planning and activity review
+- offers **Train Now**, an ad-hoc session chosen from readiness, recent load and history without changing the plan
 - automatically switches between mobile and desktop layouts as the window width changes
 - saves coaching, plans, workouts, recordings and calendar on this device
 - downloads and restores local backup files without including integration credentials
@@ -100,6 +101,21 @@ ranges on workout cards and individual targets in workout details. The Coach
 may include approved drills in suitable endurance slots; cadence is optional,
 not a diagnosis or a universal target. Ride comfortably and stop or return to
 your natural cadence if a drill causes discomfort or bouncing.
+
+## Train Now
+
+**Train Now** on the dashboard generates one cycling session for the current
+moment and opens it in the ride screen. It ignores today's planned workout and
+the calendar: no planned session is replaced, moved or marked, and the generated
+session is not added to the library. It chooses from your Coach profile, goal,
+recent completed sessions, load, readiness signals and the Coach's configured
+rules. Recovery is preferred when subjective readiness reaches the caution
+threshold or recent load is well above baseline; quality work is considered only
+when history and recovery support it, and the Coach avoids repeating the same
+hard focus too often. The ride screen shows **Why this workout?** with the
+reasons, and the explanation is kept with the recorded activity. Train Now is
+available without an active plan, but requires a configured cycling profile and
+FTP. Running profiles receive guidance to use the calendar instead.
 
 ## Current repo status
 

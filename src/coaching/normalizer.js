@@ -168,6 +168,9 @@ export function normalizeActivity(raw, profile = {timeZone: 'UTC'}) {
         bestEfforts, details,
         powerProfile: profileSamples(raw.powerProfile, 'power', 3000),
         heartRateProfile: profileSamples(raw.heartRateProfile, 'heart-rate', 255),
+        trainNow: raw.trainNow === true,
+        trainNowReasoning: typeof raw.trainNowReasoning === 'string'
+            ? raw.trainNowReasoning.slice(0, 2000) : null,
         hasPower: !!streams.power || power != null || avgPower != null,
         hasHeartRate: !!streams.heartRate || hr != null,
         hasPowerStream: !!streams.power, hasHeartRateStream: !!streams.heartRate,
@@ -197,6 +200,8 @@ export function fromRecordedRide(db, id, timestamp) {
     const complete = key => contiguous && valid(key) && records.every(r => Number.isFinite(r[key]));
     return {
         id, source: 'athlima', name: db.workout?.meta?.name || 'Free ride',
+        trainNow: Boolean(db.workout?.trainNow),
+        trainNowReasoning: db.workout?.trainNow?.reasoning ?? null,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         start: new Date(start).toISOString(),
         duration: db.elapsed, ftp: db.ftp, indoor: true,

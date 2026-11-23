@@ -205,6 +205,9 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 #ride-unsaved[hidden] { display: none; }
 .ride-settings { margin-top: 20px; border-top: 1px solid var(--platform-border); padding-top: 14px; }
 .ride-settings summary { cursor: pointer; color: var(--platform-muted); font-size: 13px; }
+.ride-train-now { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--platform-border); border-left: 3px solid var(--platform-accent); border-radius: 10px; background: color-mix(in srgb, var(--platform-accent) 6%, transparent); }
+.ride-train-now summary { cursor: pointer; font-weight: 650; }
+.ride-train-now p { margin: 8px 0 0; color: var(--platform-muted); line-height: 1.45; }
 .ride-sensors { margin-top: 14px; }
 .ride-adjust { display: grid; grid-template-columns: minmax(0, 160px) auto auto auto; align-items: end; justify-content: center; gap: 18px; margin-top: 14px; }
 #platform .ride-adjust label { margin: 0; min-width: 0; }

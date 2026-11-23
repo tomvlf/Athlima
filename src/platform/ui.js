@@ -69,6 +69,13 @@ const link = (route, text, className = '') => html`<a class="${className}" href=
 const empty = (text, route = 'library', action = 'Browse workouts') =>
     html`<div class="empty-state"><p>${text}</p>${link(route, action, 'button secondary')}</div>`;
 const stat = (label, value, unit = '') => html`<div class="stat"><span>${label}</span><strong>${value}<small>${unit}</small></strong></div>`;
+/**
+ * Offer the ad-hoc session without implying that it replaces the plan. The explanation appears on
+ * the ride screen after generation.
+ */
+const trainNowCard = () => card('Train Now', html`<p>Get the session that fits this moment. The Coach ignores today's plan and uses your recent training, readiness and goal.</p>
+    <div class="button-row"><button data-action="train-now">Train Now</button>${link('coach', 'Review Coach', 'button secondary')}</div>
+    <p class="muted">The reason for the choice appears when the ride opens. This does not change planned or calendar sessions.</p>`);
 
 /**
  * Launches the main training platform shell and hosts the navigation routing logic.
@@ -283,10 +290,12 @@ export async function launchPlatform(root) {
                 <p>${data?.plan?.status === 'active' ? 'No Coach session scheduled today. Follow your recovery guidance, or choose a ride.' : 'Build a training plan or choose a session from your library.'}</p>
                 ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
         if(mobile) return html`<section class="mobile-today panel hero"><p class="eyebrow">Today / ${today(data)}</p>${todayBody}</section>
+            ${trainNowCard()}
             ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
             ${card('Connect & ride', html`<div class="button-row">${link('player', 'Open ride controls', 'button secondary')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
             ${card('Up next', next.length ? html`<ul class="session-list">${next.slice(0, 2).map(workoutRow)}</ul>` : html`<p>No upcoming sessions.</p>`, '', true)}`;
         return html`<div class="dashboard-grid"><section class="panel hero"><p class="eyebrow">Today / ${today(data)}</p>${todayBody}</section>
+            ${trainNowCard()}
             ${card('This week', html`<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
                 ${stat('Plan completed to date', summary.adherence == null ? '--' : `${Math.round(summary.adherence * 100)}%`)}</div>
                 <p class="muted">${summary.due ? `${summary.completed} of ${summary.due} scheduled sessions through today completed or substituted.` : 'No plan sessions due yet.'}</p>
@@ -406,8 +415,9 @@ export async function launchPlatform(root) {
      */
     function player() {
         timeline = rideTimeline(db.workout, db.ftp, targetPower);
-        return html`<section class="ride-panel"><div class="ride-heading"><div><p class="eyebrow">Workout player</p><h2>${db.workout?.meta?.name || 'Free ride'}</h2></div>
+        return html`<section class="ride-panel"><div class="ride-heading"><div><p class="eyebrow">Workout player</p><h2>${db.workout?.meta?.name || 'Free ride'}${db.workout?.trainNow ? html` <span class="plan-chip">Train Now</span>` : ''}</h2></div>
             <span id="ride-status" role="status"></span></div>
+            ${db.workout?.trainNow ? html`<details class="ride-train-now" open><summary>Why this workout?</summary><p>${db.workout.trainNow.reasoning}</p></details>` : ''}
             <div class="ride-metrics">
                 <div class="ride-metric primary"><span>Target power</span><div><strong id="ride-target">--</strong><small>W</small></div>
                     <span class="ride-reading">Actual <b id="ride-power">--</b> W</span></div>
@@ -893,6 +903,26 @@ export async function launchPlatform(root) {
         void run(async () => {
             if(engineModels.activity?.pendingRecording && !['recover-download', 'recover-save'].includes(action)) {
                 throw new Error('Save or download the unsaved FIT recording before continuing.');
+            }
+            if(action === 'train-now') {
+                if(db.watchStatus !== 'stopped' || db.elapsed > 0) {
+                    throw new Error('Finish and save your current ride before starting another workout.');
+                }
+                const data = coachingData();
+                const {trainNowWorkout} = await import('../coaching/train-now.js');
+                const result = trainNowWorkout({data, asOf: today(data)});
+                if(data.profile.ftp !== db.ftp) {
+                    throw new Error('Update device FTP to match your Coach profile before using Train Now.');
+                }
+                const workout = toAppWorkout(result.workout);
+                // An ad-hoc session is not a planned session: record it as unplanned.
+                workout.coachingWorkoutId = null;
+                workout.trainNow = result.workout.trainNow;
+                xf.dispatch('workout', workout);
+                window.location.hash = '/player';
+                xf.dispatch('ui:watchStart');
+                xf.dispatch('ui:workoutStart');
+                return;
             }
             if(action === 'start-workout') {
                 if(db.watchStatus !== 'stopped' || db.elapsed > 0 || savingRide) {

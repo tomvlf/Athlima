@@ -119,10 +119,12 @@ export function activityDetailRows(activity = {}) {
 export function renderActivityDetails(activity) {
     const rows = activityDetailRows(activity);
     const description = typeof activity?.details?.description === 'string' ? activity.details.description.trim() : '';
-    if(!rows.length && !description) return '';
+    const trainNow = typeof activity?.trainNowReasoning === 'string' ? activity.trainNowReasoning.trim() : '';
+    if(!rows.length && !description && !trainNow) return '';
     return html`<details class="activity-details">
         <summary>All metrics</summary>
         ${description ? html`<p class="activity-details--description">${description}</p>` : ''}
+        ${trainNow ? html`<p class="activity-details--description"><strong>Why Train Now:</strong> ${trainNow}</p>` : ''}
         <dl>${rows.map(([label, value]) =>
             html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
     </details>`;

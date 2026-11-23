@@ -196,6 +196,35 @@ plan shows a warning; review the data, then archive and regenerate if it should
 affect the schedule. Warnings from plan generation (undated or old FTP/threshold
 pace, race readiness) remain visible after every adaptation.
 
+## Train Now
+
+**Train Now** (dashboard) asks the same Coach rules for one ad-hoc cycling
+session and starts it immediately. It deliberately does not read today's
+planned workout and does not reschedule, complete or replace anything in the
+plan or calendar. The generated session exists only for that ride and is not
+saved to the workout library. The recorded ride still enters training history
+and load estimates, but it is treated as unplanned and does not trigger plan
+adaptation or revision changes.
+
+Inputs are the athlete profile, goal, completed sessions before today, recent
+hard-session spacing, acute/chronic load, readiness signals, data sufficiency
+and the configured `coachingConfig`. The selector prefers a recovery ride when
+subjective signals reach the caution threshold or the 7-day load is well above
+the 42-day baseline. It considers a hard session only when data sufficiency is
+supported, load is not elevated, the configured hard-session spacing allows it,
+the current phase is not recovery/taper and recent planned sessions were not
+repeatedly missed. Quality focus is chosen from the goal's capability weights
+and penalised when that family was used recently. Duration uses the configured
+limit for today when available, otherwise a typical session length, capped by
+the recent longest session and the configured spike limit.
+
+The **Why this workout?** panel on the ride screen shows the reasoning (readiness,
+load, recent sessions, missed sessions, phase and progression level). The same
+text is stored with the recorded activity and shown under its metrics. This is
+decision support from the same heuristics as the planned Coach, not a diagnosis
+or a guarantee of the best possible session. Running profiles are directed to
+the calendar, because the player executes cycling workouts only.
+
 ## Running coach
 
 Choosing a running goal type (general running fitness, first 5 km, 5 km,
@@ -322,6 +351,7 @@ declared IANA time zone. Pure calculations take explicit dates and timestamps.
 | Workout Progression Engine | Build the prescribed steps for a session and level. | [workouts.js](../src/coaching/workouts.js): `progressWorkout` |
 | Library Workout Fitter | Find a suitable recipe and fit it to the allowed time/dose. | [library.js](../src/coaching/library.js): `zwoTemplate`, `coachCatalogue`, `fitWorkout`, `chooseLibraryWorkout`, `prescribeWorkout` |
 | Workout Scheduler | Place eligible sessions on available days. | [planner.js](../src/coaching/planner.js): `scheduleWorkouts` |
+| Train Now Selector | Choose one ad-hoc session from readiness, load and history without changing the plan. | [train-now.js](../src/coaching/train-now.js): `trainNowWorkout` |
 | Workout Matcher | Decide which planned session, if any, an activity supports. | [adaptation.js](../src/coaching/adaptation.js): `matchWorkout` |
 | Adaptation Engine | Adjust still-changeable work after new information. | [adaptation.js](../src/coaching/adaptation.js): `adaptPlan` |
 | Explanation Engine | Turn decisions into readable reasons. | [explanations.js](../src/coaching/explanations.js) |
@@ -341,6 +371,8 @@ validated rules are frozen into state snapshots and generated plan metadata.
 Mutating methods are asynchronous and must be awaited:
 `configure`, `importActivities`, `generate`, `recordRide`, `resolve`,
 `updateFeedback`, `advance`, `archive`. `clock` returns an ISO timestamp.
+`recordRide` accepts `trainNow: true` from an ad-hoc session: the activity is
+added to history, but plan matching and adaptation are skipped.
 `resolve` accepts `completed`, `substituted`, `failed`, `missed`, `recovery`,
 `feedback` or `unplanned` triggers as appropriate; completed/substituted outcomes
 require an actual activity, and a ride cannot satisfy two workouts. Prefer
