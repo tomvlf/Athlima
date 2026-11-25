@@ -1,25 +1,77 @@
-# GitHub runs this release workflow on the configured branch/tag pushes.
-# It publishes website images, not users' local training data.
 name: Publish Docker image
 
 on:
+  pull_request:
+    branches: [master]
   push:
     branches: [master]
     tags: ["v*"]
 
-# Read source, publish a package and request a short-lived OIDC token for
-# keyless image signing. The token is only used by the signing step.
 permissions:
   contents: read
-  packages: write
-  id-token: write
 
 jobs:
-  publish:
+  validate:
+    name: container-security
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      # Actions are pinned to commit SHAs so a moved tag cannot change what runs
-      # with package-write permission. Dependabot proposes SHA updates.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build runtime image for validation
+        run: |
+          docker build \
+            --build-arg ATHLIMA_BUILD_VERSION=validation-${{ github.run_number }}.${{ github.run_attempt }} \
+            --build-arg ATHLIMA_BUILD_REVISION=${{ github.sha }} \
+            --tag athlima:scan \
+            .
+
+      - name: Verify hardened runtime configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          user="$(docker image inspect athlima:scan --format '{{.Config.User}}')"
+          test -n "$user"
+          test "$user" != "root"
+          test "$user" != "0"
+          healthcheck="$(docker image inspect athlima:scan --format '{{json .Config.Healthcheck}}')"
+          test -n "$healthcheck"
+          test "$healthcheck" != "null"
+
+      - name: Scan final image for high and critical vulnerabilities
+        shell: bash
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/workspace" \
+            aquasec/trivy:0.67.2 image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format json \
+            --output /workspace/trivy-image.json \
+            athlima:scan
+
+      - name: Upload image scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-athlima-image
+          path: trivy-image.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -28,7 +80,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Label default-branch images as latest and release images with their Git tag.
       - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: meta
         with:
@@ -37,8 +88,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
 
-      # Build with the Dockerfile and embed a traceable build number/source revision.
-      # Provenance and SBOM attestations let a deployer verify what the image contains.
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         id: build
         with:
@@ -46,14 +95,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: true
+          provenance: mode=max
           sbom: true
           build-args: |
             ATHLIMA_BUILD_VERSION=build-${{ github.run_number }}.${{ github.run_attempt }}
             ATHLIMA_BUILD_REVISION=${{ github.sha }}
 
-      # Sign the published digest with the workflow's OIDC identity (no long-lived key).
-      # Verify with: cosign verify ghcr.io/tomvlf/athlima@<digest>
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
       - name: Sign published image
