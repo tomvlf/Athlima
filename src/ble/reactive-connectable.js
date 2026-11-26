@@ -1,5 +1,5 @@
 /*
- * Bridges Bluetooth connections and Athlima's app events. Connection callbacks
+ * Bridges Bluetooth connections and Too Many Watts's app events. Connection callbacks
  * update device panels, decoded measurements feed the selected data sources,
  * and training-target changes become trainer commands. Most connection details
  * stay in Connectable; this file decides how they affect the running app.

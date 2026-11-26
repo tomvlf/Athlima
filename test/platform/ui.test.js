@@ -82,7 +82,7 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     await launchPlatform(root, {email: 'rider@example.com'});
     await settle();
     expect(document.body.classList.contains('mobile-app')).toBe(false);
-    expect(root.querySelector('.sidebar .brand').getAttribute('aria-label')).toBe('Athlima home');
+    expect(root.querySelector('.sidebar .brand').getAttribute('aria-label')).toBe('Too Many Watts home');
     expect(root.querySelector('.mobile-brand-mark').getAttribute('aria-hidden')).toBe('true');
     const versions = root.querySelector('.sidebar > .app-versions');
     expect(versions).not.toBeNull();
@@ -408,7 +408,7 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
 
     const profileData = {...coachingProfile, timeZone: 'UTC'};
     const synced = normalizeActivity({
-        id: 'synced', source: 'athlima', name: 'Synchronized ride', start: new Date().toISOString(), duration: 1800,
+        id: 'synced', source: 'too-many-watts', name: 'Synchronized ride', start: new Date().toISOString(), duration: 1800,
         distance: 12000, normalizedPower: 210, averagePower: 190, averageHeartRate: 140, rpe: 6,
     }, profileData);
     db.activity = [

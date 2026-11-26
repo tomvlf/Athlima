@@ -5,7 +5,7 @@
  * to close so an active ride is not switched to new code mid-session.
  */
 
-const cacheName = 'athlima-shell-v1';
+const cacheName = 'too-many-watts-shell-v1';
 /**
  * Allow only same-origin JavaScript, CSS, PNG, SVG and web-manifest files outside /api/. Not every
  * resource, such as a photograph or external response, is eligible for this cache.
@@ -23,7 +23,7 @@ async function cacheResponse(request, response) {
             const cache = await caches.open(cacheName);
             await cache.put(request, response.clone());
         } catch(error) {
-            console.warn('Athlima offline caching unavailable; using the network response.', error);
+            console.warn('Too Many Watts offline caching unavailable; using the network response.', error);
         }
     }
     return response;
@@ -74,7 +74,7 @@ self.addEventListener('fetch', event => {
             .catch(async () => (await caches.match(event.request)) || Response.error()));
     } else if(isAsset(url)) {
         event.respondWith(caches.match(event.request).catch(error => {
-            console.warn('Athlima offline cache unavailable; using the network.', error);
+            console.warn('Too Many Watts offline cache unavailable; using the network.', error);
             return null;
         }).then(cached => cached || fetch(event.request).then(response => cacheResponse(event.request, response))));
     }

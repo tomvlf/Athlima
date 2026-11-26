@@ -32,7 +32,7 @@ describe('Zwo', () => {
     test('Zwo.read without textevents', () => {
         const input = `
         <workout_file>
-            <author>Athlima</author>
+            <author>Too Many Watts</author>
             <name>Test Workout</name>
             <category>Sweet Spot</category>
             <subcategory></subcategory>
@@ -51,7 +51,7 @@ describe('Zwo', () => {
 
         const expected = {
             head: {
-                author: 'Athlima',
+                author: 'Too Many Watts',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",
@@ -77,7 +77,7 @@ describe('Zwo', () => {
     test('Zwo.read with textevents', () => {
         const input = `
             <workout_file>
-                <author>Athlima</author>
+                <author>Too Many Watts</author>
                 <name>Test Workout</name>
                 <category>Sweet Spot</category>
                 <subcategory></subcategory>
@@ -111,7 +111,7 @@ describe('Zwo', () => {
 
         const expected = {
             head: {
-                author: 'Athlima',
+                author: 'Too Many Watts',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",
@@ -157,7 +157,7 @@ describe('Zwo', () => {
     test('Zwo.readToInterval without textevents', () => {
         const input = `
         <workout_file>
-            <author>Athlima</author>
+            <author>Too Many Watts</author>
             <name>Test Workout</name>
             <category>Sweet Spot</category>
             <subcategory></subcategory>
@@ -177,7 +177,7 @@ describe('Zwo', () => {
         const expected = {
             // id: "{1ec20f99-b3d8-4eb9-c000-be96e947897a}",
             meta: {
-                author: 'Athlima',
+                author: 'Too Many Watts',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",
@@ -208,7 +208,7 @@ describe('Zwo', () => {
     test('Zwo.readToInterval with text events', () => {
         const input = `
             <workout_file>
-                <author>Athlima</author>
+                <author>Too Many Watts</author>
                 <name>Test Workout</name>
                 <category>Sweet Spot</category>
                 <subcategory></subcategory>
@@ -243,7 +243,7 @@ describe('Zwo', () => {
         const expected = {
             // id: "{1ec20f99-b3d8-4eb9-c000-be96e947897a}",
             meta: {
-                author: 'Athlima',
+                author: 'Too Many Watts',
                 name: "Test Workout",
                 category: "Sweet Spot",
                 subcategory: "",

@@ -12,7 +12,7 @@ import path from 'node:path';
 
 test('build metadata is embedded into the production frontend', () => {
     const root = process.cwd();
-    const workspace = mkdtempSync(path.join(tmpdir(), 'athlima-version-build-'));
+    const workspace = mkdtempSync(path.join(tmpdir(), 'too-many-watts-version-build-'));
     try {
         cpSync(path.join(root, 'src'), path.join(workspace, 'src'), {recursive: true});
         for(const name of ['package.json', '.babelrc', '.htmlnanorc']) {
@@ -28,15 +28,15 @@ test('build metadata is embedded into the production frontend', () => {
          * explicit fictional release values for the production-bundle check.
          */
         const env = {...process.env, NODE_ENV: 'production', BABEL_ENV: 'production',
-            ATHLIMA_BUILD_VERSION: '', ATHLIMA_BUILD_REVISION: ''};
+            TOO_MANY_WATTS_BUILD_VERSION: '', TOO_MANY_WATTS_BUILD_REVISION: ''};
         execFileSync(process.execPath, [generator, infoPath], {env});
         expect(JSON.parse(readFileSync(infoPath, 'utf8'))).toEqual({version: 'development', revision: null});
 
-        env.ATHLIMA_BUILD_VERSION = 'build-987.3';
-        env.ATHLIMA_BUILD_REVISION = '0123456789abcdef0123456789abcdef01234567';
+        env.TOO_MANY_WATTS_BUILD_VERSION = 'build-987.3';
+        env.TOO_MANY_WATTS_BUILD_REVISION = '0123456789abcdef0123456789abcdef01234567';
         execFileSync(process.execPath, [generator, infoPath], {env});
         expect(JSON.parse(readFileSync(infoPath, 'utf8'))).toEqual({
-            version: env.ATHLIMA_BUILD_VERSION, revision: env.ATHLIMA_BUILD_REVISION,
+            version: env.TOO_MANY_WATTS_BUILD_VERSION, revision: env.TOO_MANY_WATTS_BUILD_REVISION,
         });
 
         const dist = path.join(workspace, 'dist');
@@ -45,9 +45,9 @@ test('build metadata is embedded into the production frontend', () => {
         {cwd: workspace, env, timeout: 60000});
         const bundles = readdirSync(dist).filter(name => name.endsWith('.js'))
             .map(name => readFileSync(path.join(dist, name), 'utf8')).join('\n');
-        expect(bundles).toContain(env.ATHLIMA_BUILD_VERSION);
-        expect(bundles).toContain(env.ATHLIMA_BUILD_REVISION);
-        expect(bundles).not.toContain('process.env.ATHLIMA_BUILD_');
+        expect(bundles).toContain(env.TOO_MANY_WATTS_BUILD_VERSION);
+        expect(bundles).toContain(env.TOO_MANY_WATTS_BUILD_REVISION);
+        expect(bundles).not.toContain('process.env.TOO_MANY_WATTS_BUILD_');
     } finally {
         rmSync(workspace, {recursive: true, force: true});
     }

@@ -1,5 +1,5 @@
 /**
- * Names the browser storage used by Athlima. A scope is a prefix that keeps one set of saved data
+ * Names the browser storage used by Too Many Watts. A scope is a prefix that keeps one set of saved data
  * separate from another. The browser-only app normally uses an empty prefix; the older account
  * prefixes remain supported here but are not automatically loaded or merged. This is naming, not a
  * login system or access protection.
@@ -9,7 +9,7 @@ let scope = '';
 
 /** Choose the prefix for later storage operations; this does not move or erase any existing data. */
 export function setAccountScope(email) {
-    scope = email ? `athlima:${encodeURIComponent(email)}:` : '';
+    scope = email ? `too-many-watts:${encodeURIComponent(email)}:` : '';
 }
 
 /**

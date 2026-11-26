@@ -277,7 +277,7 @@ class CoachingPanel extends HTMLElement {
     historyTools() {
         return `<details class="coach-card">
             <summary>Training history and backup</summary>
-            <p class="muted">Rides you record in Athlima are added automatically. For better targets, connect
+            <p class="muted">Rides you record in Too Many Watts are added automatically. For better targets, connect
                 Intervals.icu in <a href="#/settings">Settings</a>, or paste activities in the documented JSON format below
                 (duration in seconds, ISO start time with offset; for runs add <code>"sport": "running"</code> and
                 <code>"distance"</code> in metres).</p>
@@ -388,7 +388,7 @@ class CoachingPanel extends HTMLElement {
 
                 <section class="coach-step">
                     <h3><span class="coach-step-number">4</span>Create your plan</h3>
-                    <p class="muted">Rides recorded in Athlima are included automatically. For runs and better targets, connect
+                    <p class="muted">Rides recorded in Too Many Watts are included automatically. For runs and better targets, connect
                         Intervals.icu in <a href="#/settings">Settings</a> before creating the plan; you can also import activities later.</p>
                     <details><summary>More options</summary>
                         <div class="coach-fields">
@@ -512,7 +512,7 @@ class CoachingPanel extends HTMLElement {
                 const profile = this.profileFrom(values, service), goal = this.goalFrom(values);
                 await service.configure(profile, goal);
                 await service.importActivities(db.activity.filter(a => a.duration > 0).map(a => ({
-                    id: a.id, duration: a.duration, source: 'athlima-summary',
+                    id: a.id, duration: a.duration, source: 'too-many-watts-summary',
                     start: new Date(a.timestamp - a.duration * 1000).toISOString(),
                 })));
                 if(event.submitter?.value === 'generate') {
@@ -571,7 +571,7 @@ class CoachingPanel extends HTMLElement {
                 this.notice = 'Upcoming sessions were made easier.';
             }
             if(action === 'export') {
-                fileHandler.download()(JSON.stringify(service.data, null, 2), 'athlima-coaching-history.json', 'application/json');
+                fileHandler.download()(JSON.stringify(service.data, null, 2), 'too-many-watts-coaching-history.json', 'application/json');
             }
             this.changed();
         } catch(error) {

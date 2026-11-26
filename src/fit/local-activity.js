@@ -1,5 +1,5 @@
 /*
- * Builds an exportable FIT activity from Athlima's samples, laps and timer events.
+ * Builds an exportable FIT activity from Too Many Watts's samples, laps and timer events.
  * First it creates an ordered FITjs record list with layouts and ride summaries;
  * then the binary encoder turns that list into bytes. Input timestamps are
  * JavaScript milliseconds, while elapsed/riding totals are seconds. Timer time

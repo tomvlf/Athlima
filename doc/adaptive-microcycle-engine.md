@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Adaptive Microcycle Engine (AME) reviews the next seven days of an existing Athlima Coach plan. It
+The Adaptive Microcycle Engine (AME) reviews the next seven days of an existing Too Many Watts Coach plan. It
 extends the deterministic Coach rather than creating a second planning system.
 
 ## Phases

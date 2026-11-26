@@ -1,8 +1,8 @@
-# Athlima brand guidelines
+# Too Many Watts brand guidelines
 
 ## Brand idea
 
-Athlima connects focused training with forward momentum. The rising A is the
+Too Many Watts connects focused training with forward momentum. The rising A is the
 road ahead; the forward-leaning rider and partial wheels make the mark
 recognizable as cycling without becoming a literal illustration. The blue to
 cyan to green gradient expresses progress.
@@ -67,13 +67,13 @@ Preview at actual size, particularly the 16 px favicon.
 
 ```css
 :root {
-  --athlima-blue: #1479f6;
-  --athlima-cyan: #27c9e8;
-  --athlima-green: #42e89b;
-  --athlima-dark: #061527;
-  --athlima-light: #f6f9fc;
-  --athlima-text-dark: #061527;
-  --athlima-text-light: #ffffff;
+  --too-many-watts-blue: #1479f6;
+  --too-many-watts-cyan: #27c9e8;
+  --too-many-watts-green: #42e89b;
+  --too-many-watts-dark: #061527;
+  --too-many-watts-light: #f6f9fc;
+  --too-many-watts-text-dark: #061527;
+  --too-many-watts-text-light: #ffffff;
 }
 ```
 
@@ -140,8 +140,8 @@ For example, install SVGO in a separate tools directory and set
 `SVGO_MODULE` to its absolute `node_modules/svgo/lib/svgo-node.js` path:
 
 ```sh
-npm install --prefix /tmp/athlima-brand-tools svgo
-SVGO_MODULE=/tmp/athlima-brand-tools/node_modules/svgo/lib/svgo-node.js \
+npm install --prefix /tmp/too-many-watts-brand-tools svgo
+SVGO_MODULE=/tmp/too-many-watts-brand-tools/node_modules/svgo/lib/svgo-node.js \
   node scripts/generate-brand-kits.mjs
 ```
 

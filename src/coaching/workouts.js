@@ -140,7 +140,7 @@ export function progressWorkout(args) {
 export function toAppWorkout(workout) {
     return {
         id: workout.id, coachingWorkoutId: workout.id,
-        meta: {name: workout.title, description: workout.description, author: workout.libraryName ? 'Athlima workout library, adjusted by the Coach' : 'Athlima deterministic coach',
+        meta: {name: workout.title, description: workout.description, author: workout.libraryName ? 'Too Many Watts workout library, adjusted by the Coach' : 'Too Many Watts deterministic coach',
             category: workout.family, startDateLocal: workout.date, duration: workout.duration},
         intervals: workout.steps.map(step => ({duration: step.duration, steps: [{...step}]})),
     };
@@ -160,7 +160,7 @@ export function exportZwo(workout, thresholdPace = workout.runThresholdPace) {
     }
     const tenKmSeconds = run ? predictedRaceSeconds(thresholdPace, 10) : null;
     const paceScale = run ? tenKmSeconds / (10 * thresholdPace) : 1;
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<workout_file><author>Athlima</author>` +
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<workout_file><author>Too Many Watts</author>` +
         `<name>${escape(workout.title)}</name><description>${escape(workout.description)}</description>` +
         `<sportType>${run ? 'run' : 'bike'}</sportType><workout>` +
         workout.steps.map(s => `<SteadyState Duration="${s.duration}" Power="${run ? round(s.power * paceScale) : s.power}"${run ? ' pace="2"' : ''}${Number.isFinite(s.cadence) ? ` Cadence="${s.cadence}"` : ''}/>`).join('') +

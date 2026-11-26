@@ -167,7 +167,7 @@ export async function restoreBackup(backup) {
         if(backup.planned) accountStorage.setItem('planned', JSON.stringify(backup.planned));
         if(backup.version === 2) {
             const storage = await openCoachingStorage(window.indexedDB);
-            try { await storage.setItem('athlima-coaching-v1', JSON.stringify(backup.coaching)); }
+            try { await storage.setItem('too-many-watts-coaching-v1', JSON.stringify(backup.coaching)); }
             catch(error) {
                 throw new Error(`Files and settings were restored, but coaching could not be restored. Retry: ${error.message}`);
             } finally { storage.close(); }

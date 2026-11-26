@@ -13,5 +13,5 @@ Disallow: /sw.js
 
 Allow: /images/
 
-Sitemap: https://athlima.com/sitemap.xml
+Sitemap: https://too-many-watts.com/sitemap.xml
 

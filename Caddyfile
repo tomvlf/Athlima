@@ -1,7 +1,7 @@
 # Replace this example with a hostname you control and point its DNS to this host.
 # Caddy manages HTTPS certificates and forwards requests to the static frontend.
 app.example.com {
-    reverse_proxy athlima:8080
+    reverse_proxy too-many-watts:8080
     encode gzip
     header {
         # Tell browsers to keep using HTTPS for this hostname and its subdomains.

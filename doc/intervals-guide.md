@@ -2,13 +2,13 @@
 
 ## What connecting does
 
-Intervals.icu is a separate online training service. Connecting it lets Athlima
+Intervals.icu is a separate online training service. Connecting it lets Too Many Watts
 copy activities into your local history, read planned workouts and send recorded
-FIT rides back to that service. **You can use Athlima without connecting it.**
+FIT rides back to that service. **You can use Too Many Watts without connecting it.**
 
 The connection goes directly from your browser to Intervals.icu, not through an
-Athlima server. Your Coach plans and imported history are still saved in this
-browser. Connecting is not automatic synchronization of your complete Athlima
+Too Many Watts server. Your Coach plans and imported history are still saved in this
+browser. Connecting is not automatic synchronization of your complete Too Many Watts
 setup between devices; use a [local backup](backend.md#back-up-and-restore) for that.
 
 An **API** is a way for one program to exchange data with another. A personal
@@ -18,15 +18,15 @@ It is not a value to paste into source code, screenshots, bug reports or a URL.
 ## Connect
 
 1. Get your personal API key from Intervals.icu Settings.
-2. Open **Athlima Settings**, find Intervals.icu, and enter the key and history
+2. Open **Too Many Watts Settings**, find Intervals.icu, and enter the key and history
    start date. That date controls how far back the first import goes.
-3. Choose **Test & connect**. Athlima checks which athlete the key belongs to;
+3. Choose **Test & connect**. Too Many Watts checks which athlete the key belongs to;
    you do not need to enter an athlete ID yourself.
 4. FTP and body mass are refreshed automatically. Choose **Import history** and
    keep the app open while it works. Check the displayed progress and any errors.
 
 FTP is the cycling power reference used to scale workout targets, and body mass
-is your weight. While connected, Athlima treats Intervals.icu as the source of
+is your weight. While connected, Too Many Watts treats Intervals.icu as the source of
 these two values and makes local editing read-only.
 
 ### How the key is handled
@@ -49,7 +49,7 @@ redirects, avoid response caching and have a timeout.
 ## Local history and coaching
 
 **Sync** means fetch and refresh local history. To keep a large import
-manageable, Athlima works through 31-day date batches, like reading a book a
+manageable, Too Many Watts works through 31-day date batches, like reading a book a
 chapter at a time. It checks the received activities before saving them.
 
 All sports are imported. Cycling contributes to cycling coaching; running
@@ -95,12 +95,12 @@ earlier batches back.
   retained full-resolution streams. CSV is a table file that spreadsheet
   programs can open.
 - Uploading a recorded ride sends its FIT file as multipart form data to the
-  resolved athlete. A stable `athlima:` external ID prevents re-import from
+  resolved athlete. A stable `too-many-watts:` external ID prevents re-import from
   duplicating the local recording. Only this prefix links imports to local
   recordings; activities with other external-ID prefixes import separately.
 
 The stable ID is a label that lets a later import recognize an uploaded local
-ride. Uploading a FIT file does not upload your whole Athlima database, backups
+ride. Uploading a FIT file does not upload your whole Too Many Watts database, backups
 or Coach plan. Disconnecting or deleting a local record does not delete a copy
 already uploaded to the provider.
 
@@ -125,7 +125,7 @@ Reconnect separately on another browser or device;
 backup files intentionally do not include API keys.
 
 Authentication, rate-limit, network and malformed-response failures are shown
-explicitly. No request falls back to an Athlima server.
+explicitly. No request falls back to an Too Many Watts server.
 
 ### If something goes wrong
 

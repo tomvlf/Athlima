@@ -1,5 +1,5 @@
 /*
- * Athlima's chosen subset of FIT messages/fields for activity export.
+ * Too Many Watts's chosen subset of FIT messages/fields for activity export.
  * Each entry is [message name, ordered fields, local message number]. A field
  * may instead be [name, byte size], as for the ten-byte array of beat intervals.
  * The global profile supplies each field's type and units; this list chooses

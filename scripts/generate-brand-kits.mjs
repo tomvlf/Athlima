@@ -16,7 +16,7 @@ const green = "#42e89b";
 const white = "#ffffff";
 
 function outline(text, font, prefix) {
-    const dir = mkdtempSync(join(tmpdir(), "athlima-wordmark-"));
+    const dir = mkdtempSync(join(tmpdir(), "too-many-watts-wordmark-"));
     const path = join(dir, "outline.svg");
     let svg;
     try {
@@ -40,9 +40,9 @@ function outline(text, font, prefix) {
     };
 }
 
-const word = outline("Athlima", "Lato Heavy 100", "word");
+const word = outline("Too Many Watts", "Lato Heavy 100", "word");
 const tagline = outline("TRAIN   PROGRESS   FURTHER", "Lato Medium 16", "tag");
-const gradient = `<linearGradient id="athlima-gradient" x1="0" y1="190" x2="300" y2="30" gradientUnits="userSpaceOnUse"><stop stop-color="${blue}"/><stop offset=".52" stop-color="${cyan}"/><stop offset="1" stop-color="${green}"/></linearGradient>`;
+const gradient = `<linearGradient id="too-many-watts-gradient" x1="0" y1="190" x2="300" y2="30" gradientUnits="userSpaceOnUse"><stop stop-color="${blue}"/><stop offset=".52" stop-color="${cyan}"/><stop offset="1" stop-color="${green}"/></linearGradient>`;
 const shapes = {
     production: `<g id="a-and-rear-wheel">
       <path d="M8 192 119 35c14-20 32-19 43 2L58 192Z"/>
@@ -67,11 +67,11 @@ const shapes = {
 };
 
 function svg(width, height, viewBox, body) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="${viewBox}" role="img" aria-label="Athlima"><defs>${gradient}</defs>${body}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="${viewBox}" role="img" aria-label="Too Many Watts"><defs>${gradient}</defs>${body}</svg>`;
 }
 
-function mark(kind, fill = "url(#athlima-gradient)", transform = "") {
-    return `<g id="athlima-mark" fill="${fill}"${transform ? ` transform="${transform}"` : ""}>${shapes[kind]}</g>`;
+function mark(kind, fill = "url(#too-many-watts-gradient)", transform = "") {
+    return `<g id="too-many-watts-mark" fill="${fill}"${transform ? ` transform="${transform}"` : ""}>${shapes[kind]}</g>`;
 }
 
 function lettering(data, x, y, width, height, color, id) {
@@ -82,13 +82,13 @@ function icon(kind, background, scale = 2.45) {
     const x = (1024 - 320 * scale) / 2;
     const y = (1024 - 210 * scale) / 2;
     return svg(256, 256, "0 0 1024 1024",
-        `${background ? `<path id="background" fill="${background}" d="M0 0h1024v1024H0z"/>` : ""}${mark(kind, "url(#athlima-gradient)", `translate(${x} ${y}) scale(${scale})`)}`);
+        `${background ? `<path id="background" fill="${background}" d="M0 0h1024v1024H0z"/>` : ""}${mark(kind, "url(#too-many-watts-gradient)", `translate(${x} ${y}) scale(${scale})`)}`);
 }
 
 function favicon(kind) {
     if (kind === "reference") return icon(kind, dark, 2.7);
     return svg(256, 256, "0 0 1024 1024", `<path id="background" fill="${dark}" d="M0 0h1024v1024H0z"/>
-      <g id="small-size-mark" transform="translate(48 207) scale(2.9)" fill="url(#athlima-gradient)">
+      <g id="small-size-mark" transform="translate(48 207) scale(2.9)" fill="url(#too-many-watts-gradient)">
         <path d="M8 192 119 35c14-20 32-19 43 2L58 192Z"/>
         <path d="m76 192 29-34c7-8 15-8 23 0l32 34Z"/>
         <circle cx="257" cy="27" r="23"/>
@@ -99,15 +99,15 @@ function favicon(kind) {
 
 function foreground(kind) {
     // The mark stays inside Android's central 66dp safe circle on a 108dp canvas.
-    return svg(256, 256, "0 0 1080 1080", mark(kind, "url(#athlima-gradient)", "translate(270 363) scale(1.7)"));
+    return svg(256, 256, "0 0 1080 1080", mark(kind, "url(#too-many-watts-gradient)", "translate(270 363) scale(1.7)"));
 }
 
-function horizontal(kind, color, fill = "url(#athlima-gradient)") {
+function horizontal(kind, color, fill = "url(#too-many-watts-gradient)") {
     return svg(900, 260, "0 0 900 260",
         `${mark(kind, fill, "translate(12 22) scale(1.08)")}${lettering(word, 385, 49, 500, 170, color, "wordmark")}`);
 }
 
-function stacked(kind, color, fill = "url(#athlima-gradient)") {
+function stacked(kind, color, fill = "url(#too-many-watts-gradient)") {
     return svg(500, 500, "0 0 500 500",
         `${mark(kind, fill, "translate(74 12) scale(1.1)")}${lettering(word, 35, 249, 430, 146, color, "wordmark")}${lettering(tagline, 70, 394, 360, 42, color, "tagline")}`);
 }

@@ -165,7 +165,7 @@ test('renders real profiles, safe labels, feedback, and retained FIT actions in 
     expect(root.querySelector('.power-profile--recorded')).toBeNull();
     expect(root.textContent).toContain('No recorded power profile');
     expect(root.querySelector('[data-upload-ride]')).toBeNull();
-    root.innerHTML = `<table><tbody>${historyActivityRow({...activity, source: 'athlima'}, null, false)}</tbody></table>`;
+    root.innerHTML = `<table><tbody>${historyActivityRow({...activity, source: 'too-many-watts'}, null, false)}</tbody></table>`;
     expect(root.querySelector('[data-delete-ride]').dataset.deleteRide).toBe(activity.id);
 });
 

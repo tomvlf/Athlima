@@ -1,5 +1,5 @@
 /*
- * Turns decoded FIT distance/altitude samples into Athlima's course shape.
+ * Turns decoded FIT distance/altitude samples into Too Many Watts's course shape.
  * Distances and elevations are metres; slopes are percent rise over horizontal
  * distance. Missing elevations reuse the preceding elevation, and a simplified
  * point list supports the course graph alongside the original detail.

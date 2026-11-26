@@ -57,7 +57,7 @@ test('uses the named Trusted Types policy for HTML, XML and worker URL sinks', (
     const createPolicy = jest.fn(() => ({createHTML, createScriptURL}));
     const previous = globalThis.trustedTypes;
     const previousDOMParser = globalThis.DOMParser;
-    const policyKey = Symbol.for('athlima.trusted-types-policy');
+    const policyKey = Symbol.for('too-many-watts.trusted-types-policy');
     const previousPolicy = globalThis[policyKey];
     const parseFromString = jest.fn(() => 'parsed');
     globalThis.trustedTypes = {createPolicy};
@@ -71,7 +71,7 @@ test('uses the named Trusted Types policy for HTML, XML and worker URL sinks', (
         const workerURL = new URL('/timer.js', window.location.href);
         expect(trustedScriptURL(workerURL)).toBe(trustedURL);
         expect(() => trustedScriptURL('https://third-party.example/timer.js')).toThrow(TypeError);
-        expect(createPolicy).toHaveBeenCalledWith('athlima', {
+        expect(createPolicy).toHaveBeenCalledWith('too-many-watts', {
             createHTML: expect.any(Function),
             createScriptURL: expect.any(Function),
         });

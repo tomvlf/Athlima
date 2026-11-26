@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 let directory;
-beforeEach(() => { directory = mkdtempSync(join(tmpdir(), 'athlima-headers-')); });
+beforeEach(() => { directory = mkdtempSync(join(tmpdir(), 'too-many-watts-headers-')); });
 afterEach(() => { rmSync(directory, {recursive: true, force: true}); });
 
 /**
@@ -37,7 +37,7 @@ test('authorizes the exact generated import map without allowing arbitrary inlin
     expect(result).toContain("connect-src 'self' https://intervals.icu");
     expect(result).toContain("worker-src 'self'");
     expect(result).toContain("require-trusted-types-for 'script'");
-    expect(result).toContain("trusted-types athlima");
+    expect(result).toContain("trusted-types too-many-watts");
     expect(result).toContain('bluetooth=(self), serial=(self), usb=(self), screen-wake-lock=(self)');
     expect(result).toContain('add_header Cross-Origin-Opener-Policy "same-origin" always;');
     expect(result).toContain('add_header Cross-Origin-Resource-Policy "same-origin" always;');

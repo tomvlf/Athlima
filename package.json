@@ -1,5 +1,5 @@
 {
-    "name": "athlima",
+    "name": "too-many-watts",
     "private": true,
     "type": "module",
     "engines": {
@@ -14,7 +14,7 @@
         "test": "jest",
         "start": "parcel",
         "starttls": "parcel --cert ./dev_cert/cert.pem --key ./dev_cert/key.pem",
-        "build": "parcel build"
+        "build": "parcel build && node scripts/rename-build-output.mjs"
     },
     "devDependencies": {
         "@babel/core": "^7.29.7",
@@ -27,7 +27,8 @@
         "jest": "^30.5.2",
         "jest-environment-jsdom": "^30.5.2",
         "parcel": "^2.16.4",
-        "process": "^0.11.10"
+        "process": "^0.11.10",
+        "svgo": "^4.1.0"
     },
     "allowScripts": {
         "@parcel/watcher": false,

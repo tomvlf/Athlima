@@ -749,7 +749,7 @@ class Activity extends Model {
     async createFromCurrent(db) {
         const id = uuid();
         const blob = fileHandler.toBlob(this.encode(db));
-        const name = db.workout?.meta?.name ?? 'Powered by Athlima workout';
+        const name = db.workout?.meta?.name ?? 'Powered by Too Many Watts workout';
         const timestamp = Date.now();
         const ride = fromRecordedRide(db, id, timestamp);
 

@@ -12,8 +12,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
-ARG ATHLIMA_BUILD_VERSION=development
-ARG ATHLIMA_BUILD_REVISION=
+ARG TOO_MANY_WATTS_BUILD_VERSION=development
+ARG TOO_MANY_WATTS_BUILD_REVISION=
 # Require passing tests before embedding the release label and building the app.
 # Security-header hashes must be regenerated whenever the built HTML changes.
 RUN npm test -- --runInBand \

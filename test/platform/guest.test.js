@@ -1,6 +1,6 @@
 /**
  * Walks through the mobile interface with local data and network access made unavailable. "Guest"
- * is historical terminology: everyone can use this standalone app without an Athlima account.
+ * is historical terminology: everyone can use this standalone app without an Too Many Watts account.
  * Checks local library, calendar, Coach, settings, recording actions and remembered expanded
  * sections.
  */

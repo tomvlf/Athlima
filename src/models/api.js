@@ -1,6 +1,6 @@
 /**
  * Small compatibility facade exposing the direct Intervals.icu browser integration to ride models.
- * API means the agreed way one program talks to another; this is not an Athlima backend or login
+ * API means the agreed way one program talks to another; this is not an Too Many Watts backend or login
  * service.
  */
 import { xf } from '../functions.js';

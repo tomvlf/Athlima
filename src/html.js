@@ -3,14 +3,14 @@
  * fragments created by `html`/`raw`, so imported names, descriptions and provider values cannot
  * become page instructions. `setHTML`/`insertHTML`, `parseXML` and `trustedScriptURL` are the only
  * places that hand markup or script URLs to the browser. They create trusted values through the
- * `athlima` policy, which lets the Content Security Policy enforce that every assignment goes
+ * `too-many-watts` policy, which lets the Content Security Policy enforce that every assignment goes
  * through this module.
  *
  * Use `raw` only for markup that is already safe by construction, such as numeric-only charts.
  * It is an explicit trust decision, not a general escape hatch.
  */
 
-const marker = Symbol('athlima.html');
+const marker = Symbol('too-many-watts.html');
 
 const entities = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
 
@@ -63,14 +63,14 @@ export function html(strings, ...values) {
 /** Fragment text for tests and for composing with DOM APIs that accept text. */
 export const textOf = value => render(value);
 
-const policyKey = Symbol.for('athlima.trusted-types-policy');
+const policyKey = Symbol.for('too-many-watts.trusted-types-policy');
 let policy = globalThis[policyKey];
 
 /** Reuse one policy across Parcel chunks; browsers allow a Trusted Types policy name only once. */
 function getPolicy(factory) {
     policy = policy || globalThis[policyKey];
     if(policy) return policy;
-    policy = factory.createPolicy('athlima', {
+    policy = factory.createPolicy('too-many-watts', {
         createHTML: input => input,
         createScriptURL: input => input,
     });

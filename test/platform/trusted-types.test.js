@@ -22,7 +22,7 @@ function browser() {
         return trusted;
     };
     const createPolicy = jest.fn((name, rules) => {
-        if(name !== 'athlima' || names.has(name)) throw new TypeError('CSP rejected the policy name.');
+        if(name !== 'too-many-watts' || names.has(name)) throw new TypeError('CSP rejected the policy name.');
         names.add(name);
         return {
             createHTML: value => brand(rules.createHTML(value), htmlValues),

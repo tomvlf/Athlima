@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 
 test('coaching always persists locally regardless of obsolete account settings', async () => {
-    localStorage.setItem('athlima-server-mode', '1');
+    localStorage.setItem('too-many-watts-server-mode', '1');
     let service = require('../../src/coaching/service.js');
     const [first, second] = await Promise.all([service.initializeCoaching(), service.initializeCoaching()]);
     expect(first).toBe(second);

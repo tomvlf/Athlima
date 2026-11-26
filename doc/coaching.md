@@ -16,7 +16,7 @@ guide](backend.md) for local backups and recovery details.
 
 On the Ride screen, choose a library workout before starting. Finishing a ride
 shorter than one minute offers the choice to save or discard it. In Activities,
-delete an Athlima recording to remove its local FIT file and coaching history.
+delete an Too Many Watts recording to remove its local FIT file and coaching history.
 Previous plan decisions and uploads to external services are not undone;
 an external copy may reappear when that service is synchronized. Existing
 downloaded backup files are not changed until you create new ones.
@@ -88,9 +88,9 @@ that the athlete is an adult (18 or older); it does not collect a date of birth.
 3. **When can you train?** The longest session per weekday in minutes (0 for
    rest days), an indoor/outdoor preference per day, a long ride / long run day,
    weekly hours and experience in this sport.
-4. **Create your plan.** Recorded Athlima rides are included automatically; for
+4. **Create your plan.** Recorded Too Many Watts rides are included automatically; for
    runs and better targets connect **Settings > Intervals.icu** first, or import
-   activities later under **Training history and backup**. Current Athlima
+   activities later under **Training history and backup**. Current Too Many Watts
    summaries retain available duration, distance, power, heart rate, cadence,
    FTP and previews; older summaries may contain less. The recent FIT cache
    normally holds seven recordings, with pending Coach hand-offs protected.
@@ -149,7 +149,7 @@ Progression levels are based on successfully completed or substituted sessions
 with a sufficient match-quality score, not on how many workouts were scheduled.
 Hard-session progression additionally requires interval evidence: an
 Intervals.icu interval summary, or a one-second power stream (such as an
-Athlima recording) whose 3-second average stays at or above 90% of the lowest
+Too Many Watts recording) whose 3-second average stays at or above 90% of the lowest
 planned hard target for at least 85% of the planned hard time. Duration and
 average intensity alone do not establish that intervals were completed, so runs
 need an interval summary. After the configured number of successful sessions in a family, a later workout
@@ -165,7 +165,7 @@ failed or low-quality work does not earn progression. Day to day:
    plan; future/archived sessions cannot accidentally be executed as today's
    prescription. Without FTP, follow the duration/RPE guidance instead of
    executing power targets.
-- Recorded Athlima rides update the coach automatically. Imported rides can match
+- Recorded Too Many Watts rides update the coach automatically. Imported rides can match
    sessions too. Confirm a duration-only ride with **Use substitute**; duration
    alone is intentionally insufficient for automatic matching.
 - Submit post-ride feedback, mark unsuccessful sessions **Not completed**, mark
@@ -733,7 +733,7 @@ change, deterministic reason, validation warnings, version and timestamp.
 Resolved outcomes update completion/success statistics in the new snapshot.
 Repeated imports, recordings and identical feedback are idempotent.
 
-The dedicated `athlima-coaching` IndexedDB database stores the complete coaching
+The dedicated `too-many-watts-coaching` IndexedDB database stores the complete coaching
 bundle in an atomic transaction: normalized history, versioned snapshots,
 complete plan revisions and adaptation records. It is independent of the
 seven-ride FIT cache and does not inherit localStorage's small quota.
@@ -781,7 +781,7 @@ The library includes three additional long aerobic options (2h, 2h45 and
 template and a 4x4 VO2 session. The Coach can reduce interval repetitions to
 stay within the configured hard-time limit. The long rides stay within the configured
 endurance power ceiling and include reminders to pace and fuel them sensibly.
-These are original Athlima templates informed by established workout formats,
+These are original Too Many Watts templates informed by established workout formats,
 not copied workout files or guarantees of a particular adaptation.
 
 References consulted:

@@ -33,7 +33,7 @@ const policy = [
     // Every enforced markup and script-URL sink goes through src/html.js, which
     // creates trusted values with this policy name. Plain strings are rejected.
     "require-trusted-types-for 'script'",
-    "trusted-types athlima",
+    "trusted-types too-many-watts",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",

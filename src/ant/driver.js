@@ -2,7 +2,7 @@
  * Owns the browser's connection to the shared ANT+ adapter. It chooses native
  * serial access or the USB fallback, sends outgoing messages, and routes incoming
  * packets (complete groups of transmitted bytes) to radio-channel listeners.
- * App events announce connection progress and errors to the rest of Athlima.
+ * App events announce connection progress and errors to the rest of Too Many Watts.
  */
 
 import { xf } from '../functions.js';

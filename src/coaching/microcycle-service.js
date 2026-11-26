@@ -47,7 +47,7 @@ export function reviewMicrocycle(service, asOf = null, days = undefined, disrupt
  */
 export async function acceptMicrocycle(service, review) {
     if(!review?.source || !review.state || !review.context || !review.candidatePlan) throw new Error('A complete reviewed microcycle candidate is required.');
-    const persisted = service.storage?.getItem?.('athlima-coaching-v1');
+    const persisted = service.storage?.getItem?.('too-many-watts-coaching-v1');
     if(persisted) {
         try {
             const stored = JSON.parse(persisted);

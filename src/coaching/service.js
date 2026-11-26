@@ -13,14 +13,14 @@ import { matchWorkout, adaptPlan, intervalsVerified } from './adaptation.js';
 import { openCoachingStorage } from './storage.js';
 import { FAMILIES } from './workouts.js';
 
-const KEY = 'athlima-coaching-v1';
+const KEY = 'too-many-watts-coaching-v1';
 const empty = () => ({version: VERSION, profile: null, goal: null, activities: [],
     snapshots: [], revisions: [], plan: null, safetyStatus: null, microcycleReviews: []});
 
 /**
  * Stores the athlete profile, training goal, imported activities, and generated plan.
  *
- * This service is the central coaching state container for Athlima. It keeps the rider's
+ * This service is the central coaching state container for Too Many Watts. It keeps the rider's
  * profile and plan together in one JSON object so the planner, activity importer, and UI
  * can all read a single consistent state instead of separate fragmented stores.
  */
@@ -187,7 +187,7 @@ export class CoachingService {
         return this.commit(next);
     }
     /**
-     * Imports raw provider activity data and normalizes it into Athlima's internal activity model.
+     * Imports raw provider activity data and normalizes it into Too Many Watts's internal activity model.
      *
      * @param {Array<object>} rawActivities - Raw ride records from a provider like Intervals.icu.
      * @returns {Promise<object>} Updated coaching state with the imported activities applied.
@@ -205,7 +205,7 @@ export class CoachingService {
             const index = next.activities.findIndex(a => a.id === activity.id);
             if(index !== -1) {
                 const previous = next.activities[index];
-                if(previous.source === 'athlima' && activity.source === 'intervals') {
+                if(previous.source === 'too-many-watts' && activity.source === 'intervals') {
                     next.activities[index] = {...previous, providerIds: {...previous.providerIds, ...activity.providerIds},
                         syncedAt: activity.syncedAt};
                     continue;
@@ -276,7 +276,7 @@ export class CoachingService {
     async recordRide(raw, explicitId = null) {
         const existing = this.data.activities.find(a => a.id === String(raw.id));
         if(existing) {
-            if(existing.source === 'intervals' && raw.source === 'athlima') {
+            if(existing.source === 'intervals' && raw.source === 'too-many-watts') {
                 const next = JSON.parse(JSON.stringify(this.data));
                 next.activities[next.activities.findIndex(a => a.id === existing.id)] =
                     normalizeActivity({...raw, providerIds: existing.providerIds}, this.data.profile || undefined);
@@ -297,13 +297,13 @@ export class CoachingService {
         return next.plan;
     }
     /**
-     * Remove an Athlima recording from local coaching history only. The caller handles the FIT
+     * Remove an Too Many Watts recording from local coaching history only. The caller handles the FIT
      * file; previous plan decisions and external uploads are not undone.
      */
     async deleteRide(id) {
         const activity = this.data.activities.find(item => item.id === id);
         if(!activity) throw new Error('Activity not found.');
-        if(activity.source !== 'athlima') throw new Error('Only Athlima recordings can be deleted here.');
+        if(activity.source !== 'too-many-watts') throw new Error('Only Too Many Watts recordings can be deleted here.');
         const next = JSON.parse(JSON.stringify(this.data));
         next.activities = next.activities.filter(item => item.id !== id);
         return this.commit(next);

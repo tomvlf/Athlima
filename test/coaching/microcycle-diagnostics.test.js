@@ -15,7 +15,7 @@ test('records bounded operational events without sensitive fields', () => {
         planRevision: 2,
         trigger: 'evidence',
         changeCount: 3,
-        plannerVersion: 'athlima-coach',
+        plannerVersion: 'too-many-watts-coach',
         notes: 'private text',
         apiKey: 'secret',
     });
@@ -27,7 +27,7 @@ test('records bounded operational events without sensitive fields', () => {
         trigger: 'evidence',
         changeCount: 3,
         errorCode: null,
-        plannerVersion: 'athlima-coach',
+        plannerVersion: 'too-many-watts-coach',
     }]);
     expect(JSON.stringify(events)).not.toMatch(/private text|secret|apiKey|notes/);
     events[0].type = 'changed';

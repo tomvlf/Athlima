@@ -8,7 +8,7 @@ Your rides, plans and settings are then written into storage belonging to your
 browser, not into a training database on that server.
 
 The filename is historical. A **backend** normally means a separate application
-running on a server to process requests or store accounts. Athlima no longer
+running on a server to process requests or store accounts. Too Many Watts no longer
 has an account backend, login, registration, server-side Coach or server backup
 API. Optional Intervals.icu requests go directly to that external service.
 
@@ -27,11 +27,11 @@ storage. For the code behind this flow, see the [code guide](code-guide.md).
 
 ## Where your data lives
 
-| Place | What it means | What Athlima keeps there |
+| Place | What it means | What Too Many Watts keeps there |
 |---|---|---|
 | Live page memory | Temporary working data while the page is open | Current readings, unsaved work and detailed charts fetched on demand. It is lost when the page closes. |
 | IndexedDB `store` | A browser database for larger records | Saved workouts, recent FIT recordings and ride-recovery checkpoints. |
-| IndexedDB `athlima-coaching` | A separate browser database for the Coach | Full activity history, profile, goal, plans, dated estimates and revisions. |
+| IndexedDB `too-many-watts-coaching` | A separate browser database for the Coach | Full activity history, profile, goal, plans, dated estimates and revisions. |
 | Local storage | A browser cupboard for small named settings | Profile/device preferences, calendar entries and (by default) the optional Intervals.icu connection/key. A session-only connection is kept in per-tab session storage instead. |
 | Offline cache | Browser-held copies of website files | Eligible app files for later loading; not a backup of training data. |
 | Downloaded backup | A file you keep separately | The exported data listed below, without the integration key. |
@@ -42,7 +42,7 @@ history is separate; it is not limited to seven activities.
 
 ### Keeping or erasing local data
 
-Athlima asks the browser to keep its storage when available, but persistence is
+Too Many Watts asks the browser to keep its storage when available, but persistence is
 a request: the browser can still remove site data to free space, and you can
 clear it yourself. A downloaded backup remains the only copy that survives that.
 
@@ -60,7 +60,7 @@ is the combination of scheme (`http` or `https`), hostname and port.
 storage. So do different browser profiles, even on the same computer.
 
 Changing an address can make saved data appear absent without deleting it.
-Athlima does not automatically move it between addresses, browsers or devices.
+Too Many Watts does not automatically move it between addresses, browsers or devices.
 Make a backup first, and keep the old browser/address available until you have
 checked the restored copy.
 
@@ -70,7 +70,7 @@ checked the restored copy.
 2. Open **Settings > Local backup** and download a backup.
 3. Keep the downloaded file somewhere safe, preferably with another copy away
    from this device. It contains private training information.
-4. To move devices or addresses, open Athlima at the destination and select the
+4. To move devices or addresses, open Too Many Watts at the destination and select the
    backup in **Local backup**. Review the confirmation before restoring.
 5. Check your workouts, calendar and Coach history/plan afterward. Reconnect
    Intervals.icu separately if you use it; its key is intentionally excluded.
@@ -100,7 +100,7 @@ do not assume either that everything was restored or that nothing changed.
 
 Ordinary riders can skip this section if the app is already hosted for them.
 **Development** means running editable source; **production build** means
-preparing files to serve to browsers. Neither requires an Athlima database server.
+preparing files to serve to browsers. Neither requires an Too Many Watts database server.
 
 Install Node.js 22.18.0 or later with npm, open a terminal in the project folder,
 then run:

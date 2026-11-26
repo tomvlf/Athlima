@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  *
- * Local browser-backup tests kept in the historical server folder; there is no Athlima server here.
+ * Local browser-backup tests kept in the historical server folder; there is no Too Many Watts server here.
  * A simulated database and settings store exercise exact FIT-byte round trips, calendar references,
  * Coach restoration, credential exclusion and failures before/within writes. The database-file
  * transaction check does not claim the whole multi-store restore is atomic.
@@ -56,7 +56,7 @@ afterAll(() => {
 beforeEach(async () => {
     localStorage.clear();
     const storage = await openCoachingStorage(indexedDB);
-    await storage.setItem('athlima-coaching-v1', null);
+    await storage.setItem('too-many-watts-coaching-v1', null);
     storage.close();
     await transaction(tx => {
         tx.objectStore('workouts').clear();
@@ -132,13 +132,13 @@ test('local backup restores coaching plans and history without including the Int
     const coach = new CoachingService(storage);
     await coach.configure(profile, goal);
     await coach.generate('2026-01-01');
-    localStorage.setItem('athlima-intervals-v1', JSON.stringify({apiKey: 'private-key'}));
+    localStorage.setItem('too-many-watts-intervals-v1', JSON.stringify({apiKey: 'private-key'}));
     const backup = await createBackup();
     expect(backup.version).toBe(2);
     expect(backup.coaching.plan).not.toBeNull();
     expect(Array.isArray(backup.microcycleAudit)).toBe(true);
     expect(JSON.stringify(backup)).not.toContain('private-key');
-    await storage.setItem('athlima-coaching-v1', null);
+    await storage.setItem('too-many-watts-coaching-v1', null);
     storage.close();
     await restoreBackup(backup);
     expect((await createBackup()).coaching).toEqual(backup.coaching);

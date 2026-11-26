@@ -1,8 +1,8 @@
 # Public HTTPS variant: Caddy receives web traffic and forwards it to the frontend.
 # No training database is hosted by either container.
 services:
-  athlima:
-    image: ghcr.io/tomvlf/athlima:latest
+  too-many-watts:
+    image: ghcr.io/tomvlf/too-many-watts:latest
     restart: unless-stopped
     # Available to Caddy on the Compose network, not published as a host port.
     expose:
@@ -32,7 +32,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
     pids_limit: 128
     depends_on:
-      - athlima
+      - too-many-watts
     ports:
       - "80:80"
       - "443:443"

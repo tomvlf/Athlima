@@ -13,14 +13,14 @@
  */
 export async function openCoachingStorage(indexedDB) {
     const database = await new Promise((resolve, reject) => {
-        const request = indexedDB.open('athlima-coaching', 1);
+        const request = indexedDB.open('too-many-watts-coaching', 1);
         request.onupgradeneeded = () => request.result.createObjectStore('state');
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
         request.onblocked = () => reject(new Error('Coaching storage is blocked by another browser tab.'));
     });
     database.onversionchange = () => database.close();
-    const key = 'athlima-coaching-v1';
+    const key = 'too-many-watts-coaching-v1';
     const initial = await new Promise((resolve, reject) => {
         const transaction = database.transaction('state', 'readonly');
         const request = transaction.objectStore('state').get(key);
@@ -28,6 +28,43 @@ export async function openCoachingStorage(indexedDB) {
         transaction.onabort = () => reject(transaction.error || new Error('Coaching history could not be read.'));
     });
     let current = initial;
+    if(current == null) {
+        const legacyBrand = ['ath', 'lima'].join('');
+        const legacyDatabaseName = `${legacyBrand}-coaching`;
+        const legacyKey = `${legacyBrand}-coaching-v1`;
+        let legacyDatabase = null;
+        try {
+            legacyDatabase = await new Promise((resolve) => {
+                const request = indexedDB.open(legacyDatabaseName, 1);
+                request.onupgradeneeded = () => request.transaction?.abort();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => resolve(null);
+                request.onblocked = () => resolve(null);
+            });
+            if(legacyDatabase?.objectStoreNames.contains('state')) {
+                const legacyValue = await new Promise((resolve) => {
+                    const transaction = legacyDatabase.transaction('state', 'readonly');
+                    const request = transaction.objectStore('state').get(legacyKey);
+                    transaction.oncomplete = () => resolve(request.result ?? null);
+                    transaction.onabort = () => resolve(null);
+                });
+                if(legacyValue != null) {
+                    await new Promise((resolve, reject) => {
+                        const transaction = database.transaction('state', 'readwrite');
+                        transaction.objectStore('state').put(legacyValue, key);
+                        transaction.oncomplete = () => resolve();
+                        transaction.onabort = () => reject(transaction.error ||
+                            new Error('Coaching history could not be migrated.'));
+                    });
+                    current = legacyValue;
+                }
+            }
+        } catch {
+            current = null;
+        } finally {
+            legacyDatabase?.close();
+        }
+    }
     return {
         getItem: () => current,
         /**

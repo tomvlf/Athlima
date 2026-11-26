@@ -74,13 +74,13 @@ git switch -c security/hardening
 npm ci
 npm test
 npm run build
-docker build -t athlima:security-baseline .
+docker build -t too-many-watts:security-baseline .
 ```
 
 Capture the current header set so Phase 2 can be diffed against it:
 
 ```bash
-docker run --rm -p 8080:8080 athlima:security-baseline &
+docker run --rm -p 8080:8080 too-many-watts:security-baseline &
 curl -sSI http://localhost:8080/ > /tmp/headers-before.txt
 ```
 
@@ -119,7 +119,7 @@ opens at least one PR.
   `cosign sign` step using keyless (OIDC) signing. Keyless signing requires
   `id-token: write`.
 - Verify locally with `docker buildx imagetools inspect
-  ghcr.io/tomvlf/athlima:<tag>` and `cosign verify ghcr.io/tomvlf/athlima:<tag>`.
+  ghcr.io/tomvlf/too-many-watts:<tag>` and `cosign verify ghcr.io/tomvlf/too-many-watts:<tag>`.
 
 ### 1.3 Stop unverified install scripts in the image build
 
@@ -206,7 +206,7 @@ Two options, in increasing cost:
 
 - File: `scripts/write-security-headers.mjs`
 - Emit `Content-Security-Policy-Report-Only` with
-  `require-trusted-types-for 'script'; trusted-types 'athlima'` while keeping
+  `require-trusted-types-for 'script'; trusted-types 'too-many-watts'` while keeping
   the enforced policy unchanged.
 - Exercise every screen, import a workout, restore a backup, connect
   Intervals.icu, run a short ride. Collect console violations.

@@ -1,5 +1,5 @@
 /**
- * Maps Intervals.icu activity fields into Athlima's vocabulary without making network requests. A
+ * Maps Intervals.icu activity fields into Too Many Watts's vocabulary without making network requests. A
  * mapping renames provider fields and preserves selected details; the Coach normalizer performs the
  * common validation afterwards. Compact profiles are chart previews, not full-resolution sensor
  * streams.
@@ -81,14 +81,14 @@ const finite = (value, min = 0, max = Infinity) =>
 
 /**
  * Translate one provider activity into the shared import shape, using moving time when available.
- * Only the exact athlima: external-ID prefix links it to a local recording; other provider IDs stay
+ * Only the exact too-many-watts: external-ID prefix links it to a local recording; other provider IDs stay
  * separate.
  */
 export function intervalsActivity(activity, syncedAt) {
     const type = typeof activity.type === 'string' && activity.type ? activity.type : 'Other';
     const duration = finite(activity.moving_time, 1) ?? finite(activity.elapsed_time, 1);
     if(!activity.id || !activity.start_date || !duration) return null;
-    const legacyId = /^athlima:([\w-]{1,100})$/.exec(activity.external_id || '');
+    const legacyId = /^too-many-watts:([\w-]{1,100})$/.exec(activity.external_id || '');
     const details = {};
     for(const [key, field] of Object.entries(detailFields)) {
         const value = detailValue(field === 'gear' ? activity.gear?.name : activity[field]);

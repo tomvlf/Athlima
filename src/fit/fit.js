@@ -2,7 +2,7 @@
  * Public collection of the FIT file helpers. FIT is a compact file format used
  * by fitness devices to exchange recorded activities and courses. Low-level
  * helpers handle numbered bytes and record layouts; FITjs handles record lists;
- * localActivity and localCourse adapt those lists to Athlima's own data.
+ * localActivity and localCourse adapt those lists to Too Many Watts's own data.
  */
 
 //

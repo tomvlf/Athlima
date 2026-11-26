@@ -28,7 +28,7 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 #platform p { margin: 10px 0 18px; }
 #platform .muted, #platform small { color: var(--platform-muted); font-size: 13px; }
 #platform .eyebrow { color: var(--platform-accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; margin: 0 0 10px; }
-#platform .brand { display: block; width: 190px; height: 55px; background: url('../images/logo/athlima-horizontal-dark.png') center / contain no-repeat; text-indent: -9999px; overflow: hidden; }
+#platform .brand { display: block; width: 190px; height: 55px; background: url('../images/logo/too-many-watts-horizontal-dark.png') center / contain no-repeat; text-indent: -9999px; overflow: hidden; }
 #platform .platform-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
 #platform .mobile-brand-mark { display: none; }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 230px; padding: 30px 20px; background: #101923; border-right: 1px solid var(--platform-border); display: flex; flex-direction: column; z-index: 20; }
@@ -412,7 +412,7 @@ html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-i
 .mobile-app .skip-link { left: 12px; }
 .mobile-app #main-content { margin: 0 auto; max-width: 900px; padding: 20px 16px 100px; }
 .mobile-app .platform-header { margin-bottom: 8px; }
-.mobile-app #platform .mobile-brand-mark { display: block; flex: none; width: 38px; height: 28px; background: url('../images/logo/athlima-mark.png') center / contain no-repeat; }
+.mobile-app #platform .mobile-brand-mark { display: block; flex: none; width: 38px; height: 28px; background: url('../images/logo/too-many-watts-mark.png') center / contain no-repeat; }
 .mobile-app #platform .app-versions { margin-bottom: 14px; }
 .mobile-app .platform-header .eyebrow { display: none; }
 .mobile-app .panel { padding: 22px; }

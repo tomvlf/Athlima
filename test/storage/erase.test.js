@@ -16,12 +16,12 @@ beforeEach(async () => {
     Object.defineProperty(globalThis, 'caches', {
         configurable: true,
         value: {
-            keys: async () => ['athlima-shell-v1', 'other'],
+            keys: async () => ['too-many-watts-shell-v1', 'other'],
             delete: async key => { deleted.push(key); return true; },
         },
     });
     await new Promise((resolve, reject) => {
-        const request = indexedDB.open('athlima-coaching', 1);
+        const request = indexedDB.open('too-many-watts-coaching', 1);
         request.onupgradeneeded = () => request.result.createObjectStore('state');
         request.onsuccess = () => { request.result.close(); resolve(); };
         request.onerror = () => reject(request.error);
@@ -39,14 +39,14 @@ beforeEach(async () => {
 
 test('erases settings, credentials, app databases and caches', async () => {
     localStorage.setItem('ftp', '250');
-    localStorage.setItem('athlima-intervals-v1', '{"apiKey":"secret"}');
-    sessionStorage.setItem('athlima-intervals-v1', '{"apiKey":"secret"}');
+    localStorage.setItem('too-many-watts-intervals-v1', '{"apiKey":"secret"}');
+    sessionStorage.setItem('too-many-watts-intervals-v1', '{"apiKey":"secret"}');
 
     await eraseLocalData();
 
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);
-    expect(deleted).toEqual(expect.arrayContaining(['athlima-shell-v1', 'other']));
+    expect(deleted).toEqual(expect.arrayContaining(['too-many-watts-shell-v1', 'other']));
     const remaining = await indexedDB.databases?.() ?? [];
-    expect(remaining.map(database => database.name)).not.toEqual(expect.arrayContaining(['store', 'athlima-coaching']));
+    expect(remaining.map(database => database.name)).not.toEqual(expect.arrayContaining(['store', 'too-many-watts-coaching']));
 });

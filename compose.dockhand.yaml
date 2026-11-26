@@ -1,8 +1,8 @@
 # Static frontend for the existing Dockhand proxy setup; TLS stays with that proxy.
 # Keep old backend data volumes until exports/restoration have been verified.
 services:
-  athlima:
-    image: ghcr.io/tomvlf/athlima:latest
+  too-many-watts:
+    image: ghcr.io/tomvlf/too-many-watts:latest
     # Preserve the proxy's host port 1111, forwarding to Nginx's internal port 8080.
     ports:
       - "1111:8080"

@@ -1,5 +1,5 @@
 /**
- * Guards the removal of Athlima login/server mode: normal, mobile and old account links must open
+ * Guards the removal of Too Many Watts login/server mode: normal, mobile and old account links must open
  * locally, preserve settings and show local startup errors. Platform/PWA functions are mocked, and
  * any attempted backend fetch is made to fail.
  */
@@ -21,7 +21,7 @@ beforeEach(() => {
 
 test.each(['/', '/mobile', '/#/account'])('opens %s locally without login, even with a legacy server preference', async path => {
     window.history.replaceState({}, '', path);
-    localStorage.setItem('athlima-server-mode', '1');
+    localStorage.setItem('too-many-watts-server-mode', '1');
     localStorage.setItem('ftp', '250');
     await import('../../src/platform/start.js');
     await settle();
@@ -31,7 +31,7 @@ test.each(['/', '/mobile', '/#/account'])('opens %s locally without login, even 
     expect(document.querySelector('form')).toBeNull();
     expect(require('../../src/storage/account.js').accountDatabase()).toBe('store');
     expect(localStorage.getItem('ftp')).toBe('250');
-    expect(localStorage.getItem('athlima-server-mode')).toBeNull();
+    expect(localStorage.getItem('too-many-watts-server-mode')).toBeNull();
 });
 
 test('reports local startup failures without presenting a login or clearing saved data', async () => {

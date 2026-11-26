@@ -1,6 +1,6 @@
 {
-    "name": "Athlima",
-    "short_name": "Athlima",
+    "name": "Too Many Watts",
+    "short_name": "Too Many Watts",
     "description": "Browser-native structured cycling training",
     "start_url": "/",
     "display": "standalone",
@@ -10,23 +10,23 @@
     "background_color": "#061527",
     "icons": [
         {
-            "src": "./images/logo/athlima-icon-192.png",
+            "src": "./images/logo/too-many-watts-icon-192.png",
             "type": "image/png",
             "sizes": "192x192"
         },
         {
-            "src": "./images/logo/athlima-icon-512.png",
+            "src": "./images/logo/too-many-watts-icon-512.png",
             "type": "image/png",
             "sizes": "512x512"
         },
         {
-            "src": "./images/logo/athlima-maskable-512.png",
+            "src": "./images/logo/too-many-watts-maskable-512.png",
             "type": "image/png",
             "sizes": "512x512",
             "purpose": "maskable"
         },
         {
-            "src": "./images/logo/athlima-icon-1024.png",
+            "src": "./images/logo/too-many-watts-icon-1024.png",
             "type": "image/png",
             "sizes": "1024x1024"
         }

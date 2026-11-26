@@ -22,20 +22,20 @@ jobs:
       - name: Build runtime image for validation
         run: |
           docker build \
-            --build-arg ATHLIMA_BUILD_VERSION=validation-${{ github.run_number }}.${{ github.run_attempt }} \
-            --build-arg ATHLIMA_BUILD_REVISION=${{ github.sha }} \
-            --tag athlima:scan \
+            --build-arg TOO_MANY_WATTS_BUILD_VERSION=validation-${{ github.run_number }}.${{ github.run_attempt }} \
+            --build-arg TOO_MANY_WATTS_BUILD_REVISION=${{ github.sha }} \
+            --tag too-many-watts:scan \
             .
 
       - name: Verify hardened runtime configuration
         shell: bash
         run: |
           set -euo pipefail
-          user="$(docker image inspect athlima:scan --format '{{.Config.User}}')"
+          user="$(docker image inspect too-many-watts:scan --format '{{.Config.User}}')"
           test -n "$user"
           test "$user" != "root"
           test "$user" != "0"
-          healthcheck="$(docker image inspect athlima:scan --format '{{json .Config.Healthcheck}}')"
+          healthcheck="$(docker image inspect too-many-watts:scan --format '{{json .Config.Healthcheck}}')"
           test -n "$healthcheck"
           test "$healthcheck" != "null"
 
@@ -53,7 +53,7 @@ jobs:
             --exit-code 0 \
             --format json \
             --output /workspace/trivy-image.json \
-            athlima:scan
+            too-many-watts:scan
 
       - name: Enforce image vulnerability policy
         shell: bash
@@ -67,13 +67,13 @@ jobs:
             --ignore-unfixed \
             --exit-code 1 \
             --format table \
-            athlima:scan
+            too-many-watts:scan
 
       - name: Upload image scan report
         if: ${{ always() && hashFiles('trivy-image.json') != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-athlima-image
+          name: trivy-too-many-watts-image
           path: trivy-image.json
           if-no-files-found: error
           retention-days: 30
@@ -98,7 +98,7 @@ jobs:
       - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: meta
         with:
-          images: ghcr.io/tomvlf/athlima
+          images: ghcr.io/tomvlf/too-many-watts
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
@@ -113,12 +113,12 @@ jobs:
           provenance: mode=max
           sbom: true
           build-args: |
-            ATHLIMA_BUILD_VERSION=build-${{ github.run_number }}.${{ github.run_attempt }}
-            ATHLIMA_BUILD_REVISION=${{ github.sha }}
+            TOO_MANY_WATTS_BUILD_VERSION=build-${{ github.run_number }}.${{ github.run_attempt }}
+            TOO_MANY_WATTS_BUILD_REVISION=${{ github.sha }}
 
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
       - name: Sign published image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "ghcr.io/tomvlf/athlima@${DIGEST}"
+        run: cosign sign --yes "ghcr.io/tomvlf/too-many-watts@${DIGEST}"

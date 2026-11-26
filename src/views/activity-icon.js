@@ -2,7 +2,7 @@
  * activity-icon.js: small inline SVG icons for activity sport categories.
  *
  * SVG describes a picture with lines and shapes rather than a photograph.
- * Icons use currentColor so they follow the surrounding Athlima theme colour.
+ * Icons use currentColor so they follow the surrounding Too Many Watts theme colour.
  * The returned HTML includes a label for assistive tools; the label is
  * interpolated as text, and the static path markup is marked raw.
  */

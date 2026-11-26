@@ -43,7 +43,7 @@ async function clearCaches() {
 export async function eraseLocalData() {
     await closeCoachingDatabase();
     // Include legacy account-scoped databases as well as the current names.
-    const names = new Set([accountDatabase(), 'athlima-coaching']);
+    const names = new Set([accountDatabase(), 'too-many-watts-coaching']);
     try {
         for(const database of await window.indexedDB.databases?.() ?? []) {
             if(database.name) names.add(database.name);

@@ -638,7 +638,7 @@ const page = `
                         <p class="">Version: 0.0.9</p>
                     </div>
                     <div class="row">
-                        <p class="license">Code is on <a class="a" href="https://github.com/tomvlf/Athlima">github</a> | License <a class="a" href="https://www.gnu.org/licenses/agpl-3.0.en.html"> AGPL-3.0</a></p>
+                        <p class="license">Code is on <a class="a" href="https://github.com/tomvlf/Too Many Watts">github</a> | License <a class="a" href="https://www.gnu.org/licenses/agpl-3.0.en.html"> AGPL-3.0</a></p>
                     </div>
                 </div> <!-- end about -->
 

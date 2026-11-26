@@ -26,7 +26,7 @@ test('startup waits for provider profile, locks all controls and rejects local e
     const {db} = require('../../src/db.js');
     const {xf} = require('../../src/functions.js');
     const intervals = require('../../src/models/intervals.js').default;
-    localStorage.setItem('athlima-intervals-v1', JSON.stringify({
+    localStorage.setItem('too-many-watts-intervals-v1', JSON.stringify({
         apiKey: 'test-key', athleteId: '123', oldest: '2026-01-01',
     }));
     window.history.replaceState({}, '', '/#/settings');

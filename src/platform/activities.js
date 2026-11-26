@@ -236,11 +236,11 @@ export function localActivityRow(activity, timeZone) {
  */
 export function historyActivityRow(activity, local, connected) {
     const intervalsId = activity.source === 'intervals' ? activity.externalId : null;
-    const actions = local || activity.source === 'athlima' || (connected && intervalsId) ? html`<div class="button-row activity-file-actions">
+    const actions = local || activity.source === 'too-many-watts' || (connected && intervalsId) ? html`<div class="button-row activity-file-actions">
         ${local ? html`<button class="secondary" data-download="${activity.id}">FIT</button>` : ''}
         ${local && connected ? html`<button class="secondary" data-upload-ride="${activity.id}">Send to Intervals.icu</button>` : ''}
         ${connected && intervalsId ? html`<button class="secondary" data-load-activity="${intervalsId}" aria-expanded="false">Route &amp; data</button>` : ''}
-        ${activity.source === 'athlima' ? html`<button class="secondary" data-delete-ride="${activity.id}">Delete</button>` : ''}
+        ${activity.source === 'too-many-watts' ? html`<button class="secondary" data-delete-ride="${activity.id}">Delete</button>` : ''}
     </div>` : '--';
     return html`<tr>
         <td data-label="Activity" class="activity-title"><span class="activity-heading">${activityIcon(activity)}

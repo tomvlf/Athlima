@@ -341,7 +341,7 @@ function Editor() {
     let workout = {
         meta: {
             name: 'New Workout',
-            author: 'Athlima',
+            author: 'Too Many Watts',
             category: 'SweetSpot',
             description: 'Best workout ever!',
             type: 'bike',

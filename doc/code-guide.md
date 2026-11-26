@@ -1,4 +1,4 @@
-# A beginner's guide to the Athlima code
+# A beginner's guide to the Too Many Watts code
 
 This guide is for someone who can use the app but has little or no programming
 experience. You do not need to understand every line to follow what happens.
@@ -9,7 +9,7 @@ data, read [storage and backups](backend.md).
 
 ## The big picture
 
-Athlima has three main jobs:
+Too Many Watts has three main jobs:
 
 1. **Show information and controls.** Pages, buttons, charts and forms.
 2. **Run training logic.** Communicate with equipment, play workout steps,
@@ -17,7 +17,7 @@ Athlima has three main jobs:
 3. **Keep data.** Save in the browser, export files and optionally exchange data
    with Intervals.icu.
 
-There is no separate Athlima account server. The web host delivers the app's
+There is no separate Too Many Watts account server. The web host delivers the app's
 files; your browser runs them. Node, Jest and Parcel are development/build
 tools, not services each rider must run.
 

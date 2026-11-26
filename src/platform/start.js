@@ -13,7 +13,7 @@ const root = document.querySelector('#platform');
  */
 async function start() {
     setAccountScope(null);
-    window.localStorage.removeItem('athlima-server-mode');
+    window.localStorage.removeItem('too-many-watts-server-mode');
     if(window.location.hash === '#/account') window.location.hash = '/settings';
     const { launchPlatform } = await import('./ui.js');
     await launchPlatform(root);

@@ -1,6 +1,6 @@
 /**
  * Central fallback-safe presentation and formatting helpers for Adaptive Microcycle Engine text.
- * There is no existing i18n framework in Athlima, so this module intentionally remains local and
+ * There is no existing i18n framework in Too Many Watts, so this module intentionally remains local and
  * does not introduce a second framework.
  */
 

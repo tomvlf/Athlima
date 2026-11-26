@@ -199,7 +199,7 @@ export function fromRecordedRide(db, id, timestamp) {
         record[key === 'power' ? 'powerValid' : 'heartRateValid'] !== false);
     const complete = key => contiguous && valid(key) && records.every(r => Number.isFinite(r[key]));
     return {
-        id, source: 'athlima', name: db.workout?.meta?.name || 'Free ride',
+        id, source: 'too-many-watts', name: db.workout?.meta?.name || 'Free ride',
         trainNow: Boolean(db.workout?.trainNow),
         trainNowReasoning: db.workout?.trainNow?.reasoning ?? null,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,

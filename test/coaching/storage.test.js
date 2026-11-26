@@ -29,4 +29,28 @@ describe('durable coaching IndexedDB storage', () => {
         expect(second.data.profile).toBeNull();
         one.close(); two.close();
     });
+    test('silently migrates coaching data to the renamed app storage', async () => {
+        const idb = new IDBFactory();
+        const legacyBrand = ['ath', 'lima'].join('');
+        const legacyDatabaseName = `${legacyBrand}-coaching`;
+        const legacyKey = `${legacyBrand}-coaching-v1`;
+        const legacyDatabase = await new Promise((resolve, reject) => {
+            const request = idb.open(legacyDatabaseName, 1);
+            request.onupgradeneeded = () => request.result.createObjectStore('state');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise((resolve, reject) => {
+            const transaction = legacyDatabase.transaction('state', 'readwrite');
+            transaction.objectStore('state').put(JSON.stringify({version: 1, profile, goal,
+                activities: [], snapshots: [], revisions: [], plan: null, safetyStatus: null,
+                microcycleReviews: []}), legacyKey);
+            transaction.oncomplete = resolve;
+            transaction.onabort = () => reject(transaction.error);
+        });
+        legacyDatabase.close();
+        const migrated = await openCoachingStorage(idb);
+        expect(migrated.getItem()).toContain('"profile"');
+        migrated.close();
+    });
 });

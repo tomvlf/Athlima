@@ -1,13 +1,13 @@
 
-# Athlima
+# Too Many Watts
 
-Athlima turns a compatible web browser into an indoor cycling dashboard. It can guide a workout, ask a smart trainer to change resistance, record a ride, and help plan cycling or running training.
+Too Many Watts turns a compatible web browser into an indoor cycling dashboard. It can guide a workout, ask a smart trainer to change resistance, record a ride, and help plan cycling or running training.
 
-The app's calculations run in your browser, and training data is saved in that browser. There is no Athlima login or cloud account. An optional Intervals.icu connection can import activities and upload recorded rides directly to that service.
+The app's calculations run in your browser, and training data is saved in that browser. There is no Too Many Watts login or cloud account. An optional Intervals.icu connection can import activities and upload recorded rides directly to that service.
 
 ## New here? Start with this
 
-You do not need programming knowledge to use Athlima. If someone already hosts it for you, open their web address in a [supported browser](#browser-and-device-support); skip the installation and Docker sections below.
+You do not need programming knowledge to use Too Many Watts. If someone already hosts it for you, open their web address in a [supported browser](#browser-and-device-support); skip the installation and Docker sections below.
 
 1. **Check Settings.** Review your units, body mass and cycling FTP. FTP is the power reference used to scale cycling workouts; see the short glossary below.
 2. **Connect equipment.** Open **Devices** and use the connection controls. Your browser asks you to choose a trainer or sensor; a website cannot simply connect without permission.
@@ -30,13 +30,13 @@ The **Coach** is optional. It builds a proposed schedule from your goal, availab
 | ERG | Trainer mode that tries to hold a requested power by adjusting resistance. |
 | Interval / step | A section of a workout; a section can contain smaller steps with different targets. |
 | RPE | Your own rating of perceived exertion, on a 0-10 effort scale. |
-| ZWO file | A text-based workout recipe that Athlima can read. |
+| ZWO file | A text-based workout recipe that Too Many Watts can read. |
 | FIT file | A compact recording of activity data, suitable for downloading or uploading to compatible services. |
-| Backup / sync | A backup is a separate saved copy. Intervals.icu sync refreshes local history; it is not a backup of your complete Athlima setup. |
+| Backup / sync | A backup is a separate saved copy. Intervals.icu sync refreshes local history; it is not a backup of your complete Too Many Watts setup. |
 
 For a guided tour of the files and code, start with the [beginner's code guide](doc/code-guide.md).
 
-## What Athlima does
+## What Too Many Watts does
 
 - runs `.zwo` workouts and built-in structured sessions
 - shows a live workout power timeline with a current-position marker, interval countdown, and separate target/actual power and cadence; cadence targets appear only when prescribed
@@ -205,7 +205,7 @@ It preserves host port 1111 for the existing HTTPS proxy, forwarding to containe
 port 8080. TLS remains handled by your existing proxy; no Caddy or backend is
 needed in this stack. Replace the stack's Compose content with this file and
 redeploy after publishing the new frontend image.
-The frontend service is named `athlima`. If the previous deployment used a
+The frontend service is named `too-many-watts`. If the previous deployment used a
 different service name, remove the obsolete frontend container without deleting
 volumes before redeploying, so it cannot retain host port 1111.
 The old backend is no longer needed. Stop/remove its container separately if
@@ -265,17 +265,17 @@ Compose files use the moving `latest` tag for convenience. To deploy exactly
 one reviewed build, resolve the digest and pin it:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/tomvlf/athlima:latest
+docker buildx imagetools inspect ghcr.io/tomvlf/too-many-watts:latest
 # then in compose.yaml:
-#   image: ghcr.io/tomvlf/athlima@sha256:<digest>
+#   image: ghcr.io/tomvlf/too-many-watts@sha256:<digest>
 ```
 
 With [cosign](https://docs.sigstore.dev/cosign/overview/) installed, check the
 signature before pulling:
 
 ```bash
-cosign verify ghcr.io/tomvlf/athlima:latest \
-  --certificate-identity-regexp 'https://github.com/tomvlf/Athlima/.github/workflows/publish-image.yml@refs/(heads/master|tags/v.*)' \
+cosign verify ghcr.io/tomvlf/too-many-watts:latest \
+  --certificate-identity-regexp 'https://github.com/tomvlf/Too Many Watts/.github/workflows/publish-image.yml@refs/(heads/master|tags/v.*)' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -299,7 +299,7 @@ this connection on this device** to keep it only for the current tab. It is
 sent only to `https://intervals.icu` and is not encrypted against someone with
 access to your browser profile. Disconnect removes the key but keeps imported
 history. **Settings > Delete local data** also erases it, along with all other
-Athlima data on this device. There is no Athlima server or intermediary.
+Too Many Watts data on this device. There is no Too Many Watts server or intermediary.
 Strava and TrainingPeaks server-based OAuth connections have been removed;
 use FIT file downloads for manual upload to other providers.
 
@@ -312,7 +312,7 @@ notes in the backend guide.
 
 ## Browser and device support
 
-Athlima relies on browser features such as Web Bluetooth (talking to nearby
+Too Many Watts relies on browser features such as Web Bluetooth (talking to nearby
 sensors), Web Serial (communicating with supported adapters) and Web Components
 (reusable interface elements). For a supported experience, use a compatible
 browser and a **secure context**: HTTPS, or localhost on your own computer.
@@ -330,7 +330,7 @@ Important notes:
 - Firefox and Safari are not supported for the trainer/Web Bluetooth path
 
 On Android, open the HTTPS app in Chrome and use the browser menu's **Install
-app** or **Add to Home screen** option. The installed app uses the Athlima
+app** or **Add to Home screen** option. The installed app uses the Too Many Watts
 icon, including a maskable variant for Android launchers. Chrome may take time
 to refresh the icon of an existing installation after an update; close old app
 windows so the updated offline worker can activate.
@@ -349,7 +349,7 @@ The web version is not currently supported on iOS.
 
 ## Supported trainer protocols
 
-Athlima supports the industry-standard trainer and sensor protocols used by indoor bikes:
+Too Many Watts supports the industry-standard trainer and sensor protocols used by indoor bikes:
 
 - FTMS over Bluetooth
 - FE-C over BLE
@@ -373,7 +373,7 @@ including hashes for Parcel's inline import map. Scripts cannot use arbitrary
 inline code or `eval`; connections are limited to this origin and Intervals.icu.
 Trusted Types (`require-trusted-types-for 'script'`) requires every HTML update,
 XML parser input and worker script URL to pass through the app's single
-`athlima` policy, so a plain string cannot be assigned to an enforced sink. XML
+`too-many-watts` policy, so a plain string cannot be assigned to an enforced sink. XML
 remains parsed as inert XML rather than HTML, and worker scripts are restricted
 to same-origin URLs. Inline styles remain allowed for the existing dynamic
 UI. Anti-framing, cross-origin isolation, MIME-sniffing, referrer and

@@ -107,7 +107,7 @@ export async function launchPlatform(root) {
             </div></div>`
         : Object.keys(routes).filter(r => r !== 'workout').map(route => link(route, routes[route][0]));
     setHTML(root, html`<a class="skip-link" href="#main-content">Skip to content</a>
-        <aside class="sidebar"><a class="brand" href="${mobile ? '/mobile' : '/'}" aria-label="Athlima home">Athlima</a>
+        <aside class="sidebar"><a class="brand" href="${mobile ? '/mobile' : '/'}" aria-label="Too Many Watts home">Too Many Watts</a>
             <nav aria-label="Main navigation">${navigation()}</nav>
             <div class="sidebar-bottom"><span>Train with intention.</span></div>
             ${mobile ? '' : versionMarkup({showRevision: false})}
@@ -496,7 +496,7 @@ export async function launchPlatform(root) {
             <div class="button-row"><button data-action="sync" ${['running', 'queued'].includes(integration.status) ? 'disabled' : ''}>${integration.lastSuccess ? 'Sync now' : 'Import history'}</button>
                 <button class="secondary" data-action="test-connection">Test connection</button>
                 <button class="secondary" data-action="disconnect">Disconnect</button></div>
-            <p class="muted">Your API key is stored in this browser, not on an Athlima server. Disconnect removes it; imported history is retained. Sync runs while this app is open and rechecks the last seven days for updates.${integration.remembered === false ? ' This connection is kept only until you close this tab.' : ''}</p>`;
+            <p class="muted">Your API key is stored in this browser, not on an Too Many Watts server. Disconnect removes it; imported history is retained. Sync runs while this app is open and rechecks the last seven days for updates.${integration.remembered === false ? ' This connection is kept only until you close this tab.' : ''}</p>`;
     }
     /**
      * Refresh connection status without overlapping another status load or overwriting a focused
@@ -820,10 +820,10 @@ export async function launchPlatform(root) {
         const deleteRide = event.target.closest('[data-delete-ride]')?.dataset.deleteRide;
         if(deleteRide) {
             void run(async () => {
-                if(!confirm('Delete this Athlima activity and its local FIT recording? Existing plan decisions and external uploads are not removed.')) return;
+                if(!confirm('Delete this Too Many Watts activity and its local FIT recording? Existing plan decisions and external uploads are not removed.')) return;
                 const service = coachingService();
                 const activity = service.data?.activities?.find(item => String(item.id) === deleteRide);
-                if(activity && activity.source !== 'athlima') throw new Error('Only Athlima recordings can be deleted here.');
+                if(activity && activity.source !== 'too-many-watts') throw new Error('Only Too Many Watts recordings can be deleted here.');
                 if(db.activity.some(item => String(item.id) === deleteRide)) {
                     const {idb} = await import('../storage/idb.js');
                     await idb.removeChecked('activity', deleteRide);
@@ -1001,11 +1001,11 @@ export async function launchPlatform(root) {
                 const {createBackup} = await import('../storage/backup.js');
                 const {fileHandler} = await import('../file.js');
                 fileHandler.download()(JSON.stringify(await createBackup(db.workouts), null, 2),
-                    'athlima-backup.json', 'application/json');
+                    'too-many-watts-backup.json', 'application/json');
                 report('Local backup downloaded. Keep this file private.');
             } else if(action === 'export') {
                 const {fileHandler} = await import('../file.js');
-                fileHandler.download()(JSON.stringify(coachingData(), null, 2), 'athlima-training-history.json', 'application/json');
+                fileHandler.download()(JSON.stringify(coachingData(), null, 2), 'too-many-watts-training-history.json', 'application/json');
             } else if(action === 'import-profile') {
                 await intervals.syncProfile();
                 profileSyncError = '';
@@ -1013,7 +1013,7 @@ export async function launchPlatform(root) {
                 report('FTP and body mass synced from Intervals.icu. Regenerate an active plan if FTP changed.');
             } else if(action === 'delete-all') {
                 if(db.watchStatus !== 'stopped') throw new Error('Finish your current ride before deleting local data.');
-                const confirmation = window.prompt('This erases all Athlima data on this device, including any saved Intervals.icu key. Type DELETE to continue.');
+                const confirmation = window.prompt('This erases all Too Many Watts data on this device, including any saved Intervals.icu key. Type DELETE to continue.');
                 if(confirmation !== 'DELETE') return;
                 const {eraseLocalData} = await import('../storage/erase.js');
                 await eraseLocalData();

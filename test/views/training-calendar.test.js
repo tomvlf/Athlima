@@ -467,7 +467,7 @@ describe('training calendar', () => {
         });
 
         try {
-            localStorage.setItem('athlima-intervals-v1', JSON.stringify({
+            localStorage.setItem('too-many-watts-intervals-v1', JSON.stringify({
                 apiKey: 'test-key', athleteId: '123', oldest: '2026-01-01',
             }));
             const calendar = createCalendar();

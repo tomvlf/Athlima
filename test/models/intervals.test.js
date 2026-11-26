@@ -8,7 +8,7 @@ import intervals from '../../src/models/intervals.js';
 import { CoachingService } from '../../src/coaching/service.js';
 import { xf } from '../../src/functions.js';
 
-const KEY = 'athlima-intervals-v1';
+const KEY = 'too-many-watts-intervals-v1';
 /**
  * Make the minimal HTTP-response shape these client tests need, with an explicit status and
  * asynchronously readable JSON body.
@@ -95,7 +95,7 @@ test('profile import and FIT upload work directly without an app account', async
     expect(await intervals.uploadWorkout({id: 'ride', summary: {name: 'Real ride'}, blob})).toBe(':success');
     const [url, options] = fetch.mock.calls[1];
     expect(new URL(url).pathname).toBe('/api/v1/athlete/123/activities');
-    expect(new URL(url).searchParams.get('external_id')).toBe('athlima:ride');
+    expect(new URL(url).searchParams.get('external_id')).toBe('too-many-watts:ride');
     expect(options.method).toBe('POST');
     expect(options.body.get('file').name).toBe('ride.fit');
 });

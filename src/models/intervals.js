@@ -1,7 +1,7 @@
 /**
  * The optional direct connection from this browser to Intervals.icu. It keeps the API key and
  * import progress locally, fetches profiles/history/planned workouts and uploads FIT files.
- * Requests go only to the fixed provider address, not an Athlima server. Full synchronization runs
+ * Requests go only to the fixed provider address, not an Too Many Watts server. Full synchronization runs
  * only while the page is open; completed batches provide restart points.
  */
 import { xf } from '../functions.js';
@@ -11,7 +11,7 @@ import { normalizeActivity } from '../coaching/normalizer.js';
 import { intervalsActivity, compactProfile } from './intervals-data.js';
 
 const API = 'https://intervals.icu/api/v1';
-const KEY = 'athlima-intervals-v1';
+const KEY = 'too-many-watts-intervals-v1';
 const validAthleteId = id => /^(?:i)?\d{1,20}$/.test(String(id));
 let syncing = false;
 
@@ -179,7 +179,7 @@ async function wod(oldest = isoDate(), newest = isoDate()) {
 }
 
 /**
- * Upload a saved FIT file with a stable athlima:<record-id> label so importing it later can
+ * Upload a saved FIT file with a stable too-many-watts:<record-id> label so importing it later can
  * recognize the original recording. Return the existing success/fail status string and show upload
  * errors.
  */
@@ -189,7 +189,7 @@ async function uploadWorkout(record) {
         const form = new FormData();
         form.append('file', record.blob, `${record.id}.fit`);
         await request(`${athletePath()}/activities`, {method: 'POST', body: form,
-            query: {name: record.summary?.name || 'Athlima workout', external_id: `athlima:${record.id}`}});
+            query: {name: record.summary?.name || 'Too Many Watts workout', external_id: `too-many-watts:${record.id}`}});
         return ':success';
     } catch(error) {
         xf.dispatch('ui:modal:error:open', error.message);

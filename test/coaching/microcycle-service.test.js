@@ -100,9 +100,9 @@ describe('Adaptive Microcycle Engine Phase 3 service boundary', () => {
 
         const {service: crossTab, storage: crossTabStorage} = await setup();
         const crossReview = reviewMicrocycle(crossTab, start);
-        const stored = JSON.parse(crossTabStorage.getItem('athlima-coaching-v1'));
+        const stored = JSON.parse(crossTabStorage.getItem('too-many-watts-coaching-v1'));
         stored.plan.revision += 1;
-        crossTabStorage.setItem('athlima-coaching-v1', JSON.stringify(stored));
+        crossTabStorage.setItem('too-many-watts-coaching-v1', JSON.stringify(stored));
         await expect(acceptMicrocycle(crossTab, crossReview)).rejects.toThrow(/another tab|stale/);
     });
 });

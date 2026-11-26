@@ -1,7 +1,7 @@
 # Run the published static website image; training data stays in each browser.
 services:
-  athlima:
-    image: ghcr.io/tomvlf/athlima:latest
+  too-many-watts:
+    image: ghcr.io/tomvlf/too-many-watts:latest
     # Left number: port on this computer. Right number: port inside the container.
     ports:
       - "8080:8080"

@@ -1,5 +1,5 @@
 /*
- * activity-types.js: maps provider activity types to Athlima sport categories.
+ * activity-types.js: maps provider activity types to Too Many Watts sport categories.
  *
  * Intervals.icu (and Strava) use detailed type names such as GravelRide or TrailRun.
  * Coaching plans cycling and running, so every type is reduced to a broad sport category
@@ -39,7 +39,7 @@ const typeLabels = {
     OpenWaterSwim: 'Open water swim', TableTennis: 'Table tennis', StairStepper: 'Stair stepper',
 };
 
-/** Returns the Athlima sport category for a provider activity type. */
+/** Returns the Too Many Watts sport category for a provider activity type. */
 export function sportForType(type) {
     return sportByType.get(type) || 'other';
 }

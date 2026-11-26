@@ -1,7 +1,7 @@
 /** @jest-environment node */
 /**
  * Guards the Trusted Types boundary: application code must not assign HTML strings directly to
- * DOM sinks. All markup goes through src/html.js, which wraps it in the `athlima` policy. The
+ * DOM sinks. All markup goes through src/html.js, which wraps it in the `too-many-watts` policy. The
  * Content Security Policy then rejects any direct string assignment at runtime.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
