@@ -14,7 +14,7 @@ import { GOALS, RUN_GOALS, addDays, localDay, sportForGoalType } from '../coachi
 import { describeRunPaces, formatPace, paceForIntensity } from '../coaching/running.js';
 import { todayRecommendation, visibleCoachText } from '../coaching/microcycle-summary.js';
 import { DAILY_GOAL_LABELS, DAILY_HORIZONS, normalizeQuickGoal, quickProfile, missingQuickProfileFields, quickGoalTypes } from '../coaching/daily-coach.js';
-import { cadenceSummary, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
+import { escape, cadenceSummary, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
 import { html, raw, setHTML, insertHTML } from '../html.js';
 import { activityLists, historyActivityRow, localActivityRow, renderActivityOverview, renderActivityStreamData } from './activities.js';
 import { initialLibraryFilters, renderLibrary } from './library.js';

@@ -99,6 +99,8 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     await settle();
     expect(root.querySelector('[name=dailyTimeline]').value).toBe('42');
     expect(root.querySelector('[data-daily-timeline="42"]').getAttribute('aria-pressed')).toBe('true');
+    expect(root.innerHTML).not.toContain('%20');
+    expect(root.textContent).not.toContain('%20');
     expect(root.querySelector('[aria-current="page"]').textContent).toBe('Overview');
     expect(root.querySelector('.skip-link')).not.toBeNull();
     root.querySelector('.skip-link').click();
