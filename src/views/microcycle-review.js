@@ -7,6 +7,7 @@ import { microcycleChangeSummary, todayRecommendation } from '../coaching/microc
 import { compareMicrocycleForecasts } from '../coaching/microcycle-forecast.js';
 import { microcycleRevisionHistory } from '../coaching/microcycle-history.js';
 import { microcycleReviewTrigger } from '../coaching/microcycle-triggers.js';
+import { localDay } from '../coaching/domain.js';
 import { formatMicrocycleTimestamp, formatMicrocycleDate, formatMicrocycleMinutes,
     formatMicrocycleNumber, microcycleMessage } from '../coaching/microcycle-format.js';
 import { recordMicrocycleEvent } from '../coaching/microcycle-diagnostics.js';
@@ -28,7 +29,9 @@ export function todayRecommendationView(recommendation) {
     const session = recommendation.session;
     return `<section class="coach-card" data-today-recommendation><p class="eyebrow">Today</p><h3>${escape(recommendation.title)}</h3>
         ${session ? `<p><strong>${escape(session.family)}</strong> · ${minutes(session.duration)} · Effort ${escape(session.expectedRpe ?? '—')}/10</p>` : ''}
-        <p>${escape(recommendation.reason)}</p>${recommendation.status === 'review' ? '<button type="button" class="secondary" data-coach="microcycle-review">Review before training</button>' : ''}</section>`;
+        <p>${escape(recommendation.reason)}</p>
+        ${recommendation.snapshotDate ? `<p class="muted">Evidence snapshot: ${escape(formatMicrocycleDate(recommendation.snapshotDate))}</p>` : ''}
+        ${recommendation.status === 'review' ? '<button type="button" class="secondary" data-coach="microcycle-review">Review before training</button>' : ''}</section>`;
 }
 
 /**
@@ -102,6 +105,19 @@ export function microcycleReviewView(review) {
 
 const originalPlanView = CoachingPanel.prototype.planView;
 CoachingPanel.prototype.planView = function(data, plan) {
+    let todayState = null;
+    let now = new Date().toISOString();
+    if(data?.profile) {
+        try {
+            const working = JSON.parse(JSON.stringify(data));
+            const service = coachingService();
+            now = service.clock();
+            const day = localDay(now, data.profile.timeZone);
+            todayState = service.snapshot(working, day);
+        } catch(error) {
+            console.warn('Fresh Coach evidence snapshot could not be prepared:', error);
+        }
+    }
     const trigger = microcycleReviewTrigger({data});
     if(trigger && !this.microcycleReview && this.dismissedMicrocycleFingerprint !== trigger.fingerprint) {
         try {
@@ -110,7 +126,7 @@ CoachingPanel.prototype.planView = function(data, plan) {
         }
         catch(error) { console.warn('Automatic Coach review could not be prepared:', error); }
     }
-    return `${todayRecommendationView(todayRecommendation({data}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}${microcycleHistoryView(data)}`;
+    return `${todayRecommendationView(todayRecommendation({data, state: todayState, now}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}${microcycleHistoryView(data)}`;
 };
 
 const originalClick = CoachingPanel.prototype.click;

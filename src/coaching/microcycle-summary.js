@@ -14,26 +14,51 @@ import { microcycleReadiness } from './microcycle-context.js';
  * @param {object} input.data - Current Coach data.
  * @param {object} [input.state] - Latest athlete-state snapshot.
  * @param {string} [input.now] - ISO timestamp used to resolve the local day.
- * @returns {object|null} Conservative action recommendation or null outside a configured Coach.
+ * @returns {object} Conservative action recommendation, including explicit setup or evidence fallbacks.
  */
 export function todayRecommendation({data, state = data?.snapshots?.at(-1), now = new Date().toISOString()} = {}) {
-    if(!data?.profile || !data.plan || data.plan.status !== 'active') return null;
-    const day = localDay(now, data.profile.timeZone);
+    const day = localDay(now, data?.profile?.timeZone || 'UTC');
+    if(!data?.profile) {
+        return {day, status: 'unavailable', session: null, title: 'Coach setup required',
+            reason: 'Configure an athlete profile and active plan before following a today recommendation.',
+            snapshotDate: null};
+    }
+    if(!data.plan || data.plan.status !== 'active') {
+        return {day, status: 'unavailable', session: null, title: 'No active Coach plan',
+            reason: 'Create or restore an active plan before following a today recommendation.',
+            snapshotDate: null};
+    }
+    if(!state || state.date !== day) {
+        return {day, status: 'unknown', session: null, title: 'Today’s evidence is not current',
+            reason: state?.date
+                ? `The latest evidence snapshot is for ${state.date}, not ${day}. Review the latest evidence before training.`
+                : `No dated athlete snapshot is available for ${day}. Review the latest evidence before training.`,
+            snapshotDate: state?.date ?? null};
+    }
     const readiness = microcycleReadiness({...state, safetyStatus: data.safetyStatus});
     const session = data.plan.workouts.find(workout => workout.date === day && workout.status === 'scheduled') ?? null;
     if(readiness.status === 'paused' || data.plan.trainingPaused) {
-        return {day, status: 'paused', session: null, title: 'Training paused', reason: readiness.reason};
+        return {day, status: 'paused', session: null, title: 'Training paused',
+            reason: readiness.reason, snapshotDate: state.date};
     }
     if(!session) {
         return {day, status: 'rest', session: null, title: 'No planned session today',
-            reason: 'Follow the current plan and use the next scheduled session rather than adding catch-up work.'};
+            reason: 'Follow the current plan and use the next scheduled session rather than adding catch-up work.',
+            snapshotDate: state.date};
+    }
+    if(state.sufficiency !== 'supported' || readiness.status === 'monitor') {
+        return {day, status: 'review', session, title: 'Review today’s session first',
+            reason: `${readiness.reason} Evidence is limited; this is monitoring guidance, not training clearance.`,
+            snapshotDate: state.date};
     }
     if(readiness.status === 'caution' && session.role !== 'recovery' && session.family !== 'recovery') {
         return {day, status: 'review', session, title: 'Review today’s session first',
-            reason: `${readiness.reason} Review the next seven days before starting this session.`};
+            reason: `${readiness.reason} Review the next seven days before starting this session.`,
+            snapshotDate: state.date};
     }
     return {day, status: 'planned', session, title: session.title,
-        reason: session.description || session.reason || 'This is today’s existing planned session.'};
+        reason: session.description || session.reason || 'This is today’s existing planned session.',
+        snapshotDate: state.date};
 }
 
 /**

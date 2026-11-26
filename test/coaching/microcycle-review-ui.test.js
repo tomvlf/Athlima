@@ -100,6 +100,7 @@ describe('Adaptive Microcycle Engine review UI', () => {
         const before = JSON.stringify(service.data);
         try {
             expect(panel.querySelector('[data-today-recommendation]')).not.toBeNull();
+            expect(panel.textContent).toContain('Evidence snapshot:');
             await panel.click({target: panel.querySelector('[data-coach=microcycle-review]')});
             expect(panel.textContent).toContain('Proposed week update');
             expect(JSON.stringify(service.data)).toBe(before);
