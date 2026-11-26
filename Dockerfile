@@ -21,20 +21,10 @@ RUN npm test -- --runInBand \
     && npm run build \
     && node scripts/write-security-headers.mjs dist/index.html /app/security-headers.conf
 
-# Stage 2 serves only the built files. Node and build tools do not ship in this image.
-FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
-
-# The image is digest-pinned for reproducibility. Upgrade Alpine packages and explicitly install the
-# fixed nginx release from the same upstream repository used by the official nginx Alpine images.
-# Return to the non-root runtime user after package installation.
-USER root
-RUN set -eux; \
-    alpine_version="$(cut -d. -f1,2 /etc/alpine-release)"; \
-    apk upgrade --no-cache; \
-    apk add --no-cache \
-        --repository "https://<scrubbed-url-domain>/packages/alpine/v$%7Balpine_version%7D/main" \
-        'nginx=1.30.7-r0'; \
-    nginx -v
+# Stage 2 serves only the built files. Use the maintained NGINX unprivileged registry; the former
+# nginxinc registry is archived. Pin the patched stable release and let the vulnerability gate verify
+# its complete runtime package set before publication.
+FROM nginx/nginx-unprivileged:1.30.8-alpine
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/security-headers.conf /etc/nginx/security-headers.conf
