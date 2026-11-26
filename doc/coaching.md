@@ -77,6 +77,15 @@ what the numbers cannot tell you.
 
 ## Using the coach
 
+### Simple daily entry
+
+The dashboard's Today view shows the active sport and goal, the local-day
+evidence state, and one primary recommendation. The goal can be edited with
+only sport, goal type and timeline; existing profile, availability, feedback
+and event details remain in the full Coach and are not replaced by partial
+updates. A goal change is previewed before it can rebuild the active plan.
+Accepting is explicit and atomic; cancelling leaves the active plan unchanged.
+
 **Coach** guides you through four numbered steps. Setup requires confirmation
 that the athlete is an adult (18 or older); it does not collect a date of birth.
 

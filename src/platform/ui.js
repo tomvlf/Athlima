@@ -10,8 +10,10 @@ import { xf } from '../functions.js';
 import intervals from '../models/intervals.js';
 import { coachingData, coachingService } from '../coaching/service.js';
 import { toAppWorkout } from '../coaching/workouts.js';
-import { addDays } from '../coaching/domain.js';
+import { GOALS, RUN_GOALS, addDays, localDay, sportForGoalType } from '../coaching/domain.js';
 import { describeRunPaces, formatPace, paceForIntensity } from '../coaching/running.js';
+import { todayRecommendation } from '../coaching/microcycle-summary.js';
+import { DAILY_GOAL_LABELS, DAILY_HORIZONS, normalizeQuickGoal, quickProfile, missingQuickProfileFields, quickGoalTypes } from '../coaching/daily-coach.js';
 import { cadenceSummary, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
 import { html, raw, setHTML, insertHTML } from '../html.js';
 import { activityLists, historyActivityRow, localActivityRow, renderActivityOverview, renderActivityStreamData } from './activities.js';
@@ -257,15 +259,102 @@ export async function launchPlatform(root) {
     const recommendation = data => data?.plan?.adaptations?.at(-1)?.reasoning ||
         state?.readiness?.reason || data?.plan?.rationale ||
         'Set your availability and a dated goal to build a plan around your life.';
+    const remainingGoalDays = (goal, day) => {
+        if(!goal?.date) return null;
+        const remaining = Math.ceil((Date.parse(`${goal.date}T12:00:00Z`) -
+            Date.parse(`${day}T12:00:00Z`)) / 86400000);
+        return remaining > 0 ? remaining : 0;
+    };
+    const quickGoalName = type => DAILY_GOAL_LABELS[type] || type.replaceAll('_', ' ');
+    const quickGoalEditorView = data => {
+        const profile = data?.profile || null;
+        const sport = profile?.sport || 'cycling';
+        const goal = data?.goal || null;
+        const selectedSport = dailyGoalEditor?.sport || sport;
+        const types = quickGoalTypes(selectedSport);
+        const selectedType = dailyGoalEditor?.type || goal?.type ||
+            (selectedSport === 'running' ? 'general_running' : 'general_fitness');
+        const selectedDate = dailyGoalEditor?.date || goal?.date || '';
+        const missing = missingQuickProfileFields(profile);
+        return html`<section class="daily-goal-editor panel" aria-labelledby="daily-goal-editor-title">
+            <p class="eyebrow">Your goal</p>
+            <h2 id="daily-goal-editor-title" tabindex="-1">${goal ? 'Edit your goal' : 'Set your goal'}</h2>
+            <form id="daily-goal-form" novalidate>
+                <fieldset>
+                    <legend>Three choices</legend>
+                    <label>Sport<select name="dailySport" aria-label="Sport">
+                        <option value="cycling" ${selectedSport === 'cycling' ? 'selected' : ''}>Cycling</option>
+                        <option value="running" ${selectedSport === 'running' ? 'selected' : ''}>Running</option>
+                    </select></label>
+                    <label>Goal<select name="dailyGoal" aria-label="Goal">${types.map(type =>
+                        html`<option value="${type}" ${type === selectedType ? 'selected' : ''}>${quickGoalName(type)}</option>`).join('')}</select></label>
+                    <label>Timeline<select name="dailyTimeline" aria-label="Timeline">
+                        ${DAILY_HORIZONS.map(option => html`<option value="${option.days}" ${(!selectedDate && Number(option.days) === 91) ? 'selected' : ''}>${option.label}</option>`).join('')}
+                        <option value="date" ${selectedDate ? 'selected' : ''}>Choose a date</option>
+                    </select></label>
+                    <label ${selectedDate ? '' : 'hidden'}>Goal date<input type="date" name="dailyDate" value="${selectedDate}" min="${addDays(today(data), 1)}" max="${addDays(today(data), 365)}"></label>
+                </fieldset>
+                ${missing.length ? html`<p class="coach-alert" role="alert"><strong>Before a plan can be created:</strong> ${missing.map(value => escape(value)).join(', ')}.
+                    ${link('coach', 'Open Coach settings', 'button secondary')}</p>` : ''}
+                <p class="muted" data-daily-date-preview></p>
+                <p class="coach-alert" role="alert" data-daily-goal-error hidden></p>
+                <div class="button-row">
+                    <button type="button" data-action="daily-preview">Preview goal change</button>
+                    <button type="button" class="secondary" data-action="daily-cancel">Cancel</button>
+                </div>
+            </form>
+        </section>`;
+    };
+    const dailyGoalCard = data => {
+        if(!data?.goal) return quickGoalEditorView(data);
+        const goal = data.goal;
+        const day = today(data);
+        const remaining = remainingGoalDays(goal, day);
+        return html`<button type="button" class="daily-goal-card panel" data-action="daily-edit" data-today-goal-card aria-label="Edit your goal">
+            <span class="eyebrow">${data.profile?.sport === 'running' ? 'Running goal' : 'Cycling goal'}</span>
+            <strong>${goal.name || quickGoalName(goal.type)}</strong>
+            <span>${goal.date ? `${new Date(`${goal.date}T12:00:00Z`).toLocaleDateString(undefined, {day: 'numeric', month: 'long', year: 'numeric'})} · ${remaining} days remaining` : 'No goal date'}</span>
+            ${goal.distanceKm || goal.elevationM ? html`<small>Event details are saved. Open the full Coach to refine them.</small>` : html`<small>More goal details are available in the full Coach.</small>`}
+        </button>`;
+    };
 
     /**
      * Combine today's Coach, manual-calendar and imported sessions with recent cycling totals. A
      * missing Coach shows a recovery message while local riding remains available.
      */
+    const dailyPrimaryView = daily => {
+        if(!daily) return card('Today', html`<p>Refresh your Coach state to get today's recommendation.</p>`);
+        const snapshot = daily.snapshotDate
+            ? html`<p class="muted">Evidence snapshot: ${daily.snapshotDate}</p>` : '';
+        if(daily.status === 'planned' && daily.session) {
+            const run = (daily.session.sport ?? 'cycling') === 'running';
+            return card('Today', html`<p class="eyebrow">${escape(daily.session.family)} · ${minutes(daily.session.duration)}</p>
+                <h2 class="hero-title">${escape(daily.title)}</h2>
+                <p>${escape(daily.reason)}</p>${snapshot}
+                ${run ? link(`workout/${encodeURIComponent(daily.session.id)}`, 'View run', 'button')
+                    : html`<button type="button" data-action="start-workout" data-workout-id="${escape(daily.session.id)}">Start training</button>
+                        ${link(`workout/${encodeURIComponent(daily.session.id)}`, 'View training', 'button secondary')}`}`);
+        }
+        if(daily.status === 'review') {
+            return card('Today', html`<p class="eyebrow">Review before training</p><h2 class="hero-title">${escape(daily.title)}</h2>
+                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Review Coach proposal', 'button')}`);
+        }
+        if(daily.status === 'paused') {
+            return card('Today', html`<p class="eyebrow">Training paused</p><h2 class="hero-title">${escape(daily.title)}</h2>
+                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open Coach safety status', 'button secondary')}`);
+        }
+        if(daily.status === 'rest') {
+            return card('Today', html`<p class="eyebrow">Rest day</p><h2 class="hero-title">${escape(daily.title)}</h2>
+                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open full Coach', 'button secondary')}`);
+        }
+        return card('Today', html`<p class="eyebrow">${daily.status === 'unknown' ? 'Evidence needed' : 'Setup needed'}</p>
+            <h2 class="hero-title">${escape(daily.title)}</h2><p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open Coach', 'button secondary')}`);
+    };
     function dashboard(data) {
         if(!data) return card('Training data unavailable', html`<p>${coachingError || 'Your local training data has not loaded.'}</p>
             <button data-action="reload">Reload training data</button><p class="muted">Your local workout library and ride controls remain available.</p>`);
         const summary = trainingSummary(data);
+        const daily = todayRecommendation({data, state, now: new Date().toISOString()});
         const calendar = legacy.querySelector('training-calendar');
         const extras = calendar ? calendar.entriesForDate(today(data)).filter(entry => entry.source !== 'coaching' && entry.workout)
             .map(entry => ({id: entry.workout.id, family: entry.source === 'planned' ? 'Intervals.icu' : 'Calendar',
@@ -290,12 +379,24 @@ export async function launchPlatform(root) {
             : html`<h2 class="hero-title">${data?.plan?.status === 'active' ? 'Space to recover.' : 'Your next ride starts here.'}</h2>
                 <p>${data?.plan?.status === 'active' ? 'No Coach session scheduled today. Follow your recovery guidance, or choose a ride.' : 'Build a training plan or choose a session from your library.'}</p>
                 ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
-        if(mobile) return html`<section class="mobile-today panel hero"><p class="eyebrow">Today / ${today(data)}</p>${todayBody}</section>
+        if(mobile) return html`${dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data)}
+            ${dailyPrimaryView(daily)}
+            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(data.goal?.name || 'No goal')}</p>
+                <p><strong>New:</strong> ${escape(dailyGoalPreview.goal.name)}</p>
+                <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
+                ${dailyGoalPreview.warnings.length ? html`<p role="alert">${dailyGoalPreview.warnings.map(escape).join(' ')}</p>` : ''}
+                <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : ''}
             ${trainNowCard()}
             ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
             ${card('Connect & ride', html`<div class="button-row">${link('player', 'Open ride controls', 'button secondary')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
             ${card('Up next', next.length ? html`<ul class="session-list">${next.slice(0, 2).map(workoutRow)}</ul>` : html`<p>No upcoming sessions.</p>`, '', true)}`;
-        return html`<div class="dashboard-grid"><section class="panel hero"><p class="eyebrow">Today / ${today(data)}</p>${todayBody}</section>
+        return html`<div class="dashboard-grid">${dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data)}
+            ${dailyPrimaryView(daily)}
+            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(data.goal?.name || 'No goal')}</p>
+                <p><strong>New:</strong> ${escape(dailyGoalPreview.goal.name)}</p>
+                <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
+                ${dailyGoalPreview.warnings.length ? html`<p role="alert">${dailyGoalPreview.warnings.map(escape).join(' ')}</p>` : ''}
+                <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : ''}
             ${trainNowCard()}
             ${card('This week', html`<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
                 ${stat('Plan completed to date', summary.adherence == null ? '--' : `${Math.round(summary.adherence * 100)}%`)}</div>
@@ -571,6 +672,8 @@ export async function launchPlatform(root) {
 
     let libraryFilters = initialLibraryFilters();
     let libraryPage = 0;
+    let dailyGoalEditor = false;
+    let dailyGoalPreview = null;
     /**
      * Draw the selected platform page or expose the existing calendar/Coach/device/editor elements.
      * Do nothing before engine startup and profile handling finish.
@@ -698,6 +801,23 @@ export async function launchPlatform(root) {
      * library.
      */
     root.addEventListener('change', event => {
+        if(event.target.name === 'dailySport') {
+            const sport = event.target.value;
+            const types = quickGoalTypes(sport);
+            dailyGoalEditor = {sport, type: types[0], date: ''};
+            dailyGoalPreview = null;
+            render();
+            root.querySelector('[name=dailySport]')?.focus();
+            return;
+        }
+        if(event.target.name === 'dailyTimeline') {
+            const dateInput = root.querySelector('[name=dailyDate]');
+            const label = dateInput?.closest('label');
+            if(label) label.hidden = event.target.value !== 'date';
+            if(event.target.value !== 'date' && dateInput) dateInput.value = '';
+            if(event.target.value === 'date') dateInput?.focus();
+            return;
+        }
         const libraryField = {
             'workout-category': 'category', 'workout-type': 'type',
             'workout-duration': 'duration', 'workout-sort': 'sort',
@@ -904,6 +1024,69 @@ export async function launchPlatform(root) {
         }
         const action = event.target.closest('[data-action]')?.dataset.action;
         if(!action) return;
+        if(action === 'daily-edit') {
+            const data = coachingData();
+            dailyGoalEditor = {sport: data?.profile?.sport || data?.goal?.type && sportForGoalType(data.goal.type) || 'cycling',
+                type: data?.goal?.type || 'general_fitness', date: data?.goal?.date || ''};
+            dailyGoalPreview = null;
+            render();
+            root.querySelector('#daily-goal-editor-title')?.focus();
+            return;
+        }
+        if(action === 'daily-cancel') {
+            dailyGoalEditor = false;
+            dailyGoalPreview = null;
+            render();
+            root.querySelector('[data-action=daily-edit]')?.focus();
+            return;
+        }
+        if(action === 'daily-preview') {
+            void run(async () => {
+                const form = root.querySelector('#daily-goal-form');
+                if(!form) throw new Error('The goal form is no longer available.');
+                const values = new FormData(form);
+                const sport = values.get('dailySport');
+                const type = values.get('dailyGoal');
+                const timeline = values.get('dailyTimeline');
+                const requestedDate = timeline === 'date' ? values.get('dailyDate') : '';
+                const goal = normalizeQuickGoal({
+                    sport, type, horizon: timeline === 'date' ? null : timeline,
+                    date: requestedDate, today: today(coachingData()),
+                });
+                const data = coachingData();
+                let profile = quickProfile(data?.profile, sport);
+                if(!profile) {
+                    const missing = missingQuickProfileFields(null);
+                    throw new Error(`Complete the full Coach first: ${missing.join(', ')}.`);
+                }
+                if(profile.adultAthleteConfirmed !== true) {
+                    throw new Error('Confirm athlete age in the full Coach before creating or changing a plan.');
+                }
+                const missing = missingQuickProfileFields(profile);
+                if(missing.length) throw new Error(`Complete the full Coach first: ${missing.join(', ')}.`);
+                const mergedGoal = data?.goal
+                    ? {...JSON.parse(JSON.stringify(data.goal)), ...goal,
+                        date: goal.date, type: goal.type, name: goal.name, active: true}
+                    : goal;
+                dailyGoalPreview = coachingService().previewQuickGoal({profile, goal: mergedGoal});
+                render();
+                root.querySelector('[data-daily-goal-preview]')?.focus();
+            });
+            return;
+        }
+        if(action === 'daily-accept') {
+            void run(async () => {
+                if(!dailyGoalPreview) throw new Error('Preview the goal change before accepting it.');
+                await coachingService().acceptQuickGoal(dailyGoalPreview);
+                dailyGoalEditor = false;
+                dailyGoalPreview = null;
+                xf.dispatch('coaching:changed');
+                render();
+                root.querySelector('[data-today-goal-card]')?.focus();
+                report('The goal change was accepted and the plan was revised.');
+            });
+            return;
+        }
         if(action === 'sync') {
             void syncIntegration().catch(error => report(error.message, true));
             return;
@@ -950,6 +1133,8 @@ export async function launchPlatform(root) {
                     throw new Error('Finish and save your current ride before starting another workout.');
                 }
                 const data = coachingData();
+                const workoutId = event.target.closest('[data-workout-id]')?.dataset.workoutId;
+                if(workoutId) selectedId = workoutId;
                 const workout = selectedWorkout(data);
                 if(!workout) throw new Error('This workout is not available on this device.');
                 if(workout.coachingWorkoutId) {

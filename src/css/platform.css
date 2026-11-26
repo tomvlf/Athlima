@@ -289,6 +289,16 @@ coaching-panel [hidden] { display: none !important; }
 .microcycle-disruption-row label { min-width: 0; }
 .microcycle-disruption-row input, .microcycle-disruption-row select, .microcycle-disruption-row button { width: 100%; max-width: 100%; }
 #platform .coach-actions p { margin: 8px 0 0; }
+#daily-goal-form fieldset { border: 0; padding: 0; margin: 0; }
+#daily-goal-form label { display: grid; gap: 6px; }
+.daily-goal-card { width: 100%; min-height: 140px; display: grid; gap: 6px; align-content: center; text-align: left; }
+.daily-goal-card strong { font-size: 24px; line-height: 1.2; }
+.daily-goal-card small, .daily-goal-card span { color: var(--platform-muted); }
+.daily-goal-card .eyebrow { color: var(--platform-accent); }
+.daily-goal-editor { min-width: 0; }
+.mobile-app .daily-goal-card { min-height: 120px; }
+.mobile-app #daily-goal-form { min-width: 0; }
+.mobile-app #daily-goal-form fieldset { display: grid; grid-template-columns: minmax(0, 1fr); }
 #platform .coach-actions button + button { margin-left: 8px; }
 #legacy-slot coaching-panel details.coach-card > summary { font-weight: 650; font-size: 16px; padding: 0; min-height: 0; }
 #legacy-slot coaching-panel details.coach-card[open] > summary { margin-bottom: 10px; }
