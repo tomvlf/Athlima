@@ -3,11 +3,12 @@
 import { date, localDay } from './domain.js';
 import { buildMicrocycleContext } from './microcycle-context.js';
 import { buildMicrocycleCandidate } from './microcycle-candidate.js';
+import { markAutomaticReview } from './microcycle-triggers.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
-export function reviewMicrocycle(service, asOf = null, days = undefined, disruptions = {}) {
+export function reviewMicrocycle(service, asOf = null, days = undefined, disruptions = {}, trigger = null) {
     if(!service?.data?.plan || service.data.plan.status !== 'active') throw new Error('An active Coach plan is required to review a microcycle.');
     const working = clone(service.data);
     const today = date(asOf || localDay(service.clock(), working.profile.timeZone));
@@ -16,8 +17,10 @@ export function reviewMicrocycle(service, asOf = null, days = undefined, disrupt
     const context = buildMicrocycleContext({profile: working.profile, goal: working.goal, state,
         plan: working.plan, fromDate: today, ...(days == null ? {} : {days})});
     const timestamp = service.clock();
-    return {...buildMicrocycleCandidate({context, plan: working.plan, profile: working.profile,
-        state, timestamp, disruptions}), state, context, reviewedAt: timestamp};
+    const proposal = buildMicrocycleCandidate({context, plan: working.plan, profile: working.profile,
+        state, timestamp, disruptions});
+    markAutomaticReview(proposal.candidatePlan, trigger, timestamp);
+    return {...proposal, state, context, reviewedAt: timestamp, automaticTrigger: trigger};
 }
 
 export async function acceptMicrocycle(service, review) {
@@ -31,6 +34,7 @@ export async function acceptMicrocycle(service, review) {
     const expected = buildMicrocycleCandidate({context: review.context, plan: current.plan,
         profile: current.profile, state: review.state, timestamp: review.reviewedAt,
         disruptions: review.disruptions});
+    markAutomaticReview(expected.candidatePlan, review.automaticTrigger, review.reviewedAt);
     if(!same(expected.candidatePlan, review.candidatePlan) || !same(expected.changes, review.changes) ||
        !same(expected.candidate, review.candidate)) throw new Error('Microcycle candidate changed after review and cannot be accepted.');
     if(review.candidatePlan.revision !== current.plan.revision + 1 || review.candidatePlan.sourceSnapshot !== review.state.id) throw new Error('Microcycle candidate revision or source snapshot is invalid.');
