@@ -15,6 +15,11 @@ import { recordMicrocycleEvent } from '../coaching/microcycle-diagnostics.js';
 /** Escape dynamic values before inserting them into Coach HTML. */
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
+const visibleText = value => {
+    let text = String(value ?? '').replace(/\+/g, ' ');
+    try { text = decodeURIComponent(text); } catch {}
+    return text.replace(/%20/gi, ' ').replace(/%09/gi, ' ');
+};
 /** Format a duration in seconds as UI-safe whole minutes. */
 const minutes = seconds => formatMicrocycleMinutes(seconds);
 
@@ -27,9 +32,9 @@ const minutes = seconds => formatMicrocycleMinutes(seconds);
 export function todayRecommendationView(recommendation) {
     if(!recommendation) return '';
     const session = recommendation.session;
-    return `<section class="coach-card" data-today-recommendation><p class="eyebrow">Today</p><h3>${escape(recommendation.title)}</h3>
+    return `<section class="coach-card" data-today-recommendation><p class="eyebrow">Today</p><h3>${escape(visibleText(recommendation.title))}</h3>
         ${session ? `<p><strong>${escape(session.family)}</strong> · ${minutes(session.duration)} · Effort ${escape(session.expectedRpe ?? '—')}/10</p>` : ''}
-        <p>${escape(recommendation.reason)}</p>
+        <p>${escape(visibleText(recommendation.reason))}</p>
         ${recommendation.snapshotDate ? `<p class="muted">Evidence snapshot: ${escape(formatMicrocycleDate(recommendation.snapshotDate))}</p>` : ''}
         ${recommendation.status === 'review' ? `<button type="button" class="secondary" data-coach="microcycle-review">${microcycleMessage('reviewBeforeTraining')}</button>` : ''}</section>`;
 }
@@ -95,8 +100,8 @@ export function microcycleReviewView(review, plan = null) {
         </form></section>`;
     const changes = review.changes || [], summary = microcycleChangeSummary(review);
     return `<section class="coach-card" data-microcycle-review aria-live="polite"><h3 tabindex="-1" data-microcycle-review-title>${review.automaticTrigger ? microcycleMessage('reviewRecommended') : microcycleMessage('proposedUpdate')}</h3>
-        ${review.automaticTrigger ? `<p class="coach-notice">${escape(review.automaticTrigger.reason)} The proposal will not be applied without your approval.</p>` : ''}
-        <p><strong>${escape(summary.headline)}</strong> · ${escape(summary.detail)}</p><p>${escape(review.reasoning)}</p>${microcycleForecastView(review)}
+        ${review.automaticTrigger ? `<p class="coach-notice">${escape(visibleText(review.automaticTrigger.reason))} The proposal will not be applied without your approval.</p>` : ''}
+        <p><strong>${escape(summary.headline)}</strong> · ${escape(summary.detail)}</p><p>${escape(visibleText(review.reasoning))}</p>${microcycleForecastView(review)}
         <p class="muted">${escape(review.window.startDate)} to ${escape(review.window.endDate)} · based on revision ${escape(review.source.revision)}</p>
         ${changes.length ? `<ul class="coach-upcoming">${changes.map(change => { const previous = change.previous, current = change.current, day = current?.date || previous?.date;
             const text = change.action === 'removed' ? `${escape(previous.family)} removed (${minutes(previous.duration)})` : change.action === 'added' ? `${escape(current.family)} added (${minutes(current.duration)})` : `${escape(previous.family)} ${minutes(previous.duration)} → ${escape(current.family)} ${minutes(current.duration)}`;

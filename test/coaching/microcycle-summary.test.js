@@ -1,6 +1,6 @@
 /** Tests Phase 5 today guidance and concise candidate summaries without plan mutation. */
 
-import { todayRecommendation, microcycleChangeSummary } from '../../src/coaching/microcycle-summary.js';
+import { todayRecommendation, microcycleChangeSummary, visibleCoachText } from '../../src/coaching/microcycle-summary.js';
 import { profile, start, state } from './fixtures.js';
 
 const workout = {id: 'today', date: start, status: 'scheduled', family: 'threshold', title: 'Threshold 45 min',
@@ -61,6 +61,7 @@ test('does not expose percent-encoded whitespace in rest guidance', () => {
     });
     expect(result.reason).not.toContain('%20');
     expect(result.reason).toContain('no missed work or catch-up');
+    expect(visibleCoachText('Recovery%20and%20rest%20today')).toBe('Recovery and rest today');
 });
 
 test('summarises stable diff counts and net minutes', () => {

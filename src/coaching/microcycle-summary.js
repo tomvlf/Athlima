@@ -7,7 +7,11 @@
 import { localDay } from './domain.js';
 import { microcycleReadiness } from './microcycle-context.js';
 
-const visibleText = value => String(value ?? '').replace(/%20/gi, ' ').replace(/%09/gi, ' ');
+export const visibleCoachText = value => {
+    let text = String(value ?? '').replace(/\+/g, ' ');
+    try { text = decodeURIComponent(text); } catch {}
+    return text.replace(/%20/gi, ' ').replace(/%09/gi, ' ');
+};
 
 /**
  * Select today's existing planned session and explain whether it remains actionable.
@@ -19,7 +23,6 @@ const visibleText = value => String(value ?? '').replace(/%20/gi, ' ').replace(/
  * @returns {object} Conservative action recommendation, including explicit setup or evidence fallbacks.
  */
 export function todayRecommendation({data, state = data?.snapshots?.at(-1), now = new Date().toISOString()} = {}) {
-    const visible = value => String(value ?? '').replace(/%20/gi, ' ').replace(/%09/gi, ' ');
     const day = localDay(now, data?.profile?.timeZone || 'UTC');
     if(!data?.profile) {
         return {day, status: 'unavailable', session: null, title: 'Coach setup required',
@@ -49,7 +52,7 @@ export function todayRecommendation({data, state = data?.snapshots?.at(-1), now 
             ? `Recent load is ${state.weeklyLoad >= 0 ? 'being monitored' : 'not available'}`
             : 'Recent training evidence is limited';
         return {day, status: 'rest', session: null, title: 'Recovery and rest today',
-            reason: visibleText(`${recentLoad}. This rest is chosen from your recent training, current recovery signals and active goal; no missed work or catch-up is added.`),
+            reason: visibleCoachText(`${recentLoad}. This rest is chosen from your recent training, current recovery signals and active goal; no missed work or catch-up is added.`),
             snapshotDate: state.date};
     }
     if(state.sufficiency !== 'supported' || readiness.status === 'monitor') {
