@@ -34,24 +34,26 @@ revision, candidate projection, stable workout diff, reasoning and validation wa
 
 ## Phase 3: review and atomic acceptance
 
-`reviewMicrocycle()` creates a fresh state snapshot and candidate on a cloned CoachingService state.
-It does not change memory or storage. `acceptMicrocycle()` then:
+`reviewMicrocycle()` performs a side-effect-free review. `acceptMicrocycle()` rejects stale or altered
+proposals and atomically stores the snapshot, accepted plan and immutable revision.
 
-1. rejects stale plan revisions and mismatched athlete, goal or snapshot identities;
-2. deterministically rebuilds the proposal to detect tampering after review;
-3. verifies revision and source-snapshot continuity;
-4. stores the snapshot, accepted plan and immutable revision in one `CoachingService.commit()` call.
+## Phase 4: Coach review UI
 
-A failed storage write leaves the previous in-memory and persisted Coach state active. Candidates are
-not accepted automatically, and a reviewed candidate becomes stale as soon as another plan revision
-is committed.
+The existing `<coaching-panel>` now exposes a Coach review card. The rider can:
+
+1. request a fresh review of the next seven days;
+2. inspect reasoning, the source revision, warnings and per-session add/remove/modify changes;
+3. explicitly accept the verified proposal or dismiss it without changing the plan.
+
+The UI never accepts automatically. Acceptance still passes through the Phase 3 stale-context,
+identity, tamper and atomic-storage checks. All candidate text is escaped before rendering.
 
 ## Future phases
 
-1. expose review reasoning and changes through a Coach UI;
-2. add today's recommendation and explicit accept/reject controls;
-3. add richer availability and disruption input;
-4. schedule automatic review triggers without automatic unsafe acceptance.
+1. add today's recommendation and a concise "what changed" summary;
+2. add richer availability and disruption input;
+3. schedule automatic review triggers without automatic unsafe acceptance;
+4. add forecast comparisons for current versus candidate microcycles.
 
 ## Non-goals
 
