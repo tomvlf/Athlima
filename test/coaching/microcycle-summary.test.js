@@ -1,6 +1,6 @@
 /** Tests Phase 5 today guidance and concise candidate summaries without plan mutation. */
 
-import { todayRecommendation, microcycleChangeSummary } from '../../src/coaching/microcycle-summary.js';
+import { todayRecommendation, microcycleChangeSummary, visibleCoachText } from '../../src/coaching/microcycle-summary.js';
 import { profile, start, state } from './fixtures.js';
 
 const workout = {id: 'today', date: start, status: 'scheduled', family: 'threshold', title: 'Threshold 45 min',
@@ -29,7 +29,7 @@ test('pauses or asks for review when safety/readiness evidence requires it', () 
 
 test('returns a conservative rest message when nothing is planned today', () => {
     expect(todayRecommendation({data: data({plan: {...data().plan, workouts: []}}), now: `${start}T10:00:00Z`}))
-        .toMatchObject({status: 'rest', session: null});
+        .toMatchObject({status: 'rest', session: null, title: 'Recovery and rest today'});
 });
 
 test('requires setup or a dated snapshot and does not invent missing evidence', () => {
@@ -51,6 +51,17 @@ test('limits advice when the recent evidence sufficiency is limited', () => {
         readiness: {status: 'unknown', reason: 'Recent training evidence is limited.'}};
     expect(todayRecommendation({data: data(), state: limited, now: `${start}T10:00:00Z`}))
         .toMatchObject({status: 'review', snapshotDate: start});
+});
+
+test('does not expose percent-encoded whitespace in rest guidance', () => {
+    const result = todayRecommendation({
+        data: data({plan: {...data().plan, workouts: []}}),
+        state: {...state(), date: start},
+        now: `${start}T10:00:00Z`,
+    });
+    expect(result.reason).not.toContain('%20');
+    expect(result.reason).toContain('no missed work or catch-up');
+    expect(visibleCoachText('Recovery%20and%20rest%20today')).toBe('Recovery and rest today');
 });
 
 test('summarises stable diff counts and net minutes', () => {

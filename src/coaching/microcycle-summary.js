@@ -7,6 +7,12 @@
 import { localDay } from './domain.js';
 import { microcycleReadiness } from './microcycle-context.js';
 
+export const visibleCoachText = value => {
+    let text = String(value ?? '').replace(/\+/g, ' ');
+    try { text = decodeURIComponent(text); } catch {}
+    return text.replace(/%20/gi, ' ').replace(/%09/gi, ' ');
+};
+
 /**
  * Select today's existing planned session and explain whether it remains actionable.
  *
@@ -42,8 +48,11 @@ export function todayRecommendation({data, state = data?.snapshots?.at(-1), now 
             reason: readiness.reason, snapshotDate: state.date};
     }
     if(!session) {
-        return {day, status: 'rest', session: null, title: 'No planned session today',
-            reason: 'Follow the current plan and use the next scheduled session rather than adding catch-up work.',
+        const recentLoad = Number.isFinite(state.weeklyLoad)
+            ? `Recent load is ${state.weeklyLoad >= 0 ? 'being monitored' : 'not available'}`
+            : 'Recent training evidence is limited';
+        return {day, status: 'rest', session: null, title: 'Recovery and rest today',
+            reason: visibleCoachText(`${recentLoad}. This rest is chosen from your recent training, current recovery signals and active goal; no missed work or catch-up is added.`),
             snapshotDate: state.date};
     }
     if(state.sufficiency !== 'supported' || readiness.status === 'monitor') {

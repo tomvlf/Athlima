@@ -42,3 +42,13 @@ test('reports missing quick-plan inputs instead of inventing values', () => {
     expect(missingQuickProfileFields({...profile, adultAthleteConfirmed: false}))
         .toContain('adult confirmation');
 });
+
+test.each([42, 91, 182, 365])('accepts timeline choice %i days', horizon => {
+    expect(normalizeQuickGoal({
+        sport: 'cycling',
+        type: 'gran_fondo',
+        horizon,
+        today: '2026-01-01',
+    }).date).toBe(new Date(Date.parse(`2026-01-01T00:00:00Z`) + horizon * 86400000)
+        .toISOString().slice(0, 10));
+});

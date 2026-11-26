@@ -100,15 +100,14 @@ export class CoachingService {
         const next = JSON.parse(JSON.stringify(this.data));
         next.profile = JSON.parse(JSON.stringify(profile));
         next.goal = JSON.parse(JSON.stringify(goal));
-        const today = date(localDay(this.clock(), profile.timeZone));
-        const state = estimateState(next.activities, profile, today, this.rules,
+        const startDate = next.plan?.startDate || date(localDay(this.clock(), profile.timeZone));
+        const state = estimateState(next.activities, profile, startDate, this.rules,
             next.plan?.workouts.filter(workout => workout.status !== 'scheduled').map(workout =>
                 ({date: workout.date, status: workout.status, quality: workout.completionQuality,
                     family: workout.family, activityId: workout.matchedActivity,
                     expectedRpe: workout.expectedRpe, progressionEligible: workout.progressionEligible})) || []);
         state.safetyStatus = next.safetyStatus;
         state.id += `:${next.snapshots.length + 1}`;
-        const startDate = next.plan?.startDate || today;
         const candidate = generatePlan({profile, goal, state,
             startDate, generatedAt: this.clock()});
         candidate.id = next.plan?.id || candidate.id;
@@ -179,7 +178,7 @@ export class CoachingService {
             next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
         }
         const startDate = next.plan?.startDate || date(localDay(this.clock(), next.profile.timeZone));
-        const state = this.snapshot(next, date(localDay(this.clock(), next.profile.timeZone)));
+        const state = this.snapshot(next, startDate);
         const candidate = generatePlan({profile: next.profile, goal: next.goal, state,
             startDate, generatedAt: this.clock()});
         candidate.id = preview.candidate.id;

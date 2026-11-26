@@ -91,6 +91,14 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(versions.querySelector('[data-backend-version]')).toBeNull();
     expect(versions.querySelector('[data-refresh-version]')).toBeNull();
     expect(root.textContent).toContain('Set your goal');
+    expect(root.querySelectorAll('[data-daily-sport]').length).toBe(2);
+    expect(root.innerHTML).not.toContain('&lt;button');
+    const sixWeek = root.querySelector('[data-daily-timeline="42"]');
+    expect(sixWeek).not.toBeNull();
+    sixWeek.click();
+    await settle();
+    expect(root.querySelector('[name=dailyTimeline]').value).toBe('42');
+    expect(root.querySelector('[data-daily-timeline="42"]').getAttribute('aria-pressed')).toBe('true');
     expect(root.querySelector('[aria-current="page"]').textContent).toBe('Overview');
     expect(root.querySelector('.skip-link')).not.toBeNull();
     root.querySelector('.skip-link').click();

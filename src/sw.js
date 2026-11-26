@@ -5,7 +5,7 @@
  * to close so an active ride is not switched to new code mid-session.
  */
 
-const cacheName = 'too-many-watts-shell-v1';
+const cacheName = 'too-many-watts-shell-v3';
 /**
  * Allow only same-origin JavaScript, CSS, PNG, SVG and web-manifest files outside /api/. Not every
  * resource, such as a photograph or external response, is eligible for this cache.
@@ -35,7 +35,14 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-    event.waitUntil(self.clients.claim());
+    event.waitUntil((async () => {
+        if(typeof caches.keys === 'function') {
+            const names = await caches.keys();
+            await Promise.all(names.filter(name => name.startsWith('too-many-watts-shell-') && name !== cacheName)
+                .map(name => caches.delete(name)));
+        }
+        await self.clients.claim();
+    })());
 });
 
 /**

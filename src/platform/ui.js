@@ -12,7 +12,7 @@ import { coachingData, coachingService } from '../coaching/service.js';
 import { toAppWorkout } from '../coaching/workouts.js';
 import { GOALS, RUN_GOALS, addDays, localDay, sportForGoalType } from '../coaching/domain.js';
 import { describeRunPaces, formatPace, paceForIntensity } from '../coaching/running.js';
-import { todayRecommendation } from '../coaching/microcycle-summary.js';
+import { todayRecommendation, visibleCoachText } from '../coaching/microcycle-summary.js';
 import { DAILY_GOAL_LABELS, DAILY_HORIZONS, normalizeQuickGoal, quickProfile, missingQuickProfileFields, quickGoalTypes } from '../coaching/daily-coach.js';
 import { cadenceSummary, minutes, number, time, today, trainingSummary, profileGraph, mobileDetails } from './format.js';
 import { html, raw, setHTML, insertHTML } from '../html.js';
@@ -265,7 +265,34 @@ export async function launchPlatform(root) {
             Date.parse(`${day}T12:00:00Z`)) / 86400000);
         return remaining > 0 ? remaining : 0;
     };
-    const quickGoalName = type => DAILY_GOAL_LABELS[type] || type.replaceAll('_', ' ');
+    const quickGoalName = type => visibleText(DAILY_GOAL_LABELS[type] || type.replaceAll('_', ' '));
+    const visibleText = visibleCoachText;
+    const quickSportCards = selectedSport => html`
+        <button type="button" class="daily-choice ${selectedSport === 'cycling' ? 'selected' : ''}" data-daily-sport="cycling" aria-pressed="${selectedSport === 'cycling'}">
+            <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16h5.5L9.5 9h6L18 16M9.5 9l-.4-1.5M7.6 7.5h3"/><path d="M11.5 16l4-7"/>')}</span>
+            <strong>Cycling</strong>
+            <small>Bike workouts</small>
+        </button>
+        <button type="button" class="daily-choice ${selectedSport === 'running' ? 'selected' : ''}" data-daily-sport="running" aria-pressed="${selectedSport === 'running'}">
+            <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="12" cy="4" r="2"/><path d="M10 7l-2 5 4 2 2 7M8 12l-4 2M14 14l4 2"/>')}</span>
+            <strong>Running</strong>
+            <small>Run and pace</small>
+        </button>`;
+    const quickGoalCards = (types, selectedType) => types.map(type => html`
+        <button type="button" class="daily-choice daily-goal-choice ${type === selectedType ? 'selected' : ''}" data-daily-type="${type}" aria-pressed="${type === selectedType}">
+            <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4V2M20 12h2"/>')}</span>
+            <strong>${quickGoalName(type)}</strong>
+        </button>`);
+    const quickTimelineCards = (selectedDate, horizon) => html`
+        ${DAILY_HORIZONS.map(option => html`
+            <button type="button" class="daily-choice daily-timeline-choice ${!selectedDate && horizon === option.days ? 'selected' : ''}" data-daily-timeline="${option.days}" aria-pressed="${!selectedDate && horizon === option.days}">
+                <span class="daily-choice-icon" aria-hidden="true">${icon('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>')}</span>
+                <strong>${option.label}</strong>
+            </button>`)}
+        <button type="button" class="daily-choice daily-timeline-choice ${selectedDate ? 'selected' : ''}" data-daily-timeline="date" aria-pressed="${selectedDate}">
+            <span class="daily-choice-icon" aria-hidden="true">${icon('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M12 12v5M9.5 14.5h5"/>')}</span>
+            <strong>Choose a date</strong>
+        </button>`;
     const quickGoalEditorView = data => {
         const profile = data?.profile || null;
         const sport = profile?.sport || 'cycling';
@@ -274,26 +301,31 @@ export async function launchPlatform(root) {
         const types = quickGoalTypes(selectedSport);
         const selectedType = dailyGoalEditor?.type || goal?.type ||
             (selectedSport === 'running' ? 'general_running' : 'general_fitness');
-        const selectedDate = dailyGoalEditor?.date || goal?.date || '';
+        const selectedDate = dailyGoalEditor?.date !== undefined
+            ? dailyGoalEditor.date
+            : (goal?.date || '');
+        const horizon = Number(dailyGoalEditor?.horizon || 91);
         const missing = missingQuickProfileFields(profile);
         return html`<section class="daily-goal-editor panel" aria-labelledby="daily-goal-editor-title">
             <p class="eyebrow">Your goal</p>
             <h2 id="daily-goal-editor-title" tabindex="-1">${goal ? 'Edit your goal' : 'Set your goal'}</h2>
             <form id="daily-goal-form" novalidate>
                 <fieldset>
-                    <legend>Three choices</legend>
-                    <label>Sport<select name="dailySport" aria-label="Sport">
-                        <option value="cycling" ${selectedSport === 'cycling' ? 'selected' : ''}>Cycling</option>
-                        <option value="running" ${selectedSport === 'running' ? 'selected' : ''}>Running</option>
-                    </select></label>
-                    <label>Goal<select name="dailyGoal" aria-label="Goal">${types.map(type =>
-                        html`<option value="${type}" ${type === selectedType ? 'selected' : ''}>${quickGoalName(type)}</option>`).join('')}</select></label>
-                    <label>Timeline<select name="dailyTimeline" aria-label="Timeline">
-                        ${DAILY_HORIZONS.map(option => html`<option value="${option.days}" ${(!selectedDate && Number(option.days) === 91) ? 'selected' : ''}>${option.label}</option>`).join('')}
-                        <option value="date" ${selectedDate ? 'selected' : ''}>Choose a date</option>
-                    </select></label>
-                    <label ${selectedDate ? '' : 'hidden'}>Goal date<input type="date" name="dailyDate" value="${selectedDate}" min="${addDays(today(data), 1)}" max="${addDays(today(data), 365)}"></label>
+                    <legend>1. Choose your sport</legend>
+                    <div class="daily-choice-grid daily-sport-grid">${quickSportCards(selectedSport)}</div>
                 </fieldset>
+                <fieldset>
+                    <legend>2. Choose your goal</legend>
+                    <div class="daily-choice-grid daily-goal-grid">${quickGoalCards(types, selectedType)}</div>
+                </fieldset>
+                <fieldset>
+                    <legend>3. Choose a timeline</legend>
+                    <div class="daily-choice-grid daily-timeline-grid">${quickTimelineCards(selectedDate, horizon)}</div>
+                    <label class="daily-date-field" ${selectedDate ? '' : 'hidden'}>Goal date<input type="date" name="dailyDate" value="${selectedDate}" min="${addDays(today(data), 1)}" max="${addDays(today(data), 365)}"></label>
+                </fieldset>
+                <input type="hidden" name="dailySport" value="${selectedSport}">
+                <input type="hidden" name="dailyGoal" value="${selectedType}">
+                <input type="hidden" name="dailyTimeline" value="${selectedDate ? 'date' : horizon}">
                 ${missing.length ? html`<p class="coach-alert" role="alert"><strong>Before a plan can be created:</strong> ${missing.map(value => escape(value)).join(', ')}.
                     ${link('coach', 'Open Coach settings', 'button secondary')}</p>` : ''}
                 <p class="muted" data-daily-date-preview></p>
@@ -311,8 +343,9 @@ export async function launchPlatform(root) {
         const day = today(data);
         const remaining = remainingGoalDays(goal, day);
         return html`<button type="button" class="daily-goal-card panel" data-action="daily-edit" data-today-goal-card aria-label="Edit your goal">
+            <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4V2M20 12h2"/>')}</span>
             <span class="eyebrow">${data.profile?.sport === 'running' ? 'Running goal' : 'Cycling goal'}</span>
-            <strong>${goal.name || quickGoalName(goal.type)}</strong>
+            <strong>${visibleText(goal.name || quickGoalName(goal.type))}</strong>
             <span>${goal.date ? `${new Date(`${goal.date}T12:00:00Z`).toLocaleDateString(undefined, {day: 'numeric', month: 'long', year: 'numeric'})} · ${remaining} days remaining` : 'No goal date'}</span>
             ${goal.distanceKm || goal.elevationM ? html`<small>Event details are saved. Open the full Coach to refine them.</small>` : html`<small>More goal details are available in the full Coach.</small>`}
         </button>`;
@@ -326,29 +359,31 @@ export async function launchPlatform(root) {
         if(!daily) return card('Today', html`<p>Refresh your Coach state to get today's recommendation.</p>`);
         const snapshot = daily.snapshotDate
             ? html`<p class="muted">Evidence snapshot: ${daily.snapshotDate}</p>` : '';
+        const title = visibleText(daily.title);
+        const reason = visibleText(daily.reason);
         if(daily.status === 'planned' && daily.session) {
             const run = (daily.session.sport ?? 'cycling') === 'running';
             return card('Today', html`<p class="eyebrow">${escape(daily.session.family)} · ${minutes(daily.session.duration)}</p>
-                <h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}
+                <h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}
                 ${run ? link(`workout/${encodeURIComponent(daily.session.id)}`, 'View run', 'button')
                     : html`<button type="button" data-action="start-workout" data-workout-id="${escape(daily.session.id)}">Start training</button>
                         ${link(`workout/${encodeURIComponent(daily.session.id)}`, 'View training', 'button secondary')}`}`);
         }
         if(daily.status === 'review') {
-            return card('Today', html`<p class="eyebrow">Review before training</p><h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Review Coach proposal', 'button')}`);
+            return card('Today', html`<p class="eyebrow">Review before training</p><h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Review Coach proposal', 'button')}`);
         }
         if(daily.status === 'paused') {
-            return card('Today', html`<p class="eyebrow">Training paused</p><h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open Coach safety status', 'button secondary')}`);
+            return card('Today', html`<p class="eyebrow">Training paused</p><h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Open Coach safety status', 'button secondary')}`);
         }
         if(daily.status === 'rest') {
-            return card('Today', html`<p class="eyebrow">Rest day</p><h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open full Coach', 'button secondary')}`);
+            return card('Today', html`<p class="eyebrow">Recovery today</p><h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Open full Coach', 'button secondary')}`);
         }
         return card('Today', html`<p class="eyebrow">${daily.status === 'unknown' ? 'Evidence needed' : 'Setup needed'}</p>
-            <h2 class="hero-title">${escape(daily.title)}</h2><p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open Coach', 'button secondary')}`);
+            <h2 class="hero-title">${escape(title)}</h2><p>${escape(reason)}</p>${snapshot}${link('coach', 'Open Coach', 'button secondary')}`);
     };
     function dashboard(data) {
         if(!data) return card('Training data unavailable', html`<p>${coachingError || 'Your local training data has not loaded.'}</p>
@@ -381,10 +416,10 @@ export async function launchPlatform(root) {
                 ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
         if(mobile) return html`${dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data)}
             ${dailyPrimaryView(daily)}
-            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(data.goal?.name || 'No goal')}</p>
-                <p><strong>New:</strong> ${escape(dailyGoalPreview.goal.name)}</p>
+            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(visibleText(data.goal?.name || 'No goal'))}</p>
+                <p><strong>New:</strong> ${escape(visibleText(dailyGoalPreview.goal.name))}</p>
                 <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
-                ${dailyGoalPreview.warnings.length ? html`<p role="alert">${dailyGoalPreview.warnings.map(escape).join(' ')}</p>` : ''}
+                ${dailyGoalPreview.warnings.length ? html`<div role="alert" class="daily-preview-warnings">${[...new Set(dailyGoalPreview.warnings.map(visibleText))].slice(0, 3).map(warning => html`<p>${escape(warning)}</p>`)}</div>` : ''}
                 <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : ''}
             ${trainNowCard()}
             ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
@@ -392,10 +427,10 @@ export async function launchPlatform(root) {
             ${card('Up next', next.length ? html`<ul class="session-list">${next.slice(0, 2).map(workoutRow)}</ul>` : html`<p>No upcoming sessions.</p>`, '', true)}`;
         return html`<div class="dashboard-grid">${dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data)}
             ${dailyPrimaryView(daily)}
-            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(data.goal?.name || 'No goal')}</p>
-                <p><strong>New:</strong> ${escape(dailyGoalPreview.goal.name)}</p>
+            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(visibleText(data.goal?.name || 'No goal'))}</p>
+                <p><strong>New:</strong> ${escape(visibleText(dailyGoalPreview.goal.name))}</p>
                 <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
-                ${dailyGoalPreview.warnings.length ? html`<p role="alert">${dailyGoalPreview.warnings.map(escape).join(' ')}</p>` : ''}
+                ${dailyGoalPreview.warnings.length ? html`<div role="alert" class="daily-preview-warnings">${[...new Set(dailyGoalPreview.warnings.map(visibleText))].slice(0, 3).map(warning => html`<p>${escape(warning)}</p>`)}</div>` : ''}
                 <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : ''}
             ${trainNowCard()}
             ${card('This week', html`<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
@@ -1022,15 +1057,65 @@ export async function launchPlatform(root) {
             setTimeout(() => URL.revokeObjectURL(url), 1000);
             return;
         }
+        const dailySport = event.target.closest('[data-daily-sport]')?.dataset.dailySport;
+        if(dailySport) {
+            const data = coachingData();
+            const goal = data?.goal;
+            dailyGoalEditor = {
+                sport: dailySport,
+                type: dailySport === 'running' ? 'general_running' : 'general_fitness',
+                date: goal?.date || '',
+                horizon: 91,
+            };
+            dailyGoalPreview = null;
+            render();
+            root.querySelector(`[data-daily-sport="${dailySport}"]`)?.focus();
+            return;
+        }
+        const dailyType = event.target.closest('[data-daily-type]')?.dataset.dailyType;
+        if(dailyType) {
+            const data = coachingData();
+            const sport = dailyGoalEditor?.sport || data?.profile?.sport || 'cycling';
+            dailyGoalEditor = {
+                sport,
+                type: dailyType,
+                date: dailyGoalEditor?.date || data?.goal?.date || '',
+                horizon: dailyGoalEditor?.horizon || 91,
+            };
+            dailyGoalPreview = null;
+            render();
+            root.querySelector(`[data-daily-type="${dailyType}"]`)?.focus();
+            return;
+        }
+        const dailyTimeline = event.target.closest('[data-daily-timeline]')?.dataset.dailyTimeline;
+        if(dailyTimeline) {
+            const data = coachingData();
+            const sport = dailyGoalEditor?.sport || data?.profile?.sport || 'cycling';
+            const isDate = dailyTimeline === 'date';
+            dailyGoalEditor = {
+                sport,
+                type: dailyGoalEditor?.type || (sport === 'running' ? 'general_running' : 'general_fitness'),
+                date: isDate ? (dailyGoalEditor?.date || data?.goal?.date || '') : '',
+                horizon: isDate ? 91 : Number(dailyTimeline),
+            };
+            dailyGoalPreview = null;
+            render();
+            if(isDate) root.querySelector('[name=dailyDate]')?.focus();
+            else root.querySelector(`[data-daily-timeline="${dailyTimeline}"]`)?.focus();
+            return;
+        }
         const action = event.target.closest('[data-action]')?.dataset.action;
         if(!action) return;
         if(action === 'daily-edit') {
             const data = coachingData();
             dailyGoalEditor = {sport: data?.profile?.sport || data?.goal?.type && sportForGoalType(data.goal.type) || 'cycling',
-                type: data?.goal?.type || 'general_fitness', date: data?.goal?.date || ''};
+                type: data?.goal?.type || 'general_fitness', date: data?.goal?.date || '', horizon: 91};
             dailyGoalPreview = null;
             render();
             root.querySelector('#daily-goal-editor-title')?.focus();
+            return;
+        }
+        if(action === 'daily-sport') {
             return;
         }
         if(action === 'daily-cancel') {

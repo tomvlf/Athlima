@@ -324,4 +324,16 @@ describe('persistent coaching loop', () => {
         expect(service.data.goal.name).toBe('First simple goal');
         expect(service.data.plan.status).toBe('active');
     });
+    test('previews and accepts a quick goal when today differs from the existing plan start', async () => {
+        const {service, setDate} = await setup();
+        setDate('2026-11-27');
+        const preview = service.previewQuickGoal({
+            profile,
+            goal: {...goal, date: addDays(start, 182), name: 'Future goal'},
+        });
+        expect(preview.candidate.startDate).toBe(start);
+        await expect(service.acceptQuickGoal(preview)).resolves.toEqual(expect.objectContaining({
+            plan: expect.objectContaining({goalId: 'goal'}),
+        }));
+    });
 });
