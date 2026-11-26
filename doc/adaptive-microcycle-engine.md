@@ -35,6 +35,19 @@ dates, timestamps and numbers. Date and minute fields expose range constraints, 
 errors are linked to fields with `aria-invalid`, and validation feedback is announced in an
 alert region.
 
+## P2 runtime verification
+
+The AME review UI is exercised with jsdom runtime tests at the 320-pixel mobile layout,
+including repeatable day controls, keyboard focus, validation focus and review/dismiss
+actions. Cross-tab stale-acceptance is exercised against the shared persisted coaching
+state. These tests verify application behavior but are not substitutes for an independent
+real-browser and assistive-technology audit.
+
+Provider secrets are not encrypted by the application. Intervals.icu credentials remain in
+browser storage, may be readable by scripts with access to that browser profile, are sent
+only to Intervals.icu, and are excluded from local backups. Disconnecting or deleting local
+data removes the credential while external provider copies remain controlled at the provider.
+
 ## Phase 10: extended temporary availability
 
 The review UI uses repeatable day rules instead of comma-separated dates. Each rule can mark a date

@@ -105,6 +105,18 @@ describe('Adaptive Microcycle Engine Phase 3 service boundary', () => {
         crossTabStorage.setItem('too-many-watts-coaching-v1', JSON.stringify(stored));
         await expect(acceptMicrocycle(crossTab, crossReview)).rejects.toThrow(/another tab|stale/);
     });
+
+    test('accept revalidates persisted storage before a second tab can commit', async () => {
+        const {service, storage} = await setup();
+        const review = reviewMicrocycle(service, start);
+        const secondTab = new CoachingService(storage, () => timestamp);
+        const next = clone(secondTab.data);
+        next.plan.revision += 1;
+        await secondTab.commit(next);
+
+        await expect(acceptMicrocycle(service, review)).rejects.toThrow(/stale|another tab/);
+        expect(service.data.plan.revision).toBe(review.source.revision);
+    });
 });
 
 function clone(value) {

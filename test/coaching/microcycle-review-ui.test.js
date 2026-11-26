@@ -54,6 +54,26 @@ describe('Adaptive Microcycle Engine review UI', () => {
         } finally { panel.remove(); }
     });
 
+    test('keeps repeatable review controls usable in a 320-pixel mobile viewport', async () => {
+        window.innerWidth = 320;
+        document.body.classList.add('mobile-app');
+        const {panel} = await setup();
+        try {
+            const form = panel.querySelector('[data-microcycle-disruptions]');
+            expect(form).not.toBeNull();
+            const row = panel.querySelector('[data-microcycle-row]');
+            expect(row.querySelectorAll('input, select, button').length).toBeGreaterThanOrEqual(5);
+            expect([...row.querySelectorAll('input, select')].every(field =>
+                field.getAttribute('aria-label') || field.closest('label'))).toBe(true);
+            expect(panel.querySelector('[data-microcycle-accept]') || panel.querySelector('[data-coach=microcycle-review]'))
+                .not.toBeNull();
+        } finally {
+            document.body.classList.remove('mobile-app');
+            window.innerWidth = 1024;
+            panel.remove();
+        }
+    });
+
     test('links AME validation errors to the relevant field', async () => {
         const {panel} = await setup();
         try {
