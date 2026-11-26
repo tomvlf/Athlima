@@ -17,6 +17,28 @@ extends the deterministic Coach rather than creating a second planning system.
 - **Phase 7:** automatic review triggers without automatic acceptance.
 - **Phase 8:** transparent current-versus-candidate forecast comparison.
 - **Phase 9:** compact accepted-review history over immutable plan revisions.
+- **Phase 10:** repeatable temporary availability, duration, environment and per-day context rules.
+- **Phase 11:** accessible, centralised review presentation and formatting.
+- **Phase 12:** exportable, derived microcycle audit trail in coaching backups.
+- **Phase 13:** minimal persisted dismissal and seen status by fingerprint.
+- **Phase 14:** privacy-safe local diagnostics with stable error codes.
+- **Phase 15:** end-to-end stale, tamper, storage and plan-boundary hardening.
+
+## Phase 10: extended temporary availability
+
+The review UI uses repeatable day rules instead of comma-separated dates. Each rule can mark a date
+unavailable, set a maximum session duration, request indoor, outdoor or either environments, and
+add a short per-day note.
+
+`normalizeDisruptionRows()` detects duplicate dates and `normalizeDisruptions()` rejects out-of-window
+dates, invalid durations, unknown environments and invalid per-day notes. Candidate generation applies
+these rules to the existing plan only; it does not move or distribute removed load.
+
+Environment changes preserve workout identity and never increase duration, load, intensity or
+progression. When an existing workout cannot support the requested environment, the candidate tries
+only the existing validated workout library. If no conservative library variant fits, the session is
+removed. The existing accepted-candidate rebuilding process repeats the same normalized input so
+tampering between review and acceptance is rejected.
 
 ## Phase 9: revision history
 

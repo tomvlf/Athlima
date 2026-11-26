@@ -62,6 +62,49 @@ describe('Adaptive Microcycle Engine Phase 3 service boundary', () => {
         service.data.plan.status = 'active';
         expect(() => reviewMicrocycle(service, '2025-12-31')).toThrow(/inside/);
     });
+
+    test('rejects manipulated availability input when rebuilding the candidate', async () => {
+        const {service} = await setup();
+        const review = reviewMicrocycle(service, start, undefined, {
+            unavailableDates: [start],
+            environmentByDate: {[start]: 'indoor'},
+        });
+        review.disruptions.environmentByDate[start] = 'outdoor';
+        await expect(acceptMicrocycle(service, review)).rejects.toThrow(/changed after review|stale/);
+    });
+
+    test('persists only minimal dismiss and seen review status', async () => {
+        const {service} = await setup();
+        const trigger = {fingerprint: 'plan:1:state:2026-01-01:safe:unknown',
+            kind: 'weekly', reason: 'Due', today: '2026-01-08'};
+        await service.setMicrocycleReviewStatus(trigger, 'seen');
+        await service.setMicrocycleReviewStatus(trigger, 'dismissed');
+        expect(service.data.microcycleReviews[0]).toMatchObject({
+            fingerprint: trigger.fingerprint, status: 'dismissed',
+            planId: service.data.plan.id, revision: service.data.plan.revision,
+        });
+        expect(JSON.stringify(service.data.microcycleReviews)).not.toMatch(/candidate|workouts|snapshot/i);
+        await service.archive();
+        expect(service.data.microcycleReviews).toEqual([]);
+    });
+
+    test('rejects safety, plan-end and cross-tab changes during an open review', async () => {
+        const {service, storage} = await setup();
+        const safetyReview = reviewMicrocycle(service, start);
+        service.data.safetyStatus = 'illness';
+        await expect(acceptMicrocycle(service, safetyReview)).rejects.toThrow(/Safety status changed/);
+
+        const endReview = reviewMicrocycle(service, start);
+        service.clock = () => '2026-04-03T10:00:00Z';
+        await expect(acceptMicrocycle(service, endReview)).rejects.toThrow(/plan ended|stale/);
+
+        const {service: crossTab, storage: crossTabStorage} = await setup();
+        const crossReview = reviewMicrocycle(crossTab, start);
+        const stored = JSON.parse(crossTabStorage.getItem('athlima-coaching-v1'));
+        stored.plan.revision += 1;
+        crossTabStorage.setItem('athlima-coaching-v1', JSON.stringify(stored));
+        await expect(acceptMicrocycle(crossTab, crossReview)).rejects.toThrow(/another tab|stale/);
+    });
 });
 
 function clone(value) {

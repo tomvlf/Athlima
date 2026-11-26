@@ -60,4 +60,20 @@ describe('Adaptive Microcycle Engine Phase 2 candidate', () => {
         expect(diff.map(change => `${change.workoutId}:${change.action}`))
             .toEqual(['a:modified', 'b:removed', 'c:added']);
     });
+
+    test('rebuilds identical availability input without changing authoritative inputs', () => {
+        const source = inputs();
+        const disruptions = {
+            unavailableDates: [source.context.current.sessions[0].date],
+            maxMinutesByDate: {},
+            environmentByDate: {},
+            notesByDate: {[source.context.current.sessions[0].date]: 'Travel'},
+            note: 'Busy week',
+        };
+        const before = JSON.stringify(source);
+        const first = buildMicrocycleCandidate({...source, disruptions});
+        const second = buildMicrocycleCandidate({...source, disruptions});
+        expect(first).toEqual(second);
+        expect(JSON.stringify(source)).toBe(before);
+    });
 });

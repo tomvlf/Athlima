@@ -136,6 +136,7 @@ test('local backup restores coaching plans and history without including the Int
     const backup = await createBackup();
     expect(backup.version).toBe(2);
     expect(backup.coaching.plan).not.toBeNull();
+    expect(Array.isArray(backup.microcycleAudit)).toBe(true);
     expect(JSON.stringify(backup)).not.toContain('private-key');
     await storage.setItem('athlima-coaching-v1', null);
     storage.close();

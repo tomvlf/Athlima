@@ -15,7 +15,7 @@ import { FAMILIES } from './workouts.js';
 
 const KEY = 'athlima-coaching-v1';
 const empty = () => ({version: VERSION, profile: null, goal: null, activities: [],
-    snapshots: [], revisions: [], plan: null, safetyStatus: null});
+    snapshots: [], revisions: [], plan: null, safetyStatus: null, microcycleReviews: []});
 
 /**
  * Stores the athlete profile, training goal, imported activities, and generated plan.
@@ -42,6 +42,7 @@ export class CoachingService {
             throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
         }
         this.data.safetyStatus ??= null;
+        if(!Array.isArray(this.data.microcycleReviews)) this.data.microcycleReviews = [];
     }
     /**
      * Persists the next coaching state and swaps the runtime state only after a successful write.
@@ -116,6 +117,7 @@ export class CoachingService {
         next.plan = generatePlan({profile: next.profile, goal: next.goal, state,
             startDate, generatedAt: this.clock()});
         next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
+        next.microcycleReviews = [];
         return (await this.commit(next)).plan;
     }
     /**
@@ -128,7 +130,36 @@ export class CoachingService {
         const next = JSON.parse(JSON.stringify(this.data));
         next.plan.status = 'archived';
         next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
+        next.microcycleReviews = [];
         return this.commit(next);
+    }
+    /**
+     * Persist only the minimal status of a microcycle review fingerprint. Candidate plans,
+     * snapshots and availability details are never stored by this method.
+     *
+     * @param {object|null} trigger - Trigger returned by microcycleReviewTrigger().
+     * @param {'dismissed'|'seen'} status - Minimal review status.
+     * @returns {Promise<object>} Updated coaching state.
+     */
+    async setMicrocycleReviewStatus(trigger, status) {
+        if(!trigger?.fingerprint || !['dismissed', 'seen'].includes(status)) {
+            throw new Error('A valid microcycle review trigger and status are required.');
+        }
+        const plan = this.data.plan;
+        if(!plan) return this.data;
+        const next = JSON.parse(JSON.stringify(this.data));
+        next.microcycleReviews = (next.microcycleReviews || []).filter(entry =>
+            entry.fingerprint !== trigger.fingerprint);
+        next.microcycleReviews.push({
+            fingerprint: trigger.fingerprint,
+            status,
+            dismissedAt: status === 'dismissed' ? this.clock() : null,
+            planId: plan.id,
+            revision: plan.revision,
+        });
+        next.microcycleReviews = next.microcycleReviews.slice(-50);
+        await this.commit(next);
+        return this.data;
     }
     /**
      * Persist a pain/illness report or clear it. An active plan is adjusted and marked paused while

@@ -3,6 +3,7 @@
 import { adaptPlan } from './adaptation.js';
 import { projectMicrocycle } from './microcycle.js';
 import { applyMicrocycleDisruptions, normalizeDisruptions } from './microcycle-disruptions.js';
+import { recordMicrocycleEvent } from './microcycle-diagnostics.js';
 
 /** Deep-clone JSON-compatible Coach values without mutating their sources. */
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -64,6 +65,14 @@ export function buildMicrocycleCandidate({context, plan, profile, state, timesta
         }
     }
     if(!same(plan, beforePlan) || !same(state, beforeState)) throw new Error('Candidate generation mutated authoritative Coach inputs.');
+    recordMicrocycleEvent({
+        type: changes.length ? 'review_built' : 'review_no_changes',
+        timestamp,
+        planRevision: plan.revision,
+        trigger,
+        changeCount: changes.length,
+        plannerVersion: candidatePlan.plannerVersion ?? candidatePlan.workouts?.[0]?.plannerVersion ?? null,
+    });
     return {trigger, source: {planId: plan.id, revision: plan.revision, stateId: state.id},
         window: {...context.window}, current: context.current, candidate, changes, candidatePlan,
         disruptions: normalized,
