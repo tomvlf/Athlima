@@ -6,87 +6,68 @@
   <meta name="theme-color" content="#061527">
   <link rel="apple-touch-icon" sizes="180x180" href="images/logo/athlima-touch-180.png">
   <link rel="icon" type="image/png" sizes="64x64" href="images/logo/athlima-favicon-64.png">
-  <title>Athlima vs RestOrTrain vs ChatGPT | Cycling training comparison</title>
-  <meta name="description" content="Compare Athlima, RestOrTrain and ChatGPT for cycling workouts, coaching, trainer control, privacy and price.">
+  <title>Athlima vs TrainerRoad, HumanGO, JOIN, RestOrTrain and ChatGPT</title>
+  <meta name="description" content="Compare Athlima with TrainerRoad, HumanGO, JOIN, RestOrTrain and ChatGPT for adaptive coaching, workouts, trainer control, privacy and value.">
   <style>
-    :root { color-scheme: dark; --bg:#050c17; --panel:#0c1a2a; --line:#24415d; --text:#f4f8fc; --muted:#a9bac9; --cyan:#47e6ff; --yellow:#f6dd3d; --green:#77e6ad; }
-    * { box-sizing:border-box; }
-    body { margin:0; font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at top,#102c45 0,var(--bg) 42rem); }
-    a { color:var(--cyan); }
-    .wrap { width:min(1180px,calc(100% - 32px)); margin:auto; padding:24px 0 64px; }
-    nav { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:56px; }
-    .brand { color:var(--text); font-weight:800; letter-spacing:.12em; text-decoration:none; text-transform:uppercase; }
-    .back { border:1px solid var(--line); border-radius:999px; padding:9px 14px; text-decoration:none; }
-    .eyebrow { color:var(--yellow); font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-    h1 { max-width:900px; margin:.25em 0; font-size:clamp(2.4rem,7vw,5.5rem); line-height:.97; }
-    .lead { max-width:760px; color:var(--muted); font-size:1.15rem; }
-    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:34px 0; }
-    .card { padding:24px; border:1px solid var(--line); border-radius:18px; background:color-mix(in srgb,var(--panel) 92%,transparent); }
-    .card.athlima { border-color:var(--yellow); box-shadow:0 0 32px #f6dd3d18; }
-    .tag { display:inline-block; margin-bottom:8px; padding:4px 9px; border-radius:999px; background:#17314b; color:var(--cyan); font-size:.8rem; font-weight:700; }
-    .card h2 { margin:.2rem 0 .4rem; }
-    .card p { margin:0; color:var(--muted); }
-    .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
-    table { width:100%; min-width:820px; border-collapse:collapse; }
-    th,td { padding:16px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
-    th { position:sticky; top:0; background:#0b1826; }
-    th:first-child,td:first-child { width:19%; color:var(--muted); font-weight:700; }
-    th:nth-child(2) { color:var(--yellow); }
-    tr:last-child td { border-bottom:0; }
-    .yes { color:var(--green); font-weight:700; }
-    section { margin-top:48px; }
-    .choice { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
-    .note { color:var(--muted); font-size:.9rem; }
-    .cta { display:inline-block; margin-top:12px; padding:12px 18px; border-radius:10px; background:var(--yellow); color:#07101b; font-weight:800; text-decoration:none; }
-    @media (max-width:760px) { .summary,.choice { grid-template-columns:1fr; } nav { margin-bottom:36px; } }
+    :root{color-scheme:dark;--bg:#050c17;--panel:#0c1a2a;--panel2:#102238;--line:#24415d;--text:#f4f8fc;--muted:#a9bac9;--cyan:#47e6ff;--yellow:#f6dd3d;--green:#77e6ad}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font:16px/1.58 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at top,#102c45 0,var(--bg) 46rem)}a{color:var(--cyan)}.wrap{width:min(1240px,calc(100% - 32px));margin:auto;padding:24px 0 64px}nav{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:54px}.brand{color:var(--text);font-weight:850;letter-spacing:.13em;text-decoration:none;text-transform:uppercase}.button,.cta{display:inline-block;border-radius:10px;padding:11px 16px;font-weight:800;text-decoration:none}.button{border:1px solid var(--line)}.cta{margin-top:14px;background:var(--yellow);color:#07101b}.eyebrow{color:var(--yellow);font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{max-width:980px;margin:.2em 0;font-size:clamp(2.5rem,6.6vw,5.6rem);line-height:.98}.lead{max-width:850px;color:var(--muted);font-size:1.16rem}.quick{display:flex;flex-wrap:wrap;gap:9px;margin:28px 0}.quick a{padding:7px 11px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--muted)}section{margin-top:52px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{padding:23px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 94%,transparent)}.card.athlima{border-color:var(--yellow);box-shadow:0 0 32px #f6dd3d18}.tag{display:inline-block;margin-bottom:8px;padding:4px 9px;border-radius:999px;background:#17314b;color:var(--cyan);font-size:.78rem;font-weight:750}.card h2,.card h3{margin:.2rem 0 .45rem}.card p{margin:.4rem 0;color:var(--muted)}.card ul{padding-left:19px;color:var(--muted)}.card li{margin:.35rem 0}.verdict{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);color:var(--text)!important;font-weight:650}.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:var(--panel)}table{width:100%;min-width:1320px;border-collapse:collapse;font-size:.94rem}th,td{padding:14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{position:sticky;top:0;background:#0b1826}th:first-child,td:first-child{position:sticky;left:0;z-index:1;width:165px;background:#0b1826;color:var(--muted);font-weight:750}th:nth-child(2){color:var(--yellow)}tr:last-child td{border-bottom:0}.yes{color:var(--green);font-weight:700}.chooser{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.note{color:var(--muted);font-size:.9rem}.sources{display:flex;flex-wrap:wrap;gap:8px}.sources a{padding:6px 10px;border:1px solid var(--line);border-radius:8px;text-decoration:none}@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.grid,.chooser{grid-template-columns:1fr}nav{margin-bottom:36px}}
   </style>
 </head>
 <body>
 <main class="wrap">
-  <nav><a class="brand" href="./">Athlima</a><a class="back" href="./">Open the app</a></nav>
-  <p class="eyebrow">Training tools compared</p>
-  <h1>Athlima vs RestOrTrain vs ChatGPT</h1>
-  <p class="lead">These three tools solve different parts of training. Athlima is an open-source browser app for planning and executing workouts locally, with no subscription required. RestOrTrain is a managed endurance-coaching service with limited free use and an optional Pro subscription. ChatGPT is a general-purpose assistant that can reason about training context you provide.</p>
+  <nav><a class="brand" href="./">Athlima</a><a class="button" href="./">Open the app</a></nav>
+  <p class="eyebrow">Six ways to train smarter</p>
+  <h1>Which training platform fits the way you ride?</h1>
+  <p class="lead">Athlima, TrainerRoad, HumanGO, JOIN, RestOrTrain and ChatGPT can all support better training, but they make very different promises. Some take over the planning. Some turn your devices into a connected coaching ecosystem. Athlima puts workout execution, local data and practical coaching directly in your browser.</p>
+  <div class="quick"><a href="#profiles">The six options</a><a href="#comparison">Full comparison</a><a href="#choose">Find your fit</a><a href="#sources">Sources</a></div>
 
-  <div class="summary">
-    <article class="card athlima"><span class="tag">Local &amp; open source</span><h2>Athlima</h2><p>Best for riders who want trainer control, workout execution and deterministic local coaching without an account or cloud backend.</p></article>
-    <article class="card"><span class="tag">Integrated coaching service</span><h2>RestOrTrain</h2><p>Best for athletes who want synchronized history, adaptive planning and workout delivery handled as a managed service.</p></article>
-    <article class="card"><span class="tag">General-purpose AI</span><h2>ChatGPT</h2><p>Best for broad questions, explanations and flexible analysis when you supply or connect the relevant training context.</p></article>
-  </div>
+  <section id="profiles">
+    <h2>The market at a glance</h2>
+    <div class="grid">
+      <article class="card athlima"><span class="tag">LOCAL, OPEN &amp; HANDS-ON</span><h2>Athlima</h2><p>A browser-based training cockpit for riders who want to plan, ride and review without handing their full training life to another cloud account.</p><ul><li>Runs structured cycling workouts and controls compatible smart trainers</li><li>Local rule-based coaching for cycling and running</li><li>Workout library, calendar, FIT recording and Intervals.icu connection</li><li>No Athlima login, no subscription and self-hosting is possible</li></ul><p class="verdict">Best fit: privacy-conscious riders, tinkerers and anyone who wants maximum control with minimum subscription overhead.</p></article>
+      <article class="card"><span class="tag">CYCLING PERFORMANCE ENGINE</span><h2>TrainerRoad</h2><p>A polished, performance-first system built around one central promise: make cyclists faster with adaptive, power-based training.</p><ul><li>AI selects and adapts workouts from training history, performance and recovery</li><li>AI FTP Detection, fatigue prevention and daily recommendations</li><li>Indoor and outdoor delivery through Zwift, Garmin, Wahoo and more</li><li>Interactive calendar and personalized performance insights</li></ul><p class="verdict">Best fit: committed cyclists who want a mature, highly automated path to stronger race performance.</p></article>
+      <article class="card"><span class="tag">MULTISPORT AI COACH</span><h2>HumanGO</h2><p>A conversational, AI-led endurance coach designed around busy schedules, changing availability and ambitious single- or multisport goals.</p><ul><li>Hugo adapts plans using training, availability, feedback and health metrics</li><li>Running, cycling, triathlon and duathlon support</li><li>Wearable connections, guided workouts and workout delivery to supported watches</li><li>Premium adds multiple goals, recalibration tests and race pacing tools</li></ul><p class="verdict">Best fit: runners and multisport athletes who want a personable AI coach that reshapes the plan around real life.</p></article>
+      <article class="card"><span class="tag">SIMPLE, FLEXIBLE CYCLING</span><h2>JOIN</h2><p>A cyclist-friendly coaching app that hides the complexity and gives you a clear next step based on your goal, level and available time.</p><ul><li>Adaptive plans react to availability, completed rides and missed sessions</li><li>More than 400 workouts and plans for building, improving and peaking</li><li>Workout player, workout score and easy-to-understand JOIN level</li><li>Connections with services and devices including Strava, Zwift, Garmin and Wahoo</li></ul><p class="verdict">Best fit: cyclists with busy calendars who want professional structure without feeling like they are operating a sports-science dashboard.</p></article>
+      <article class="card"><span class="tag">CONNECTED ENDURANCE COACH</span><h2>RestOrTrain</h2><p>A managed coaching experience that combines computed training metrics, AI guidance, season planning and workout delivery.</p><ul><li>Calculates training values before AI analysis and adds endurance-specific guardrails</li><li>Builds seasons, phases and individual workouts</li><li>Automatic activity and recovery sync from supported services</li><li>Workout delivery plus an indoor FTMS player with ERG</li></ul><p class="verdict">Best fit: endurance athletes who want coaching decisions and workout delivery in one connected service.</p></article>
+      <article class="card"><span class="tag">FLEXIBLE GENERAL ASSISTANT</span><h2>ChatGPT</h2><p>A broad AI assistant rather than a dedicated training platform. Its strength is flexible thinking, explanation and analysis across almost any topic.</p><ul><li>Can discuss plans, interpret uploaded files and explain training concepts</li><li>Useful for brainstorming, reflection and turning context into readable advice</li><li>Not a dedicated workout calendar, sensor platform or smart-trainer controller</li><li>Quality depends heavily on the prompt, supplied data and available tools</li></ul><p class="verdict">Best fit: athletes who want a versatile thinking partner and are happy to bring their own data and workflow.</p></article>
+    </div>
+  </section>
 
-  <section aria-labelledby="comparison-title">
-    <h2 id="comparison-title">At a glance</h2>
+  <section id="comparison">
+    <h2>Side-by-side comparison</h2>
+    <p class="lead">No single platform wins every category. The real choice is whether you value local ownership, deep cycling automation, multisport intelligence, simplicity or open-ended conversation most.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Capability</th><th>Athlima</th><th>RestOrTrain</th><th>ChatGPT</th></tr></thead>
+      <thead><tr><th>Capability</th><th>Athlima</th><th>TrainerRoad</th><th>HumanGO</th><th>JOIN</th><th>RestOrTrain</th><th>ChatGPT</th></tr></thead>
       <tbody>
-        <tr><td>Primary role</td><td>Browser-based indoor cycling dashboard, workout player and local coach</td><td>Endurance coaching, planning and delivery service</td><td>General-purpose conversational assistant</td></tr>
-        <tr><td>Coaching approach</td><td>Local, deterministic rule-based coaching for cycling and running</td><td>Computed metrics plus AI tuned for endurance decisions</td><td>Answers depend on the prompt, supplied context and available connections</td></tr>
-        <tr><td>Training data</td><td>Stored in the browser; optional direct Intervals.icu import and FIT upload</td><td>Automatic activity and recovery sync from supported services</td><td>Files, screenshots and supported connections supplied by the user</td></tr>
-        <tr><td>Season &amp; weekly planning</td><td class="yes">Yes, local multi-week calendar and proposed schedules</td><td class="yes">Yes, goal-based phases and scheduled workouts</td><td>Can suggest plans, but does not provide a dedicated training calendar by default</td></tr>
-        <tr><td>Smart-trainer control</td><td class="yes">Built in: ERG, resistance and grade simulation</td><td class="yes">Built-in indoor player with ERG</td><td>No built-in trainer control</td></tr>
-        <tr><td>Workout formats</td><td>Built-in workouts, ZWO import and FIT recording/export</td><td>Workouts created in the service and delivered to supported devices</td><td>Can draft workouts in text or files when prompted</td></tr>
-        <tr><td>Sensor support</td><td>FTMS, FE-C over BLE, Wahoo CPS and ANT+ FE-C; power, cadence and heart-rate recording</td><td>Bluetooth FTMS trainer and optional heart-rate strap in its indoor player</td><td>No direct sensor control as a general chat interface</td></tr>
-        <tr><td>Offline use</td><td class="yes">Best-effort after required assets are cached; integrations require connectivity</td><td>Not specified on the cited comparison page</td><td>Not assessed in this comparison</td></tr>
-        <tr><td>Privacy model</td><td>Local browser storage, no Athlima login, no external AI provider</td><td>Cloud account with synchronized training history</td><td>Cloud service; handling depends on account, settings and connected features</td></tr>
-        <tr><td>Open source / self-hosting</td><td class="yes">Yes, AGPL-3.0 and Docker deployment</td><td>No self-hosted version stated on the cited comparison page</td><td>Hosted service; no self-hosting option identified in the cited consumer documentation</td></tr>
-        <tr><td>Price</td><td class="yes">No subscription required; open-source and self-hostable</td><td>Limited free use; optional Pro subscription with regional pricing</td><td>Free and paid plans</td></tr>
-        <tr><td>Platform</td><td>Compatible Chromium-based browsers; trainer path is not supported on iOS</td><td>iPhone, iPad and Android; Apple-silicon Mac via the iPad app; no web version</td><td>Website and supported apps</td></tr>
+        <tr><td>Core promise</td><td>Own the workout experience locally</td><td>Get faster through adaptive cycling training</td><td>Fit personalized endurance coaching around your life</td><td>Make effective cycling plans simple and flexible</td><td>Connect coaching decisions directly to your training</td><td>Reason about almost anything you provide</td></tr>
+        <tr><td>Main sports</td><td>Cycling execution; cycling and running plans</td><td>Primarily cycling</td><td>Running, cycling, triathlon and duathlon</td><td>Cycling</td><td>Cycling, running, swimming and triathlon</td><td>Not sport-specific</td></tr>
+        <tr><td>Personalization</td><td>Local rules use goals, availability, history, load and readiness</td><td>AI adapts to history, fitness, goals, performance and recovery</td><td>AI adapts to schedule, physiology, health data and feedback</td><td>Adapts to level, goals, availability and completed or missed rides</td><td>Computed metrics, athlete history and endurance-tuned AI</td><td>Depends on prompts, memory, files and connected context</td></tr>
+        <tr><td>Planning style</td><td>Local calendar, proposed schedules and Train Now</td><td>Adaptive plan, daily recommendations and interactive calendar</td><td>Dynamic single- or multisport goals with schedule changes</td><td>Build, improve and peak plans with a clear next action</td><td>Season phases, weekly plans and scheduled workouts</td><td>Can draft plans; no dedicated training calendar by default</td></tr>
+        <tr><td>Workout execution</td><td class="yes">Built-in browser workout player</td><td class="yes">Indoor app plus outside delivery and Zwift integration</td><td>Guided workouts and delivery to supported watches</td><td>Workout player and workout score</td><td class="yes">Indoor FTMS player and device delivery</td><td>No built-in workout player</td></tr>
+        <tr><td>Smart-trainer control</td><td class="yes">ERG, resistance and grade simulation</td><td>Indoor structured workouts on compatible equipment</td><td>Not positioned as the core product experience</td><td>Indoor-trainer connection and workout execution</td><td class="yes">FTMS indoor player with ERG</td><td>No direct trainer control</td></tr>
+        <tr><td>Data &amp; devices</td><td>Local browser data; optional Intervals.icu; FIT and ZWO workflows</td><td>Training history plus Zwift, Garmin, Wahoo and other supported services</td><td>Wearables, apps and devices; includes health and recovery metrics</td><td>Strava, Zwift, Garmin, Wahoo and other supported connections</td><td>Automatic ride and recovery sync across supported providers</td><td>Files, screenshots and supported connections supplied by the user</td></tr>
+        <tr><td>Privacy model</td><td class="yes">Local by default; no Athlima account or external AI</td><td>Cloud subscription service</td><td>Cloud-native web and mobile service</td><td>Cloud subscription service</td><td>Cloud account and synchronized athlete history</td><td>Cloud service; handling depends on plan and settings</td></tr>
+        <tr><td>Open source</td><td class="yes">Yes, AGPL-3.0</td><td>No self-hosting offer identified</td><td>No self-hosting offer identified</td><td>No self-hosting offer identified</td><td>No self-hosting offer identified</td><td>No self-hosted consumer service identified</td></tr>
+        <tr><td>Price checked 26 Nov 2026</td><td class="yes">No subscription required</td><td>$21.99 monthly or $209.99 yearly; 30-day guarantee</td><td>Essential $16.99/month; Premium $28.99/month; annual options and trial</td><td>€16.99 monthly or €119.99 yearly; free trial advertised</td><td>Limited free use; Pro pricing varies by region</td><td>Free and paid plans; Plus listed at $20/month</td></tr>
+        <tr><td>Strongest reason to choose</td><td>Ownership, trainer control and value</td><td>Deep cycling performance automation</td><td>Multisport coaching with a conversational feel</td><td>Simple plans that fit a busy cycling life</td><td>End-to-end endurance coaching and delivery</td><td>Maximum breadth and flexibility</td></tr>
       </tbody>
     </table></div>
   </section>
 
-  <section>
-    <h2>Which one should you choose?</h2>
-    <div class="choice">
-      <article class="card"><h3>Choose Athlima if…</h3><p>You value local data, self-hosting, open source, direct trainer control and a cycling-first workout screen. Among these three, Athlima uniquely combines an in-browser cycling workout player with a fully local rule-based coach.</p><a class="cta" href="./">Start Athlima</a></article>
-      <article class="card"><h3>Choose RestOrTrain if…</h3><p>You want a managed coaching experience that automatically syncs training and recovery data, adapts plans and sends workouts to supported devices.</p></article>
-      <article class="card"><h3>Choose ChatGPT if…</h3><p>You want a flexible general assistant for explanations, brainstorming and analysis across training and unrelated topics, and you are comfortable supplying the necessary context.</p></article>
+  <section id="choose">
+    <h2>Choose by the experience you want</h2>
+    <div class="chooser">
+      <article class="card"><h3>“I want to ride, not manage another subscription.”</h3><p><strong>Athlima</strong> is the clearest fit. Your core training data stays in your browser, trainer control is built in and you can self-host it.</p><a class="cta" href="./">Start Athlima</a></article>
+      <article class="card"><h3>“My main goal is becoming a faster cyclist.”</h3><p><strong>TrainerRoad</strong> offers the deepest performance-focused automation. <strong>JOIN</strong> is the more approachable alternative when simplicity and schedule flexibility matter more than a heavy performance system.</p></article>
+      <article class="card"><h3>“I train for running or triathlon too.”</h3><p><strong>HumanGO</strong> stands out for multisport goals and an AI-coach relationship. <strong>RestOrTrain</strong> is compelling when connected metrics and workout delivery are the bigger priority.</p></article>
+      <article class="card"><h3>“I want advice beyond the training app.”</h3><p><strong>ChatGPT</strong> is the broadest thinking partner. Use it alongside a dedicated platform when you want explanations, reflection or help connecting training with travel, nutrition planning or everyday life.</p></article>
     </div>
   </section>
 
-  <section class="note">
-    <p><strong>Sources and scope.</strong> Athlima details are based on the project documentation, privacy page and current repository. RestOrTrain details are based on its public comparison page. ChatGPT plan, file-upload and platform details are based on official OpenAI consumer documentation. Sources checked on 26 November 2026. Features and prices can change. This comparison focuses on product workflow, not medical or safety advice.</p>
-    <p><a href="https://<scrubbed-url-domain>/tomvlf/Athlima">Athlima source code</a> · <a href="https://<scrubbed-url-domain>/compare/restortrain-vs-chatgpt" rel="noopener noreferrer">RestOrTrain comparison</a> · <a href="https://<scrubbed-url-domain>/en/articles/6950777-what-is-chatgpt-plus" rel="noopener noreferrer">Official ChatGPT Plus documentation</a></p>
+  <section id="sources" class="note">
+    <h2>Sources and scope</h2>
+    <p>Product descriptions and public prices were checked against first-party pages on 26 November 2026. Marketing claims such as rankings, performance gains and review scores are not treated as independently verified outcomes. Prices, trials, integrations and features can change by region and over time. This is a product-workflow comparison, not medical advice.</p>
+    <div class="sources"><a href="https://<scrubbed-url-domain>/tomvlf/Athlima">Athlima source</a><a href="https://<scrubbed-url-domain>">TrainerRoad</a><a href="https://<scrubbed-url-domain>/pricing">TrainerRoad pricing</a><a href="https://<scrubbed-url-domain>/app">HumanGO</a><a href="https://<scrubbed-url-domain>/faqs">HumanGO FAQ</a><a href="https://<scrubbed-url-domain>/nl/">JOIN</a><a href="https://<scrubbed-url-domain>/nl/pricing">JOIN pricing</a><a href="https://<scrubbed-url-domain>/compare/restortrain-vs-chatgpt">RestOrTrain comparison</a><a href="https://<scrubbed-url-domain>/en/articles/6950777-what-is-chatgpt-plus">OpenAI documentation</a></div>
   </section>
 </main>
 </body>
