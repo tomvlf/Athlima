@@ -1,10 +1,11 @@
-/** Extends the Coach dashboard with today guidance, disruption input and explicit review controls. */
+/** Extends the Coach dashboard with today guidance, review controls, forecasts and revision history. */
 
 import { CoachingPanel } from './coaching-panel.js';
 import { coachingService } from '../coaching/service.js';
 import { reviewMicrocycle, acceptMicrocycle } from '../coaching/microcycle-service.js';
 import { microcycleChangeSummary, todayRecommendation } from '../coaching/microcycle-summary.js';
 import { compareMicrocycleForecasts } from '../coaching/microcycle-forecast.js';
+import { microcycleRevisionHistory } from '../coaching/microcycle-history.js';
 import { microcycleReviewTrigger } from '../coaching/microcycle-triggers.js';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
@@ -21,14 +22,22 @@ export function todayRecommendationView(recommendation) {
 
 export function microcycleForecastView(review) {
     const forecast = compareMicrocycleForecasts(review.current, review.candidate);
-    const rows = [['Sessions', 'sessions'], ['Training days', 'trainingDays'], ['Minutes', 'minutes'],
-        ['Planned load', 'load'], ['Quality sessions', 'qualitySessions'], ['Recovery sessions', 'recoverySessions'],
-        ['Longest session (min)', 'longestMinutes']];
-    return `<section data-microcycle-forecast><h4>Seven-day plan comparison</h4>
-        <p><strong>${escape(forecast.headline)}</strong></p>
-        <div class="coach-stats"><div><strong>Current</strong><span>plan</span></div><div><strong>Candidate</strong><span>proposal</span></div></div>
+    const rows = [['Sessions', 'sessions'], ['Training days', 'trainingDays'], ['Minutes', 'minutes'], ['Planned load', 'load'],
+        ['Quality sessions', 'qualitySessions'], ['Recovery sessions', 'recoverySessions'], ['Longest session (min)', 'longestMinutes']];
+    return `<section data-microcycle-forecast><h4>Seven-day plan comparison</h4><p><strong>${escape(forecast.headline)}</strong></p>
         <dl>${rows.map(([label, key]) => `<div><dt>${escape(label)}</dt><dd>${escape(forecast.current[key])} → ${escape(forecast.candidate[key])}</dd></div>`).join('')}</dl>
         <p class="muted">${escape(forecast.disclaimer)}</p></section>`;
+}
+
+export function microcycleHistoryView(data) {
+    const history = microcycleRevisionHistory(data, 10);
+    if(!history.length) return '';
+    return `<details class="coach-card" data-microcycle-history><summary>Adaptive review history <span class="muted">${history.length} accepted</span></summary>
+        <p class="muted">Read-only audit trail. Historical revisions cannot be restored from here.</p>
+        <ol>${history.map(item => `<li><details><summary>Revision ${escape(item.revision)} · ${escape(item.trigger)} · ${escape(new Date(item.timestamp).toLocaleString())}</summary>
+            <p><strong>${escape(item.summary.headline)}</strong> · ${escape(item.summary.detail)}</p>
+            <p>${escape(item.reasoning)}</p><p class="muted">Snapshot ${escape(item.snapshotId)} · Load change ${escape(item.loadChange ?? 'unknown')} · ${escape(item.warningCount)} warning${item.warningCount === 1 ? '' : 's'}</p>
+        </details></li>`).join('')}</ol></details>`;
 }
 
 export function microcycleReviewView(review) {
@@ -36,19 +45,15 @@ export function microcycleReviewView(review) {
         <form data-microcycle-disruptions><label>Unavailable dates <input name="unavailableDates" placeholder="YYYY-MM-DD, YYYY-MM-DD"></label>
             <label>Shorter session <input type="date" name="limitDate"> <input type="number" name="maxMinutes" min="0" max="1440" step="1" placeholder="minutes"></label>
             <label>Context note <input name="note" maxlength="240" placeholder="e.g. travel or late meeting"></label>
-            <p class="muted">Unavailable work is removed, never moved or made up. Nothing changes until you accept.</p>
-            <button type="button" class="secondary" data-coach="microcycle-review">Review next 7 days</button></form></section>`;
+            <p class="muted">Unavailable work is removed, never moved or made up. Nothing changes until you accept.</p><button type="button" class="secondary" data-coach="microcycle-review">Review next 7 days</button></form></section>`;
     const changes = review.changes || [], summary = microcycleChangeSummary(review);
     return `<section class="coach-card" data-microcycle-review><h3>${review.automaticTrigger ? 'Coach review recommended' : 'Proposed week update'}</h3>
-        ${review.automaticTrigger ? `<p class="coach-notice">${escape(review.automaticTrigger.reason)} The proposal was prepared automatically but will not be applied without your approval.</p>` : ''}
-        <p><strong>${escape(summary.headline)}</strong> · ${escape(summary.detail)}</p><p>${escape(review.reasoning)}</p>
-        ${microcycleForecastView(review)}
-        ${review.disruptions?.note ? `<p class="muted"><strong>Context:</strong> ${escape(review.disruptions.note)}</p>` : ''}
+        ${review.automaticTrigger ? `<p class="coach-notice">${escape(review.automaticTrigger.reason)} The proposal will not be applied without your approval.</p>` : ''}
+        <p><strong>${escape(summary.headline)}</strong> · ${escape(summary.detail)}</p><p>${escape(review.reasoning)}</p>${microcycleForecastView(review)}
         <p class="muted">${escape(review.window.startDate)} to ${escape(review.window.endDate)} · based on revision ${escape(review.source.revision)}</p>
         ${changes.length ? `<ul class="coach-upcoming">${changes.map(change => { const previous = change.previous, current = change.current, day = current?.date || previous?.date;
             const text = change.action === 'removed' ? `${escape(previous.family)} removed (${minutes(previous.duration)})` : change.action === 'added' ? `${escape(current.family)} added (${minutes(current.duration)})` : `${escape(previous.family)} ${minutes(previous.duration)} → ${escape(current.family)} ${minutes(current.duration)}`;
             return `<li><span>${escape(day)}</span><strong>${text}</strong></li>`; }).join('')}</ul>` : '<p class="muted">The review found no session changes.</p>'}
-        ${review.validationWarnings?.length ? `<details><summary>Validation warnings</summary><ul>${review.validationWarnings.map(warning => `<li>${escape(warning)}</li>`).join('')}</ul></details>` : ''}
         <div class="coach-actions">${changes.length ? '<button type="button" data-coach="microcycle-accept">Accept update</button>' : ''}<button type="button" class="secondary" data-coach="microcycle-dismiss">Dismiss</button></div></section>`;
 }
 
@@ -59,7 +64,7 @@ CoachingPanel.prototype.planView = function(data, plan) {
         try { this.microcycleReview = reviewMicrocycle(coachingService(), trigger.today, undefined, {}, trigger); }
         catch(error) { console.warn('Automatic Coach review could not be prepared:', error); }
     }
-    return `${todayRecommendationView(todayRecommendation({data}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}`;
+    return `${todayRecommendationView(todayRecommendation({data}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}${microcycleHistoryView(data)}`;
 };
 
 const originalClick = CoachingPanel.prototype.click;
@@ -72,9 +77,8 @@ CoachingPanel.prototype.click = async function(event) {
             const form = this.querySelector('[data-microcycle-disruptions]');
             const unavailableDates = String(form?.elements.unavailableDates.value || '').split(',').map(value => value.trim()).filter(Boolean);
             const limitDate = form?.elements.limitDate.value, max = form?.elements.maxMinutes.value;
-            this.microcycleReview = reviewMicrocycle(service, null, undefined, {unavailableDates,
-                note: form?.elements.note.value || '', maxMinutesByDate: limitDate && max !== '' ? {[limitDate]: Number(max)} : {}});
-            this.notice = this.microcycleReview.changes.length ? 'Coach review ready. Inspect the proposed changes before accepting.' : 'Coach review complete. No session changes are needed.';
+            this.microcycleReview = reviewMicrocycle(service, null, undefined, {unavailableDates, note: form?.elements.note.value || '', maxMinutesByDate: limitDate && max !== '' ? {[limitDate]: Number(max)} : {}});
+            this.notice = 'Coach review ready. Inspect the proposal before accepting.';
         }
         if(action === 'microcycle-accept') { if(!this.microcycleReview) throw new Error('Review the current plan before accepting an update.'); await acceptMicrocycle(service, this.microcycleReview); this.microcycleReview = null; this.dismissedMicrocycleFingerprint = null; this.notice = 'The reviewed seven-day update was accepted and saved.'; }
         if(action === 'microcycle-dismiss') { this.dismissedMicrocycleFingerprint = this.microcycleReview?.automaticTrigger?.fingerprint ?? null; this.microcycleReview = null; this.notice = 'Coach proposal dismissed. Your plan was not changed.'; }
