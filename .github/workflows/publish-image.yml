@@ -70,7 +70,7 @@ jobs:
             athlima:scan
 
       - name: Upload image scan report
-        if: always()
+        if: ${{ always() && hashFiles('trivy-image.json') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: trivy-athlima-image
