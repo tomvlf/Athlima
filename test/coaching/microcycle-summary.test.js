@@ -29,7 +29,7 @@ test('pauses or asks for review when safety/readiness evidence requires it', () 
 
 test('returns a conservative rest message when nothing is planned today', () => {
     expect(todayRecommendation({data: data({plan: {...data().plan, workouts: []}}), now: `${start}T10:00:00Z`}))
-        .toMatchObject({status: 'rest', session: null});
+        .toMatchObject({status: 'rest', session: null, title: 'Recovery and rest today'});
 });
 
 test('requires setup or a dated snapshot and does not invent missing evidence', () => {
@@ -60,7 +60,7 @@ test('does not expose percent-encoded whitespace in rest guidance', () => {
         now: `${start}T10:00:00Z`,
     });
     expect(result.reason).not.toContain('%20');
-    expect(result.reason).toContain('Follow the current plan');
+    expect(result.reason).toContain('no missed work or catch-up');
 });
 
 test('summarises stable diff counts and net minutes', () => {

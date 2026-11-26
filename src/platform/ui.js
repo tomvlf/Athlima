@@ -301,7 +301,9 @@ export async function launchPlatform(root) {
         const types = quickGoalTypes(selectedSport);
         const selectedType = dailyGoalEditor?.type || goal?.type ||
             (selectedSport === 'running' ? 'general_running' : 'general_fitness');
-        const selectedDate = dailyGoalEditor?.date || goal?.date || '';
+        const selectedDate = dailyGoalEditor?.date !== undefined
+            ? dailyGoalEditor.date
+            : (goal?.date || '');
         const horizon = Number(dailyGoalEditor?.horizon || 91);
         const missing = missingQuickProfileFields(profile);
         return html`<section class="daily-goal-editor panel" aria-labelledby="daily-goal-editor-title">
@@ -1107,7 +1109,7 @@ export async function launchPlatform(root) {
         if(action === 'daily-edit') {
             const data = coachingData();
             dailyGoalEditor = {sport: data?.profile?.sport || data?.goal?.type && sportForGoalType(data.goal.type) || 'cycling',
-                type: data?.goal?.type || 'general_fitness', date: data?.goal?.date || ''};
+                type: data?.goal?.type || 'general_fitness', date: data?.goal?.date || '', horizon: 91};
             dailyGoalPreview = null;
             render();
             root.querySelector('#daily-goal-editor-title')?.focus();

@@ -45,8 +45,11 @@ export function todayRecommendation({data, state = data?.snapshots?.at(-1), now 
             reason: readiness.reason, snapshotDate: state.date};
     }
     if(!session) {
-        return {day, status: 'rest', session: null, title: 'No planned session today',
-            reason: visibleText('Follow the current plan and use the next scheduled session rather than adding catch-up work.'),
+        const recentLoad = Number.isFinite(state.weeklyLoad)
+            ? `Recent load is ${state.weeklyLoad >= 0 ? 'being monitored' : 'not available'}`
+            : 'Recent training evidence is limited';
+        return {day, status: 'rest', session: null, title: 'Recovery and rest today',
+            reason: visibleText(`${recentLoad}. This rest is chosen from your recent training, current recovery signals and active goal; no missed work or catch-up is added.`),
             snapshotDate: state.date};
     }
     if(state.sufficiency !== 'supported' || readiness.status === 'monitor') {
