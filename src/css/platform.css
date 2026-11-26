@@ -316,7 +316,8 @@ coaching-panel [hidden] { display: none !important; }
     text-align: center;
 }
 #platform .daily-choice.selected { border-color: var(--platform-accent); background: #1a332f; box-shadow: 0 0 0 1px rgba(101,228,190,.2); }
-#platform .daily-choice strong { color: inherit; font-size: 13px; line-height: 1.25; }
+#platform .daily-choice strong { color: var(--platform-text) !important; font-size: 13px; line-height: 1.25; }
+.daily-goal-card, .dashboard-grid .panel, #platform .hero-title, #platform .panel p { overflow-wrap: anywhere; }
 #platform .daily-choice small { color: var(--platform-muted); }
 .daily-choice-icon { display: grid; width: 30px; height: 30px; place-items: center; color: var(--platform-accent); }
 .daily-choice-icon svg { width: 30px; height: 30px; }

@@ -53,6 +53,16 @@ test('limits advice when the recent evidence sufficiency is limited', () => {
         .toMatchObject({status: 'review', snapshotDate: start});
 });
 
+test('does not expose percent-encoded whitespace in rest guidance', () => {
+    const result = todayRecommendation({
+        data: data({plan: {...data().plan, workouts: []}}),
+        state: {...state(), date: start},
+        now: `${start}T10:00:00Z`,
+    });
+    expect(result.reason).not.toContain('%20');
+    expect(result.reason).toContain('Follow the current plan');
+});
+
 test('summarises stable diff counts and net minutes', () => {
     const summary = microcycleChangeSummary({changes: [
         {action: 'modified', previous: {duration: 3600}, current: {duration: 2700}},

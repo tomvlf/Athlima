@@ -266,6 +266,7 @@ export async function launchPlatform(root) {
         return remaining > 0 ? remaining : 0;
     };
     const quickGoalName = type => DAILY_GOAL_LABELS[type] || type.replaceAll('_', ' ');
+    const visibleText = value => String(value ?? '').replace(/%20/gi, ' ').replace(/%09/gi, ' ');
     const quickSportCards = selectedSport => html`
         <button type="button" class="daily-choice ${selectedSport === 'cycling' ? 'selected' : ''}" data-daily-sport="cycling" aria-pressed="${selectedSport === 'cycling'}">
             <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16h5.5L9.5 9h6L18 16M9.5 9l-.4-1.5M7.6 7.5h3"/><path d="M11.5 16l4-7"/>')}</span>
@@ -356,29 +357,31 @@ export async function launchPlatform(root) {
         if(!daily) return card('Today', html`<p>Refresh your Coach state to get today's recommendation.</p>`);
         const snapshot = daily.snapshotDate
             ? html`<p class="muted">Evidence snapshot: ${daily.snapshotDate}</p>` : '';
+        const title = visibleText(daily.title);
+        const reason = visibleText(daily.reason);
         if(daily.status === 'planned' && daily.session) {
             const run = (daily.session.sport ?? 'cycling') === 'running';
             return card('Today', html`<p class="eyebrow">${escape(daily.session.family)} · ${minutes(daily.session.duration)}</p>
-                <h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}
+                <h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}
                 ${run ? link(`workout/${encodeURIComponent(daily.session.id)}`, 'View run', 'button')
                     : html`<button type="button" data-action="start-workout" data-workout-id="${escape(daily.session.id)}">Start training</button>
                         ${link(`workout/${encodeURIComponent(daily.session.id)}`, 'View training', 'button secondary')}`}`);
         }
         if(daily.status === 'review') {
-            return card('Today', html`<p class="eyebrow">Review before training</p><h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Review Coach proposal', 'button')}`);
+            return card('Today', html`<p class="eyebrow">Review before training</p><h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Review Coach proposal', 'button')}`);
         }
         if(daily.status === 'paused') {
-            return card('Today', html`<p class="eyebrow">Training paused</p><h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open Coach safety status', 'button secondary')}`);
+            return card('Today', html`<p class="eyebrow">Training paused</p><h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Open Coach safety status', 'button secondary')}`);
         }
         if(daily.status === 'rest') {
-            return card('Today', html`<p class="eyebrow">Rest day</p><h2 class="hero-title">${escape(daily.title)}</h2>
-                <p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open full Coach', 'button secondary')}`);
+            return card('Today', html`<p class="eyebrow">Rest day</p><h2 class="hero-title">${escape(title)}</h2>
+                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Open full Coach', 'button secondary')}`);
         }
         return card('Today', html`<p class="eyebrow">${daily.status === 'unknown' ? 'Evidence needed' : 'Setup needed'}</p>
-            <h2 class="hero-title">${escape(daily.title)}</h2><p>${escape(daily.reason)}</p>${snapshot}${link('coach', 'Open Coach', 'button secondary')}`);
+            <h2 class="hero-title">${escape(title)}</h2><p>${escape(reason)}</p>${snapshot}${link('coach', 'Open Coach', 'button secondary')}`);
     };
     function dashboard(data) {
         if(!data) return card('Training data unavailable', html`<p>${coachingError || 'Your local training data has not loaded.'}</p>
