@@ -9,10 +9,11 @@ import { IDBFactory } from 'fake-indexeddb';
 import { initializeCoaching } from '../../src/coaching/service.js';
 import { CoachingPanel } from '../../src/views/coaching-panel.js';
 import '../../src/views/microcycle-review.js';
-import { profile, goal, start, history } from './fixtures.js';
+import { profile, goal, start, timestamp, history } from './fixtures.js';
 
 async function setup() {
     const service = await initializeCoaching(new IDBFactory());
+    service.clock = () => timestamp;
     if(!service.data.profile) {
         await service.configure(profile, goal);
         await service.importActivities(history().map(activity => activity.original));
@@ -43,8 +44,7 @@ describe('Adaptive Microcycle Engine Phase 4 UI', () => {
     test('accept saves the reviewed candidate and clears the proposal', async () => {
         const {service, panel} = await setup();
         try {
-            const snapshot = service.data.snapshots.at(-1);
-            snapshot.readiness = {...snapshot.readiness, status: 'caution', reason: 'Combined warning signals.'};
+            service.data.safetyStatus = 'illness';
             await panel.click({target: panel.querySelector('[data-coach=microcycle-review]')});
             const accept = panel.querySelector('[data-coach=microcycle-accept]');
             expect(accept).not.toBeNull();
@@ -53,6 +53,7 @@ describe('Adaptive Microcycle Engine Phase 4 UI', () => {
             expect(service.data.plan.revision).toBe(revision + 1);
             expect(panel.textContent).toContain('Review next 7 days');
             expect(panel.textContent).toContain('accepted and saved');
+            service.data.safetyStatus = null;
         } finally {
             panel.remove();
         }
