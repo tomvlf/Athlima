@@ -296,9 +296,40 @@ coaching-panel [hidden] { display: none !important; }
 .daily-goal-card small, .daily-goal-card span { color: var(--platform-muted); }
 .daily-goal-card .eyebrow { color: var(--platform-accent); }
 .daily-goal-editor { min-width: 0; }
+.daily-goal-editor fieldset { margin: 0 0 22px; padding: 0; border: 0; }
+.daily-goal-editor legend { margin-bottom: 10px; color: var(--platform-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.daily-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.daily-goal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.daily-timeline-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+#platform .daily-choice {
+    min-width: 0;
+    min-height: 92px;
+    padding: 12px 10px;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 5px;
+    border: 1px solid var(--platform-border);
+    border-radius: 12px;
+    background: #111c27;
+    color: var(--platform-text);
+    text-align: center;
+}
+#platform .daily-choice.selected { border-color: var(--platform-accent); background: #1a332f; box-shadow: 0 0 0 1px rgba(101,228,190,.2); }
+#platform .daily-choice strong { color: inherit; font-size: 13px; line-height: 1.25; }
+#platform .daily-choice small { color: var(--platform-muted); }
+.daily-choice-icon { display: grid; width: 30px; height: 30px; place-items: center; color: var(--platform-accent); }
+.daily-choice-icon svg { width: 30px; height: 30px; }
+.daily-goal-choice { min-height: 82px; }
+.daily-timeline-choice { min-height: 78px; }
+.daily-date-field { max-width: 260px; }
 .mobile-app .daily-goal-card { min-height: 120px; }
 .mobile-app #daily-goal-form { min-width: 0; }
 .mobile-app #daily-goal-form fieldset { display: grid; grid-template-columns: minmax(0, 1fr); }
+.mobile-app .daily-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mobile-app .daily-goal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mobile-app .daily-timeline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mobile-app #platform .daily-choice { min-height: 80px; }
 #platform .coach-actions button + button { margin-left: 8px; }
 #legacy-slot coaching-panel details.coach-card > summary { font-weight: 650; font-size: 16px; padding: 0; min-height: 0; }
 #legacy-slot coaching-panel details.coach-card[open] > summary { margin-bottom: 10px; }
