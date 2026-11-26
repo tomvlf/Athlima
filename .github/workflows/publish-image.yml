@@ -39,23 +39,38 @@ jobs:
           test -n "$healthcheck"
           test "$healthcheck" != "null"
 
-      - name: Scan final image for high and critical vulnerabilities
+      - name: Generate image vulnerability report
         shell: bash
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD:/workspace" \
             aquasec/trivy:0.67.2 image \
+            --skip-version-check \
             --scanners vuln \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
-            --exit-code 1 \
+            --exit-code 0 \
             --format json \
             --output /workspace/trivy-image.json \
             athlima:scan
 
+      - name: Enforce image vulnerability policy
+        shell: bash
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.67.2 image \
+            --skip-version-check \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format table \
+            athlima:scan
+
       - name: Upload image scan report
-        if: always()
+        if: ${{ always() && hashFiles('trivy-image.json') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: trivy-athlima-image
