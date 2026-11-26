@@ -596,6 +596,7 @@ export function generatePlan({profile, goal, state, startDate, generatedAt, regi
     const plan = {
         id, athleteId: profile.id, goalId: goal.id, sport, startDate, endDate: goal.date, status: 'active',
         goalDefinition: JSON.parse(JSON.stringify(goal)),
+        profileSnapshot: JSON.parse(JSON.stringify(profile)),
         plannerVersion: VERSION, generatedAt, sourceSnapshot: state.id, revision: 1,
         coachingConfig: JSON.parse(JSON.stringify(config)),
         progressionBaseline: JSON.parse(JSON.stringify(state.successfulSessionsByFamily || {})),

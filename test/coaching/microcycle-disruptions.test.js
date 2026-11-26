@@ -74,3 +74,21 @@ test('removes a session incompatible with a temporary environment instead of mov
     expect(result.plan.workouts).toHaveLength(0);
     expect(result.changes).toContainEqual(expect.objectContaining({id: 'indoor-only', action: 'removed'}));
 });
+
+test('keeps a compatible workout identity and dose for a temporary environment change', () => {
+    const input = source();
+    const workout = {id: 'indoor-outdoor', date: start, status: 'scheduled', duration: 3600,
+        targetLoad: 30, targetIntensity: 0.65, progressionLevel: 1, family: 'endurance',
+        suitability: ['indoor', 'outdoor'], weekId: 'week'};
+    const plan = {workouts: [workout], weeks: [{id: 'week', targetMinutes: 60, scheduledMinutes: 60,
+        scheduledLoad: 30}], adaptations: [{changes: [], reasoning: '', observations: {}}]};
+    const before = JSON.stringify(plan);
+    const result = applyMicrocycleDisruptions({plan, profile: input.profile, state: input.state,
+        window: {startDate: start, endDate: '2026-01-07'},
+        disruptions: {environmentByDate: {[start]: 'outdoor'}}});
+    expect(result.plan.workouts[0]).toMatchObject({
+        id: 'indoor-outdoor', duration: 3600, targetLoad: 30, progressionLevel: 1,
+        family: 'endurance', environment: 'outdoor',
+    });
+    expect(JSON.stringify(plan)).toBe(before);
+});

@@ -13,7 +13,7 @@ import {
     microcycleReviewView,
 } from '../../src/views/microcycle-review.js';
 import { formatMicrocycleDate, formatMicrocycleTimestamp, formatMicrocycleNumber,
-    formatMicrocycleMinutes } from '../../src/coaching/microcycle-format.js';
+    formatMicrocycleMinutes, microcycleMessage } from '../../src/coaching/microcycle-format.js';
 import { profile, goal, start, timestamp, history } from './fixtures.js';
 
 async function setup() {
@@ -36,6 +36,8 @@ describe('Adaptive Microcycle Engine review UI', () => {
         expect(formatMicrocycleTimestamp('invalid')).toBe('Unknown time');
         expect(formatMicrocycleNumber(12.5, 1, 'en-US')).toBe('12.5');
         expect(formatMicrocycleMinutes(5400, 'en-US')).toBe('90 min');
+        expect(microcycleMessage('coachReview')).toBe('Coach review');
+        expect(microcycleMessage('missing-key')).toBe('');
     });
 
     test('supports repeatable day rules and removes extra rows', async () => {
@@ -49,6 +51,20 @@ describe('Adaptive Microcycle Engine review UI', () => {
             const remove = panel.querySelectorAll('[data-microcycle-remove-row]')[1];
             panel.click({target: remove});
             expect(panel.querySelectorAll('[data-microcycle-row]').length).toBe(1);
+        } finally { panel.remove(); }
+    });
+
+    test('links AME validation errors to the relevant field', async () => {
+        const {panel} = await setup();
+        try {
+            await panel.click({target: panel.querySelector('[data-microcycle-add-row]')});
+            const rows = [...panel.querySelectorAll('[data-microcycle-row]')];
+            rows[0].querySelector('[name=dayDate]').value = '2026-01-02';
+            rows[1].querySelector('[name=dayDate]').value = '2026-01-02';
+            await panel.click({target: panel.querySelector('[data-coach=microcycle-review]')});
+            expect(panel.querySelector('[data-microcycle-form-error]').hidden).toBe(false);
+            expect(panel.querySelector('[name=dayDate][aria-invalid="true"]')).not.toBeNull();
+            expect(document.activeElement).toBe(panel.querySelector('[name=dayDate][aria-invalid="true"]'));
         } finally { panel.remove(); }
     });
 
@@ -84,7 +100,8 @@ describe('Adaptive Microcycle Engine review UI', () => {
                 validationWarnings: [],
             }],
         }]})).toContain('Adaptive review history');
-        expect(microcycleReviewView(null)).toContain('Temporary availability');
+        expect(microcycleReviewView(null, {startDate: '2026-01-01', endDate: '2026-01-07'}))
+            .toContain('Temporary availability');
         expect(microcycleReviewView({
             reasoning: '<b>Review</b>',
             source: {revision: 2},

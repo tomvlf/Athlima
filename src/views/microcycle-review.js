@@ -31,7 +31,7 @@ export function todayRecommendationView(recommendation) {
         ${session ? `<p><strong>${escape(session.family)}</strong> · ${minutes(session.duration)} · Effort ${escape(session.expectedRpe ?? '—')}/10</p>` : ''}
         <p>${escape(recommendation.reason)}</p>
         ${recommendation.snapshotDate ? `<p class="muted">Evidence snapshot: ${escape(formatMicrocycleDate(recommendation.snapshotDate))}</p>` : ''}
-        ${recommendation.status === 'review' ? '<button type="button" class="secondary" data-coach="microcycle-review">Review before training</button>' : ''}</section>`;
+        ${recommendation.status === 'review' ? `<button type="button" class="secondary" data-coach="microcycle-review">${microcycleMessage('reviewBeforeTraining')}</button>` : ''}</section>`;
 }
 
 /**
@@ -44,7 +44,7 @@ export function microcycleForecastView(review) {
     const forecast = compareMicrocycleForecasts(review.current, review.candidate);
     const rows = [['Sessions', 'sessions'], ['Training days', 'trainingDays'], ['Minutes', 'minutes'], ['Planned load', 'load'],
         ['Quality sessions', 'qualitySessions'], ['Recovery sessions', 'recoverySessions'], ['Longest session (min)', 'longestMinutes']];
-    return `<section data-microcycle-forecast aria-labelledby="microcycle-forecast-title"><h4 id="microcycle-forecast-title">Seven-day plan comparison</h4><p><strong>${escape(forecast.headline)}</strong></p>
+    return `<section data-microcycle-forecast aria-labelledby="microcycle-forecast-title"><h4 id="microcycle-forecast-title">${microcycleMessage('forecastTitle')}</h4><p><strong>${escape(forecast.headline)}</strong></p>
         <dl aria-label="Current plan and candidate forecast">${rows.map(([label, key]) =>
             `<div><dt>${escape(label)}</dt><dd><span>Current: ${escape(formatMicrocycleNumber(forecast.current[key]))}</span> → <span>Candidate: ${escape(formatMicrocycleNumber(forecast.candidate[key]))}</span></dd></div>`).join('')}</dl>
         <p class="muted">${escape(forecast.disclaimer)}</p></section>`;
@@ -73,34 +73,35 @@ export function microcycleHistoryView(data) {
  * @param {object|null} review - Review proposal or null for the initial form.
  * @returns {string} Safe HTML fragment.
  */
-export function microcycleReviewView(review) {
-    if(!review) return `<section class="coach-card" data-microcycle-review aria-live="polite"><h3>Coach review</h3><p>Review the next seven days against your latest training history, recovery and temporary availability.</p>
+export function microcycleReviewView(review, plan = null) {
+    if(!review) return `<section class="coach-card" data-microcycle-review aria-live="polite"><h3>${microcycleMessage('coachReview')}</h3><p>Review the next seven days against your latest training history, recovery and temporary availability.</p>
         <form data-microcycle-disruptions>
             <div data-microcycle-day-rules>
                 <fieldset class="microcycle-disruption-row" data-microcycle-row>
-                    <legend>Temporary availability</legend>
-                    <label>Date<input type="date" name="dayDate" required aria-describedby="microcycle-date-help"><small id="microcycle-date-help">Choose a date inside the review window.</small></label>
-                    <label>Availability<select name="availability"><option value="available">Available</option><option value="unavailable">Unavailable</option></select></label>
-                    <label>Maximum minutes<input type="number" name="maxMinutes" min="0" max="1440" step="1" inputmode="numeric" placeholder="Optional"></label>
-                    <label>Environment<select name="environment"><option value="either">Either</option><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select></label>
-                    <label>Day note<input type="text" name="dayNote" maxlength="240" placeholder="e.g. late meeting"></label>
-                    <button type="button" class="secondary" data-microcycle-remove-row>Remove day</button>
+                    <legend>${microcycleMessage('temporaryAvailability')}</legend>
+                    <label>${microcycleMessage('date')}<input type="date" name="dayDate" required${plan?.startDate ? ` min="${escape(plan.startDate)}"` : ''}${plan?.endDate ? ` max="${escape(plan.endDate)}"` : ''} aria-describedby="microcycle-date-help"><small id="microcycle-date-help">Choose a date inside the review window.</small></label>
+                    <label>${microcycleMessage('availability')}<select name="availability"><option value="available">${microcycleMessage('available')}</option><option value="unavailable">${microcycleMessage('unavailable')}</option></select></label>
+                    <label>${microcycleMessage('maximumMinutes')}<input type="number" name="maxMinutes" min="0" max="1440" step="1" inputmode="numeric" placeholder="Optional"></label>
+                    <label>${microcycleMessage('environment')}<select name="environment"><option value="either">${microcycleMessage('either')}</option><option value="indoor">${microcycleMessage('indoor')}</option><option value="outdoor">${microcycleMessage('outdoor')}</option></select></label>
+                    <label>${microcycleMessage('dayNote')}<input type="text" name="dayNote" maxlength="240" placeholder="e.g. late meeting"></label>
+                    <button type="button" class="secondary" data-microcycle-remove-row>${microcycleMessage('removeDay')}</button>
                 </fieldset>
             </div>
-            <label>General context note<input type="text" name="note" maxlength="240" placeholder="e.g. busy work week"></label>
-            <button type="button" class="secondary" data-microcycle-add-row>Add another day</button>
+            <p class="coach-alert" role="alert" data-microcycle-form-error hidden></p>
+            <label>${microcycleMessage('generalNote')}<input type="text" name="note" maxlength="240" placeholder="e.g. busy work week"></label>
+            <button type="button" class="secondary" data-microcycle-add-row>${microcycleMessage('addAnotherDay')}</button>
             <p class="muted">Unavailable work is removed, never moved or made up. Nothing changes until you accept.</p>
             <button type="button" class="secondary" data-coach="microcycle-review" aria-label="Review prepares the next seven-day proposal">Review next 7 days</button>
         </form></section>`;
     const changes = review.changes || [], summary = microcycleChangeSummary(review);
-    return `<section class="coach-card" data-microcycle-review aria-live="polite"><h3 tabindex="-1" data-microcycle-review-title>${review.automaticTrigger ? 'Coach review recommended' : 'Proposed week update'}</h3>
+    return `<section class="coach-card" data-microcycle-review aria-live="polite"><h3 tabindex="-1" data-microcycle-review-title>${review.automaticTrigger ? microcycleMessage('reviewRecommended') : microcycleMessage('proposedUpdate')}</h3>
         ${review.automaticTrigger ? `<p class="coach-notice">${escape(review.automaticTrigger.reason)} The proposal will not be applied without your approval.</p>` : ''}
         <p><strong>${escape(summary.headline)}</strong> · ${escape(summary.detail)}</p><p>${escape(review.reasoning)}</p>${microcycleForecastView(review)}
         <p class="muted">${escape(review.window.startDate)} to ${escape(review.window.endDate)} · based on revision ${escape(review.source.revision)}</p>
         ${changes.length ? `<ul class="coach-upcoming">${changes.map(change => { const previous = change.previous, current = change.current, day = current?.date || previous?.date;
             const text = change.action === 'removed' ? `${escape(previous.family)} removed (${minutes(previous.duration)})` : change.action === 'added' ? `${escape(current.family)} added (${minutes(current.duration)})` : `${escape(previous.family)} ${minutes(previous.duration)} → ${escape(current.family)} ${minutes(current.duration)}`;
             return `<li><span>${escape(day)}</span><strong>${text}</strong></li>`; }).join('')}</ul>` : '<p class="muted">The review found no session changes.</p>'}
-        <div class="coach-actions">${changes.length ? '<button type="button" data-coach="microcycle-accept" aria-label="Accept proposed week update">Accept update</button>' : ''}<button type="button" class="secondary" data-coach="microcycle-dismiss" aria-label="Dismiss proposed week update">Dismiss</button></div></section>`;
+        <div class="coach-actions">${changes.length ? `<button type="button" data-coach="microcycle-accept" aria-label="Accept proposed week update">${microcycleMessage('acceptUpdate')}</button>` : ''}<button type="button" class="secondary" data-coach="microcycle-dismiss" aria-label="Dismiss proposed week update">${microcycleMessage('dismiss')}</button></div></section>`;
 }
 
 const originalPlanView = CoachingPanel.prototype.planView;
@@ -126,7 +127,7 @@ CoachingPanel.prototype.planView = function(data, plan) {
         }
         catch(error) { console.warn('Automatic Coach review could not be prepared:', error); }
     }
-    return `${todayRecommendationView(todayRecommendation({data, state: todayState, now}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}${microcycleHistoryView(data)}`;
+    return `${todayRecommendationView(todayRecommendation({data, state: todayState, now}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview, plan)}${microcycleHistoryView(data)}`;
 };
 
 const originalClick = CoachingPanel.prototype.click;
@@ -162,13 +163,29 @@ CoachingPanel.prototype.click = async function(event) {
             const unavailableDates = [], maxMinutesByDate = {}, environmentByDate = {}, notesByDate = {};
             const seen = new Set();
             for(const row of form?.querySelectorAll('[data-microcycle-row]') || []) {
-                const day = row.querySelector('[name=dayDate]').value.trim();
+                const dateInput = row.querySelector('[name=dayDate]');
+                const maxInput = row.querySelector('[name=maxMinutes]');
+                dateInput.removeAttribute('aria-invalid');
+                maxInput.removeAttribute('aria-invalid');
+                const day = dateInput.value.trim();
                 if(!day) continue;
-                if(seen.has(day)) throw new Error(`Duplicate temporary availability date: ${day}.`);
+                if(seen.has(day)) {
+                    dateInput.setAttribute('aria-invalid', 'true');
+                    this.microcycleValidationField = 'dayDate';
+                    throw new Error(`Duplicate temporary availability date: ${day}.`);
+                }
                 seen.add(day);
                 if(row.querySelector('[name=availability]').value === 'unavailable') unavailableDates.push(day);
                 const max = row.querySelector('[name=maxMinutes]').value;
-                if(max !== '') maxMinutesByDate[day] = Number(max);
+                if(max !== '') {
+                    const minutes = Number(max);
+                    if(!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) {
+                        maxInput.setAttribute('aria-invalid', 'true');
+                        this.microcycleValidationField = 'maxMinutes';
+                        throw new Error('Maximum minutes must be a whole number between 0 and 1440.');
+                    }
+                    maxMinutesByDate[day] = minutes;
+                }
                 const environment = row.querySelector('[name=environment]').value;
                 if(environment !== 'either') environmentByDate[day] = environment;
                 const note = row.querySelector('[name=dayNote]').value.trim();
@@ -206,10 +223,16 @@ CoachingPanel.prototype.click = async function(event) {
         this.error = error.message || error.name || 'Coach review failed.';
         this.microcycleReview = null;
         this.render({keepInput: true});
-        const invalidDate = this.querySelector('[name=dayDate]');
-        if(invalidDate) {
-            invalidDate.setAttribute('aria-invalid', 'true');
-            invalidDate.focus();
+        const formError = this.querySelector('[data-microcycle-form-error]');
+        if(formError) {
+            formError.hidden = false;
+            formError.textContent = error.message || 'Coach review could not be prepared.';
         }
+        const invalidField = this.querySelector(`[name="${this.microcycleValidationField || 'dayDate'}"]`);
+        if(invalidField) {
+            invalidField.setAttribute('aria-invalid', 'true');
+            invalidField.focus();
+        }
+        this.microcycleValidationField = null;
     }
 };

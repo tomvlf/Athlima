@@ -24,6 +24,17 @@ extends the deterministic Coach rather than creating a second planning system.
 - **Phase 14:** privacy-safe local diagnostics with stable error codes.
 - **Phase 15:** end-to-end stale, tamper, storage and plan-boundary hardening.
 
+## P1 alignment
+
+Automatic reviews distinguish availability, load/ramp, safety, readiness, evidence and
+weekly triggers. Availability and load values participate in the trigger fingerprint, so
+changing them creates a new review while unchanged dismissals stay suppressed.
+
+The review UI uses the central fallback-safe AME formatter for labels and locale-sensitive
+dates, timestamps and numbers. Date and minute fields expose range constraints, validation
+errors are linked to fields with `aria-invalid`, and validation feedback is announced in an
+alert region.
+
 ## Phase 10: extended temporary availability
 
 The review UI uses repeatable day rules instead of comma-separated dates. Each rule can mark a date
