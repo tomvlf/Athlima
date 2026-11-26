@@ -13,24 +13,32 @@ Coach plan. It extends the current deterministic Coach rather than creating a se
 - **Phase 3:** review is side-effect free and acceptance is stale-safe, tamper-checked and atomic.
 - **Phase 4:** the Coach dashboard exposes explicit review, accept and dismiss controls.
 - **Phase 5:** the dashboard shows today's existing planned recommendation and a concise change summary.
+- **Phase 6:** reviews accept bounded temporary availability and disruption input.
 
-## Phase 5: today and what changed
+## Phase 6: temporary availability
 
-`todayRecommendation()` selects today's existing scheduled session. It does not create an ad-hoc
-workout or replace Train Now. Safety status pauses the recommendation; readiness caution asks the
-rider to review the seven-day proposal before starting a non-recovery session; an empty day remains a
-rest day rather than becoming catch-up work.
+A rider may mark dates in the seven-day window unavailable, set one temporary maximum session length
+and add a short context note. `normalizeDisruptions()` validates that every date is inside the review
+window and every limit is a whole number of minutes. `applyMicrocycleDisruptions()` then applies only
+conservative changes:
 
-`microcycleChangeSummary()` reports stable add/modify/remove counts and the net duration difference of
-the Phase 2 diff. The UI presents this summary before detailed per-session changes. All rendered data
-remains escaped, and acceptance still uses the Phase 3 verification boundary.
+- scheduled work on unavailable dates is removed;
+- a session above a temporary limit is shortened while retaining its workout ID and family;
+- a limit below the minimum session duration removes the session;
+- omitted volume is never moved, stacked or made up on another day;
+- resolved and pre-window sessions remain frozen;
+- affected weekly scheduled minutes and load are recalculated.
+
+Disruptions are included in deterministic reconstruction during Phase 3 acceptance, so changing the
+input or candidate after review invalidates it. The inputs are stored only when the reviewed candidate
+is explicitly accepted, inside the existing adaptation observations and reasoning.
 
 ## Future phases
 
-1. add richer availability and disruption input;
-2. schedule automatic review triggers without automatic unsafe acceptance;
-3. add forecast comparisons for current versus candidate microcycles;
-4. add a compact plan-revision history view.
+1. schedule automatic review triggers without automatic unsafe acceptance;
+2. add forecast comparisons for current versus candidate microcycles;
+3. add a compact plan-revision history view;
+4. support multiple per-day limits and environment changes.
 
 ## Non-goals
 
