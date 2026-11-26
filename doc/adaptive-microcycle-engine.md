@@ -16,28 +16,27 @@ extends the deterministic Coach rather than creating a second planning system.
 - **Phase 6:** bounded temporary availability and disruption input.
 - **Phase 7:** automatic review triggers without automatic acceptance.
 - **Phase 8:** transparent current-versus-candidate forecast comparison.
+- **Phase 9:** compact accepted-review history over immutable plan revisions.
 
-## Phase 8: plan forecast comparison
+## Phase 9: revision history
 
-`microcycleForecast()` aggregates scheduled sessions in a bounded projection: session count, training
-days, minutes, planned load, quality/recovery counts, longest session and role distribution.
-`compareMicrocycleForecasts()` shows the current and candidate values plus direct deltas.
+`microcycleRevisionHistory()` reads the existing `data.revisions` archive and returns a bounded,
+newest-first history of accepted microcycle decisions. Each entry contains revision continuity,
+timestamp, trigger, snapshot identity, reasoning, change count, duration summary, load change and
+warning count.
 
-This is deliberately a schedule forecast, not a physiological model. It does not estimate fatigue,
-fitness, health, race outcome or injury risk. Missing planned load contributes zero rather than an
-invented value, and completed sessions are excluded from future scheduled-work comparison.
-
-The Coach review UI presents both columns before acceptance, while the detailed workout diff remains
-the authoritative explanation of individual changes.
+The Coach UI displays this audit trail as read-only details. Historical plans cannot be restored or
+edited from this view. The helper returns cloned summaries and introduces no new store, schema or
+persistence model. Existing immutable revisions remain the source of truth.
 
 ## Future phases
 
-1. add a compact plan-revision history view;
-2. support multiple per-day limits and environment changes;
-3. add opt-in notification surfaces for pending reviews;
-4. improve accessibility and localisation of review summaries.
+1. support multiple per-day limits and environment changes;
+2. add opt-in notification surfaces for pending reviews;
+3. improve accessibility and localisation of review summaries;
+4. add export of the review audit trail to the existing coaching backup.
 
 ## Non-goals
 
 The AME does not add duplicate persistent domain models, a second Coach facade, automatic acceptance,
-Train Now replacement, physiological prediction or LLM planning decisions.
+revision rollback, Train Now replacement, physiological prediction or LLM planning decisions.
