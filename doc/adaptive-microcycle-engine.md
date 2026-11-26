@@ -24,6 +24,30 @@ extends the deterministic Coach rather than creating a second planning system.
 - **Phase 14:** privacy-safe local diagnostics with stable error codes.
 - **Phase 15:** end-to-end stale, tamper, storage and plan-boundary hardening.
 
+## P1 alignment
+
+Automatic reviews distinguish availability, load/ramp, safety, readiness, evidence and
+weekly triggers. Availability and load values participate in the trigger fingerprint, so
+changing them creates a new review while unchanged dismissals stay suppressed.
+
+The review UI uses the central fallback-safe AME formatter for labels and locale-sensitive
+dates, timestamps and numbers. Date and minute fields expose range constraints, validation
+errors are linked to fields with `aria-invalid`, and validation feedback is announced in an
+alert region.
+
+## P2 runtime verification
+
+The AME review UI is exercised with jsdom runtime tests at the 320-pixel mobile layout,
+including repeatable day controls, keyboard focus, validation focus and review/dismiss
+actions. Cross-tab stale-acceptance is exercised against the shared persisted coaching
+state. These tests verify application behavior but are not substitutes for an independent
+real-browser and assistive-technology audit.
+
+Provider secrets are not encrypted by the application. Intervals.icu credentials remain in
+browser storage, may be readable by scripts with access to that browser profile, are sent
+only to Intervals.icu, and are excluded from local backups. Disconnecting or deleting local
+data removes the credential while external provider copies remain controlled at the provider.
+
 ## Phase 10: extended temporary availability
 
 The review UI uses repeatable day rules instead of comma-separated dates. Each rule can mark a date

@@ -46,3 +46,25 @@ test('a dismissed fingerprint stays quiet until the fingerprint changes', () => 
     const changed = {...dismissed, plan: {...dismissed.plan, revision: 2}};
     expect(microcycleReviewTrigger({data: changed, now: '2026-01-08T10:00:00Z'})).not.toBeNull();
 });
+
+test('triggers separate availability and load review categories', () => {
+    const availabilityState = state();
+    availabilityState.profileInputs = {...profile};
+    const availabilityPlan = {...data().plan,
+        profileSnapshot: {...profile, availableDays: [0, 2, 4, 6]}};
+    const changed = data({snapshots: [availabilityState],
+        plan: availabilityPlan,
+        profile: {...profile, availableDays: [0, 2, 6], maxSessionMinutes: {...profile.maxSessionMinutes, 4: 45}}});
+    const availability = microcycleReviewTrigger({data: changed, now: '2026-01-08T10:00:00Z'});
+    expect(availability.kind).toBe('availability');
+
+    const elevated = state();
+    elevated.id = 'elevated-state';
+    elevated.chronicLoad = 100;
+    elevated.rampRate = 20;
+    elevated.config = {...elevated.config, maxRamp: 0.1};
+    const load = microcycleReviewTrigger({data: data({snapshots: [elevated],
+        plan: {...data().plan, coachingConfig: {...data().plan.coachingConfig, maxRamp: 0.1}}}),
+        now: '2026-01-08T10:00:00Z'});
+    expect(load.kind).toBe('load');
+});

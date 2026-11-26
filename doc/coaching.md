@@ -46,6 +46,13 @@ as a record. A missing power reading does not become a made-up zero, and a
 similar ride duration alone does not prove that the intended hard intervals
 were completed.
 
+For the dashboard's “Today” recommendation, the Coach derives a fresh dated
+athlete-state snapshot for the local day before presenting planned work.
+The UI shows that snapshot date. If setup is incomplete, no active plan exists,
+or the snapshot is missing or stale, it gives an explicit review/setup fallback
+instead of implying medical clearance or complete evidence. Limited or monitor
+readiness evidence also asks for review rather than assuming quality eligibility.
+
 Read [Using the Coach](#using-the-coach) and, if relevant, [Running coach](#running-coach)
 first. The later architecture, formulas and scientific references are optional
 technical detail. [Estimation limitations](#estimation-limitations) explains

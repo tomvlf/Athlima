@@ -11,7 +11,9 @@ const data = overrides => ({profile, safetyStatus: null, snapshots: [state()],
 test('returns today’s existing session without creating a separate prescription', () => {
     const input = data();
     const before = JSON.stringify(input);
-    const result = todayRecommendation({data: input, now: `${start}T10:00:00Z`});
+    const supported = {...state(), sufficiency: 'supported',
+        readiness: {status: 'unknown', reason: 'Recent training evidence supports considering the existing planned quality sessions.'}};
+    const result = todayRecommendation({data: input, state: supported, now: `${start}T10:00:00Z`});
     expect(result).toMatchObject({status: 'planned', session: workout, title: workout.title});
     expect(JSON.stringify(input)).toBe(before);
 });
@@ -28,6 +30,27 @@ test('pauses or asks for review when safety/readiness evidence requires it', () 
 test('returns a conservative rest message when nothing is planned today', () => {
     expect(todayRecommendation({data: data({plan: {...data().plan, workouts: []}}), now: `${start}T10:00:00Z`}))
         .toMatchObject({status: 'rest', session: null});
+});
+
+test('requires setup or a dated snapshot and does not invent missing evidence', () => {
+    expect(todayRecommendation({data: null, now: `${start}T10:00:00Z`})).toMatchObject({
+        status: 'unavailable', title: 'Coach setup required',
+    });
+    expect(todayRecommendation({data: data({plan: null}), now: `${start}T10:00:00Z`})).toMatchObject({
+        status: 'unavailable', title: 'No active Coach plan',
+    });
+    expect(todayRecommendation({data: data(), state: null, now: `${start}T10:00:00Z`})).toMatchObject({
+        status: 'unknown', snapshotDate: null,
+    });
+    expect(todayRecommendation({data: data(), state: {...state(), date: '2025-12-31'},
+        now: `${start}T10:00:00Z`})).toMatchObject({status: 'unknown', snapshotDate: '2025-12-31'});
+});
+
+test('limits advice when the recent evidence sufficiency is limited', () => {
+    const limited = {...state(), sufficiency: 'limited', confidence: 'low',
+        readiness: {status: 'unknown', reason: 'Recent training evidence is limited.'}};
+    expect(todayRecommendation({data: data(), state: limited, now: `${start}T10:00:00Z`}))
+        .toMatchObject({status: 'review', snapshotDate: start});
 });
 
 test('summarises stable diff counts and net minutes', () => {

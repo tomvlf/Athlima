@@ -533,6 +533,19 @@ html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-i
 .mobile-app #legacy-slot .coach-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .mobile-app #legacy-slot .coach-day { padding: 8px; }
 .mobile-app #legacy-slot .coach-fields label { margin: 8px 0; }
+.mobile-app #legacy-slot [data-microcycle-day-rules],
+.mobile-app #legacy-slot .microcycle-disruption-row { width: 100%; min-width: 0; }
+.mobile-app #legacy-slot .microcycle-disruption-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 10px;
+}
+.mobile-app #legacy-slot .microcycle-disruption-row label,
+.mobile-app #legacy-slot .microcycle-disruption-row input,
+.mobile-app #legacy-slot .microcycle-disruption-row select,
+.mobile-app #legacy-slot .microcycle-disruption-row button { min-width: 0; width: 100%; max-width: 100%; }
+.mobile-app #legacy-slot .coach-upcoming li { grid-template-columns: minmax(72px, 0.8fr) minmax(0, 1.8fr); }
+.mobile-app #legacy-slot .coach-actions { grid-template-columns: minmax(0, 1fr); }
+.mobile-app #legacy-slot .coach-actions button { width: 100%; margin-left: 0 !important; }
 /* Mobile calendar: a compact 7-day grid that fits the screen; tapping a day lists its sessions below. */
 .mobile-app #legacy-slot .training-calendar { padding: 0; }
 .mobile-app #legacy-slot .training-calendar--header { gap: 8px; margin-bottom: 8px; }
