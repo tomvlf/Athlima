@@ -2,8 +2,8 @@
 
 ## Purpose
 
-The Adaptive Microcycle Engine (AME) continuously reviews the next seven days of an existing Athlima
-Coach plan. It extends the current deterministic Coach rather than creating a second planning system.
+The Adaptive Microcycle Engine (AME) reviews the next seven days of an existing Athlima Coach plan. It
+extends the deterministic Coach rather than creating a second planning system.
 
 ## Phases
 
@@ -15,31 +15,29 @@ Coach plan. It extends the current deterministic Coach rather than creating a se
 - **Phase 5:** today's plan recommendation and concise change summary.
 - **Phase 6:** bounded temporary availability and disruption input.
 - **Phase 7:** automatic review triggers without automatic acceptance.
+- **Phase 8:** transparent current-versus-candidate forecast comparison.
 
-## Phase 7: automatic review triggers
+## Phase 8: plan forecast comparison
 
-`microcycleReviewTrigger()` deterministically recommends a fresh review when:
+`microcycleForecast()` aggregates scheduled sessions in a bounded projection: session count, training
+days, minutes, planned load, quality/recovery counts, longest session and role distribution.
+`compareMicrocycleForecasts()` shows the current and candidate values plus direct deltas.
 
-- pain, illness or a paused plan is present;
-- the latest readiness snapshot reaches caution;
-- a newer state snapshot exists than the plan source snapshot;
-- seven days have passed since the last accepted review or plan decision.
+This is deliberately a schedule forecast, not a physiological model. It does not estimate fatigue,
+fitness, health, race outcome or injury risk. Missing planned load contributes zero rather than an
+invented value, and completed sessions are excluded from future scheduled-work comparison.
 
-A trigger contains a stable fingerprint for the plan revision, snapshot, local date and readiness
-state. The dashboard may prepare one in-memory proposal per fingerprint. It never accepts or persists
-a candidate automatically. Every proposal still requires explicit rider acceptance through Phase 3.
-
-When accepted, trigger provenance is written into the existing adaptation observations. No new store,
-schema migration, background service or duplicate plan model is introduced.
+The Coach review UI presents both columns before acceptance, while the detailed workout diff remains
+the authoritative explanation of individual changes.
 
 ## Future phases
 
-1. add forecast comparisons for current versus candidate microcycles;
-2. add a compact plan-revision history view;
-3. support multiple per-day limits and environment changes;
-4. add opt-in notification surfaces for pending reviews.
+1. add a compact plan-revision history view;
+2. support multiple per-day limits and environment changes;
+3. add opt-in notification surfaces for pending reviews;
+4. improve accessibility and localisation of review summaries.
 
 ## Non-goals
 
 The AME does not add duplicate persistent domain models, a second Coach facade, automatic acceptance,
-Train Now replacement or LLM planning decisions.
+Train Now replacement, physiological prediction or LLM planning decisions.
