@@ -23,37 +23,38 @@ plans retain phases, weeks, workouts, adaptations and revisions.
 
 ## Phase 0: projection boundary
 
-`projectMicrocycle()` provides a deterministic, read-only projection of an existing plan and state
-snapshot. It retains existing workout IDs, families, statuses, phase/week relationships, duration and
-scheduled load. The projection is not stored and introduces no migration or behaviour change.
+`projectMicrocycle()` provides a deterministic, read-only view over an existing plan and state
+snapshot. It retains existing workout identities and does not persist or modify anything.
 
 ## Phase 1: planning context
 
-`buildMicrocycleContext()` combines the existing authoritative inputs into the bounded context needed
-by a future rebuild:
+`buildMicrocycleContext()` combines profile, goal, snapshot and plan into validated goal demand,
+evidence-backed gaps, readiness/safety constraints, phase/week context and the current projection.
 
-```text
-profile + goal + estimateState snapshot + current plan
-  -> goal demand and evidence-backed gaps
-  -> readiness/safety gate
-  -> active phase and intersecting weeks
-  -> current seven-day projection
-```
+## Phase 2: candidate window
 
-Phase 1 deliberately does not select, move or replace sessions. It validates that the profile, goal,
-snapshot, sport and plan window belong together. Unknown readiness is kept unknown, a caution state
-blocks quality eligibility, and pain/illness pauses the context. Goal demand and gap analysis reuse
-`modelGoalDemand()` and `analyzeGaps()` rather than adding new stimulus scores.
+`buildMicrocycleCandidate()` asks the existing `adaptPlan()` engine to create an uncommitted candidate
+revision. Caution and safety contexts use the established recovery adaptation; other contexts use a
+feedback review. The result contains:
+
+- the unchanged current projection;
+- a candidate seven-day projection;
+- a stable add/remove/modify diff keyed by workout ID;
+- the validated candidate plan revision and its existing adaptation reasoning;
+- validation warnings for review.
+
+Candidate generation rejects stale contexts, preserves resolved and pre-window workouts, and verifies
+that source plan and state objects were not mutated. It does not write to storage. This retains one
+source of truth for workout rebuilding, load budgets, progression, return-to-training and validation.
 
 ## Future phases
 
-1. build a candidate mutable future window from the Phase 1 context;
-2. preserve resolved and frozen sessions;
-3. validate volume, load, recovery, availability and sport constraints;
-4. present a plan diff through existing adaptation/explanation structures;
-5. commit an accepted candidate as a normal `CoachingService` plan revision.
+1. constrain candidate rebuilding to richer availability and disruption scenarios;
+2. present the candidate diff through existing explanation structures;
+3. let `CoachingService` atomically accept a reviewed candidate as a normal revision;
+4. add the Coach UI for "what changed" and today's recommendation.
 
 ## Non-goals
 
-The current phases do not add persistent AthleteState, PlannedSession, MicrocyclePlan or CoachDecision
-models, a second Coach facade, an IndexedDB migration, UI changes, Train Now changes or LLM planning.
+The current phases do not add persistent duplicate domain models, a second Coach facade, an IndexedDB
+migration, UI changes, Train Now changes or LLM planning decisions.
