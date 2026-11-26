@@ -5,7 +5,8 @@
  * not a remote AI. Methods that save return Promises and must be awaited before reporting success.
  */
 
-import { VERSION, DEFAULTS, addDays, localDay, sportOf, validateProfile, validateCoachingConfig, date } from './domain.js';
+import { VERSION, DEFAULTS, addDays, localDay, sportOf, goalRegistry, validateProfile,
+    validateGoal, validateCoachingConfig, date } from './domain.js';
 import { normalizeActivity } from './normalizer.js';
 import { estimateState } from './state.js';
 import { generatePlan } from './planner.js';
@@ -80,6 +81,115 @@ export class CoachingService {
         }, profile));
         return this.commit({...this.data, activities, profile: JSON.parse(JSON.stringify(profile)),
             goal: JSON.parse(JSON.stringify(goal))});
+    }
+    /**
+     * Build a read-only preview for a simple goal/profile change. It does not archive or alter
+     * the live plan and can be discarded without creating a revision.
+     *
+     * @param {object} input - New sport, goal and profile.
+     * @returns {object} Stable preview with source revisions and candidate plan.
+     */
+    previewQuickGoal({profile, goal}) {
+        validateProfile(profile);
+        const sport = sportOf(profile);
+        validateGoal(goal, this.data.plan?.startDate || date(localDay(this.clock(), profile.timeZone)),
+            goalRegistry(sport), this.rules);
+        if(goal.type && !Object.hasOwn(goalRegistry(sport), goal.type)) {
+            throw new Error('The selected goal is not supported for this sport.');
+        }
+        const next = JSON.parse(JSON.stringify(this.data));
+        next.profile = JSON.parse(JSON.stringify(profile));
+        next.goal = JSON.parse(JSON.stringify(goal));
+        const today = date(localDay(this.clock(), profile.timeZone));
+        const state = estimateState(next.activities, profile, today, this.rules,
+            next.plan?.workouts.filter(workout => workout.status !== 'scheduled').map(workout =>
+                ({date: workout.date, status: workout.status, quality: workout.completionQuality,
+                    family: workout.family, activityId: workout.matchedActivity,
+                    expectedRpe: workout.expectedRpe, progressionEligible: workout.progressionEligible})) || []);
+        state.safetyStatus = next.safetyStatus;
+        state.id += `:${next.snapshots.length + 1}`;
+        const startDate = next.plan?.startDate || today;
+        const candidate = generatePlan({profile, goal, state,
+            startDate, generatedAt: this.clock()});
+        candidate.id = next.plan?.id || candidate.id;
+        candidate.revision = (next.plan?.revision || 0) + 1;
+        candidate.sourceSnapshot = state.id;
+        const before = next.plan?.workouts || [];
+        const after = candidate.workouts || [];
+        const beforeMap = new Map(before.map(workout => [workout.id, workout]));
+        const afterMap = new Map(after.map(workout => [workout.id, workout]));
+        const changes = [...new Set([...beforeMap.keys(), ...afterMap.keys()])].sort()
+            .flatMap(id => {
+                const previous = beforeMap.get(id) || null;
+                const current = afterMap.get(id) || null;
+                if(JSON.stringify(previous) === JSON.stringify(current)) return [];
+                return [{workoutId: id,
+                    action: !previous ? 'added' : !current ? 'removed' : 'modified',
+                    previous, current}];
+            });
+        return {
+            source: {
+                planId: next.plan?.id || null,
+                revision: next.plan?.revision || 0,
+                goalId: this.data.goal?.id || null,
+            },
+            profile,
+            goal,
+            state,
+            candidate,
+            changes,
+            warnings: candidate.validationWarnings || [],
+            forecast: {
+                beforeMinutes: before.reduce((total, workout) => total + workout.duration / 60, 0),
+                afterMinutes: after.reduce((total, workout) => total + workout.duration / 60, 0),
+                beforeLoad: before.reduce((total, workout) => total + (workout.targetLoad || 0), 0),
+                afterLoad: after.reduce((total, workout) => total + (workout.targetLoad || 0), 0),
+            },
+        };
+    }
+    /**
+     * Atomically create or replace the Coach plan after a quick goal preview.
+     * Rebuilds the candidate before commit so stale or tampered previews are rejected.
+     */
+    async acceptQuickGoal(preview) {
+        if(!preview?.source || !preview.profile || !preview.goal || !preview.candidate) {
+            throw new Error('A complete quick-goal preview is required.');
+        }
+        if((this.data.plan?.id || null) !== preview.source.planId ||
+           (this.data.plan?.revision || 0) !== preview.source.revision ||
+           (this.data.goal?.id || null) !== preview.source.goalId) {
+            throw new Error('The quick-goal preview is stale. Build a new preview.');
+        }
+        const rebuilt = this.previewQuickGoal({profile: preview.profile, goal: preview.goal});
+        if(JSON.stringify(rebuilt.candidate) !== JSON.stringify(preview.candidate) ||
+           JSON.stringify(rebuilt.changes) !== JSON.stringify(preview.changes)) {
+            throw new Error('The quick-goal preview changed. Build a new preview.');
+        }
+        const next = JSON.parse(JSON.stringify(this.data));
+        next.profile = JSON.parse(JSON.stringify(preview.profile));
+        next.goal = JSON.parse(JSON.stringify(preview.goal));
+        next.activities = next.activities.map(activity => normalizeActivity({
+            ...activity.original,
+            providerIds: activity.providerIds,
+            rpe: activity.rpe,
+            feedback: activity.feedback,
+        }, next.profile));
+        if(next.plan) {
+            next.plan.status = 'archived';
+            next.revisions.push(JSON.parse(JSON.stringify(next.plan)));
+        }
+        const startDate = next.plan?.startDate || date(localDay(this.clock(), next.profile.timeZone));
+        const state = this.snapshot(next, date(localDay(this.clock(), next.profile.timeZone)));
+        const candidate = generatePlan({profile: next.profile, goal: next.goal, state,
+            startDate, generatedAt: this.clock()});
+        candidate.id = preview.candidate.id;
+        candidate.revision = preview.candidate.revision;
+        candidate.sourceSnapshot = state.id;
+        next.plan = candidate;
+        next.revisions.push(JSON.parse(JSON.stringify(candidate)));
+        next.microcycleReviews = [];
+        await this.commit(next);
+        return {plan: this.data.plan, state, preview: rebuilt};
     }
     /**
      * Captures a training-state snapshot at a specific date for planning and historical comparison.

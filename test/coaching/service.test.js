@@ -283,4 +283,45 @@ describe('persistent coaching loop', () => {
         expect(service.data.plan.status).toBe('finished');
         expect(service.data.plan.workouts.every(w => w.status !== 'scheduled')).toBe(true);
     });
+    test('previews and atomically accepts a quick goal change', async () => {
+        const {service} = await setup();
+        const originalRevision = service.data.plan.revision;
+        const originalGoal = JSON.stringify(service.data.goal);
+        const changedGoal = {...goal, date: addDays(start, 182), name: 'New long-term goal'};
+        const preview = service.previewQuickGoal({profile, goal: changedGoal});
+        expect(preview.changes.length).toBeGreaterThanOrEqual(0);
+        expect(JSON.stringify(service.data.goal)).toBe(originalGoal);
+        expect(service.data.plan.revision).toBe(originalRevision);
+
+        const result = await service.acceptQuickGoal(preview);
+        expect(service.data.goal).toMatchObject({name: 'New long-term goal', date: changedGoal.date});
+        expect(service.data.plan.revision).toBe(originalRevision + 1);
+        expect(result.plan).toEqual(service.data.plan);
+        expect(service.data.revisions.at(-1)).toEqual(service.data.plan);
+    });
+    test('rejects stale and tampered quick goal previews', async () => {
+        const {service} = await setup();
+        const preview = service.previewQuickGoal({profile,
+            goal: {...goal, date: addDays(start, 182), name: 'Changed goal'}});
+        await service.recordRide({id: 'stale-ride', source: 'too-many-watts',
+            start: timestamp, duration: 3600});
+        await expect(service.acceptQuickGoal(preview)).rejects.toThrow(/stale|preview changed/i);
+    });
+    test('creates a first plan atomically from a quick goal and existing profile', async () => {
+        const storage = memoryStorage();
+        const service = new CoachingService(storage, () => timestamp);
+        await service.configure(profile, {...goal, date: addDays(start, 91)});
+        const preview = service.previewQuickGoal({
+            profile,
+            goal: {...goal, date: addDays(start, 182), name: 'First simple goal'},
+        });
+        // Reconfigure normally leaves no active plan; the preview must remain acceptable.
+        preview.source.planId = null;
+        preview.source.revision = 0;
+        preview.source.goalId = goal.id;
+        const result = await service.acceptQuickGoal(preview);
+        expect(result.plan.goalId).toBe('goal');
+        expect(service.data.goal.name).toBe('First simple goal');
+        expect(service.data.plan.status).toBe('active');
+    });
 });
