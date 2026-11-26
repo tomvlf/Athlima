@@ -281,13 +281,13 @@ export async function launchPlatform(root) {
         <button type="button" class="daily-choice daily-goal-choice ${type === selectedType ? 'selected' : ''}" data-daily-type="${type}" aria-pressed="${type === selectedType}">
             <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4V2M20 12h2"/>')}</span>
             <strong>${quickGoalName(type)}</strong>
-        </button>`).join('');
+        </button>`);
     const quickTimelineCards = (selectedDate, horizon) => html`
         ${DAILY_HORIZONS.map(option => html`
             <button type="button" class="daily-choice daily-timeline-choice ${!selectedDate && horizon === option.days ? 'selected' : ''}" data-daily-timeline="${option.days}" aria-pressed="${!selectedDate && horizon === option.days}">
                 <span class="daily-choice-icon" aria-hidden="true">${icon('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>')}</span>
                 <strong>${option.label}</strong>
-            </button>`).join('')}
+            </button>`)}
         <button type="button" class="daily-choice daily-timeline-choice ${selectedDate ? 'selected' : ''}" data-daily-timeline="date" aria-pressed="${selectedDate}">
             <span class="daily-choice-icon" aria-hidden="true">${icon('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M12 12v5M9.5 14.5h5"/>')}</span>
             <strong>Choose a date</strong>

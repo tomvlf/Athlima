@@ -291,7 +291,7 @@ coaching-panel [hidden] { display: none !important; }
 #platform .coach-actions p { margin: 8px 0 0; }
 #daily-goal-form fieldset { border: 0; padding: 0; margin: 0; }
 #daily-goal-form label { display: grid; gap: 6px; }
-.daily-goal-card { width: 100%; min-height: 140px; display: grid; gap: 6px; align-content: center; text-align: left; }
+.daily-goal-card { width: 100%; min-height: 140px; display: grid; gap: 6px; align-content: center; text-align: left; background: var(--platform-panel) !important; border: 1px solid var(--platform-border) !important; color: var(--platform-text) !important; }
 .daily-goal-card strong { font-size: 24px; line-height: 1.2; }
 .daily-goal-card small, .daily-goal-card span { color: var(--platform-muted); }
 .daily-goal-card .eyebrow { color: var(--platform-accent); }
