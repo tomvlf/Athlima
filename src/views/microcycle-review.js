@@ -9,6 +9,7 @@ import { microcycleRevisionHistory } from '../coaching/microcycle-history.js';
 import { microcycleReviewTrigger } from '../coaching/microcycle-triggers.js';
 import { formatMicrocycleTimestamp, formatMicrocycleDate, formatMicrocycleMinutes,
     formatMicrocycleNumber, microcycleMessage } from '../coaching/microcycle-format.js';
+import { recordMicrocycleEvent } from '../coaching/microcycle-diagnostics.js';
 
 /** Escape dynamic values before inserting them into Coach HTML. */
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
@@ -171,6 +172,9 @@ CoachingPanel.prototype.click = async function(event) {
             const trigger = this.microcycleReview?.automaticTrigger;
             this.dismissedMicrocycleFingerprint = trigger?.fingerprint ?? null;
             if(trigger) await service.setMicrocycleReviewStatus(trigger, 'dismissed');
+            recordMicrocycleEvent({type: 'review_dismissed', timestamp: service.clock(),
+                planRevision: service.data.plan?.revision ?? null, trigger: trigger?.kind ?? null,
+                changeCount: this.microcycleReview?.changes?.length ?? null});
             this.microcycleReview = null;
             this.notice = 'Coach proposal dismissed. Your plan was not changed.';
         }

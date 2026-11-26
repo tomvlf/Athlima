@@ -4,6 +4,7 @@
  */
 
 import { daysBetween, localDay } from './domain.js';
+import { recordMicrocycleEvent } from './microcycle-diagnostics.js';
 
 const REVIEW_TRIGGERS = Object.freeze({
     safety: 'Pain or illness status changed.',
@@ -32,19 +33,30 @@ export function microcycleReviewTrigger({data, now = new Date().toISOString()} =
     const status = (data.microcycleReviews || []).find(entry => entry.status === 'dismissed' &&
         entry.fingerprint === fingerprint);
     if(status) return null;
-
     if(data.safetyStatus || data.plan.trainingPaused) {
-        return {kind: 'safety', reason: REVIEW_TRIGGERS.safety, today, fingerprint};
+        const trigger = {kind: 'safety', reason: REVIEW_TRIGGERS.safety, today, fingerprint};
+        recordMicrocycleEvent({type: 'trigger_detected', timestamp: now, planRevision: data.plan.revision,
+            trigger: trigger.kind});
+        return trigger;
     }
     if(state?.readiness?.status === 'caution') {
-        return {kind: 'caution', reason: REVIEW_TRIGGERS.caution, today, fingerprint};
+        const trigger = {kind: 'caution', reason: REVIEW_TRIGGERS.caution, today, fingerprint};
+        recordMicrocycleEvent({type: 'trigger_detected', timestamp: now, planRevision: data.plan.revision,
+            trigger: trigger.kind});
+        return trigger;
     }
     if(state && state.id !== data.plan.sourceSnapshot) {
-        return {kind: 'evidence', reason: REVIEW_TRIGGERS.evidence, today, fingerprint};
+        const trigger = {kind: 'evidence', reason: REVIEW_TRIGGERS.evidence, today, fingerprint};
+        recordMicrocycleEvent({type: 'trigger_detected', timestamp: now, planRevision: data.plan.revision,
+            trigger: trigger.kind});
+        return trigger;
     }
     const lastDate = lastReview?.date ?? latestDecision?.observations?.date ?? data.plan.startDate;
     if(daysBetween(lastDate, today) >= 7) {
-        return {kind: 'weekly', reason: REVIEW_TRIGGERS.weekly, today, fingerprint};
+        const trigger = {kind: 'weekly', reason: REVIEW_TRIGGERS.weekly, today, fingerprint};
+        recordMicrocycleEvent({type: 'trigger_detected', timestamp: now, planRevision: data.plan.revision,
+            trigger: trigger.kind});
+        return trigger;
     }
     return null;
 }

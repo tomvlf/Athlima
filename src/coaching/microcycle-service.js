@@ -4,6 +4,7 @@ import { date, localDay } from './domain.js';
 import { buildMicrocycleContext } from './microcycle-context.js';
 import { buildMicrocycleCandidate } from './microcycle-candidate.js';
 import { markAutomaticReview } from './microcycle-triggers.js';
+import { MICROCYCLE_ERROR_CODES, recordMicrocycleEvent } from './microcycle-diagnostics.js';
 
 /** Clone JSON-compatible CoachingService data for isolated review calculations. */
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -49,6 +50,9 @@ export async function acceptMicrocycle(service, review) {
     const current = service.data;
     if(!current.plan || current.plan.status !== 'active' || review.source.planId !== current.plan.id ||
        review.source.revision !== current.plan.revision || review.source.stateId !== review.state.id) {
+        recordMicrocycleEvent({type: 'stale_review_rejected', timestamp: service.clock(),
+            planRevision: current.plan?.revision ?? null, trigger: review.automaticTrigger?.kind ?? null,
+            errorCode: MICROCYCLE_ERROR_CODES.stale});
         throw new Error('Microcycle candidate is stale; review the current plan again.');
     }
     if(review.state.athleteId !== current.profile.id || review.context.goalId !== current.goal.id) throw new Error('Microcycle candidate does not belong to the configured athlete and goal.');
@@ -57,10 +61,25 @@ export async function acceptMicrocycle(service, review) {
         disruptions: review.disruptions});
     markAutomaticReview(expected.candidatePlan, review.automaticTrigger, review.reviewedAt);
     if(!same(expected.candidatePlan, review.candidatePlan) || !same(expected.changes, review.changes) ||
-       !same(expected.candidate, review.candidate)) throw new Error('Microcycle candidate changed after review and cannot be accepted.');
-    if(review.candidatePlan.revision !== current.plan.revision + 1 || review.candidatePlan.sourceSnapshot !== review.state.id) throw new Error('Microcycle candidate revision or source snapshot is invalid.');
+       !same(expected.candidate, review.candidate)) {
+        recordMicrocycleEvent({type: 'tamper_check_failed', timestamp: service.clock(),
+            planRevision: current.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+            changeCount: review.changes?.length ?? null, errorCode: MICROCYCLE_ERROR_CODES.tamper});
+        throw new Error('Microcycle candidate changed after review and cannot be accepted.');
+    }
+    if(review.candidatePlan.revision !== current.plan.revision + 1 || review.candidatePlan.sourceSnapshot !== review.state.id) {
+        recordMicrocycleEvent({type: 'validation_failed', timestamp: service.clock(),
+            planRevision: current.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+            errorCode: MICROCYCLE_ERROR_CODES.validation});
+        throw new Error('Microcycle candidate revision or source snapshot is invalid.');
+    }
     const next = clone(current);
-    if(next.snapshots.some(snapshot => snapshot.id === review.state.id)) throw new Error('Microcycle review snapshot was already accepted.');
+    if(next.snapshots.some(snapshot => snapshot.id === review.state.id)) {
+        recordMicrocycleEvent({type: 'stale_review_rejected', timestamp: service.clock(),
+            planRevision: current.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+            errorCode: MICROCYCLE_ERROR_CODES.stale});
+        throw new Error('Microcycle review snapshot was already accepted.');
+    }
     next.snapshots.push(clone(review.state));
     next.plan = clone(review.candidatePlan);
     next.revisions.push(clone(review.candidatePlan));
@@ -68,6 +87,16 @@ export async function acceptMicrocycle(service, review) {
         next.microcycleReviews = (next.microcycleReviews || []).filter(entry =>
             entry.fingerprint !== review.automaticTrigger.fingerprint);
     }
-    await service.commit(next);
+    try { await service.commit(next); }
+    catch(error) {
+        recordMicrocycleEvent({type: 'storage_failed', timestamp: service.clock(),
+            planRevision: current.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+            errorCode: MICROCYCLE_ERROR_CODES.storage});
+        throw error;
+    }
+    recordMicrocycleEvent({type: 'review_accepted', timestamp: service.clock(),
+        planRevision: next.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+        changeCount: review.changes?.length ?? null,
+        plannerVersion: next.plan.plannerVersion ?? next.plan.workouts?.[0]?.plannerVersion ?? null});
     return service.data.plan;
 }
