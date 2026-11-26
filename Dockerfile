@@ -24,11 +24,17 @@ RUN npm test -- --runInBand \
 # Stage 2 serves only the built files. Node and build tools do not ship in this image.
 FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
 
-# The image is digest-pinned for reproducibility, while Alpine and nginx may publish security fixes
-# after that digest. Apply only repository-provided package upgrades, then return to the non-root
-# runtime user. The vulnerability gate verifies that no fixed HIGH/CRITICAL issue remains.
+# The image is digest-pinned for reproducibility. Upgrade Alpine packages and explicitly install the
+# fixed nginx release from the same upstream repository used by the official nginx Alpine images.
+# Return to the non-root runtime user after package installation.
 USER root
-RUN apk upgrade --no-cache
+RUN set -eux; \
+    alpine_version="$(cut -d. -f1,2 /etc/alpine-release)"; \
+    apk upgrade --no-cache; \
+    apk add --no-cache \
+        --repository "https://<scrubbed-url-domain>/packages/alpine/v$%7Balpine_version%7D/main" \
+        'nginx=1.30.7-r0'; \
+    nginx -v
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/security-headers.conf /etc/nginx/security-headers.conf
