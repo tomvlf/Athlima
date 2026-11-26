@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#061527">
+  <link rel="apple-touch-icon" sizes="180x180" href="images/logo/athlima-touch-180.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="images/logo/athlima-favicon-64.png">
+  <title>Athlima vs RestOrTrain vs ChatGPT | Cycling training comparison</title>
+  <meta name="description" content="Compare Athlima, RestOrTrain and ChatGPT for cycling workouts, coaching, trainer control, privacy and price.">
+  <style>
+    :root { color-scheme: dark; --bg:#050c17; --panel:#0c1a2a; --line:#24415d; --text:#f4f8fc; --muted:#a9bac9; --cyan:#47e6ff; --yellow:#f6dd3d; --green:#77e6ad; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at top,#102c45 0,var(--bg) 42rem); }
+    a { color:var(--cyan); }
+    .wrap { width:min(1180px,calc(100% - 32px)); margin:auto; padding:24px 0 64px; }
+    nav { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:56px; }
+    .brand { color:var(--text); font-weight:800; letter-spacing:.12em; text-decoration:none; text-transform:uppercase; }
+    .back { border:1px solid var(--line); border-radius:999px; padding:9px 14px; text-decoration:none; }
+    .eyebrow { color:var(--yellow); font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+    h1 { max-width:900px; margin:.25em 0; font-size:clamp(2.4rem,7vw,5.5rem); line-height:.97; }
+    .lead { max-width:760px; color:var(--muted); font-size:1.15rem; }
+    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:34px 0; }
+    .card { padding:24px; border:1px solid var(--line); border-radius:18px; background:color-mix(in srgb,var(--panel) 92%,transparent); }
+    .card.athlima { border-color:var(--yellow); box-shadow:0 0 32px #f6dd3d18; }
+    .tag { display:inline-block; margin-bottom:8px; padding:4px 9px; border-radius:999px; background:#17314b; color:var(--cyan); font-size:.8rem; font-weight:700; }
+    .card h2 { margin:.2rem 0 .4rem; }
+    .card p { margin:0; color:var(--muted); }
+    .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+    table { width:100%; min-width:820px; border-collapse:collapse; }
+    th,td { padding:16px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { position:sticky; top:0; background:#0b1826; }
+    th:first-child,td:first-child { width:19%; color:var(--muted); font-weight:700; }
+    th:nth-child(2) { color:var(--yellow); }
+    tr:last-child td { border-bottom:0; }
+    .yes { color:var(--green); font-weight:700; }
+    section { margin-top:48px; }
+    .choice { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .note { color:var(--muted); font-size:.9rem; }
+    .cta { display:inline-block; margin-top:12px; padding:12px 18px; border-radius:10px; background:var(--yellow); color:#07101b; font-weight:800; text-decoration:none; }
+    @media (max-width:760px) { .summary,.choice { grid-template-columns:1fr; } nav { margin-bottom:36px; } }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <nav><a class="brand" href="./">Athlima</a><a class="back" href="./">Open the app</a></nav>
+  <p class="eyebrow">Training tools compared</p>
+  <h1>Athlima vs RestOrTrain vs ChatGPT</h1>
+  <p class="lead">These three tools solve different parts of training. Athlima is a free, open-source browser app for planning and executing workouts locally. RestOrTrain is a subscription endurance-coaching service with automatic sync and delivery. ChatGPT is a general-purpose assistant that can reason about training context you provide.</p>
+
+  <div class="summary">
+    <article class="card athlima"><span class="tag">Local & open source</span><h2>Athlima</h2><p>Best for riders who want trainer control, workout execution and deterministic local coaching without an account or cloud backend.</p></article>
+    <article class="card"><span class="tag">Integrated coaching service</span><h2>RestOrTrain</h2><p>Best for athletes who want synchronized history, adaptive planning and workout delivery handled as a managed service.</p></article>
+    <article class="card"><span class="tag">General-purpose AI</span><h2>ChatGPT</h2><p>Best for broad questions, explanations and flexible analysis when you supply or connect the relevant training context.</p></article>
+  </div>
+
+  <section aria-labelledby="comparison-title">
+    <h2 id="comparison-title">At a glance</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Capability</th><th>Athlima</th><th>RestOrTrain</th><th>ChatGPT</th></tr></thead>
+      <tbody>
+        <tr><td>Primary role</td><td>Browser-based indoor cycling dashboard, workout player and local coach</td><td>Endurance coaching, planning and delivery service</td><td>General-purpose conversational assistant</td></tr>
+        <tr><td>Coaching approach</td><td>Local, deterministic rule-based coaching for cycling and running</td><td>Computed metrics plus AI tuned for endurance decisions</td><td>Answers depend on the prompt, supplied context and available connections</td></tr>
+        <tr><td>Training data</td><td>Stored in the browser; optional direct Intervals.icu import and FIT upload</td><td>Automatic activity and recovery sync from supported services</td><td>Files, screenshots and supported connections supplied by the user</td></tr>
+        <tr><td>Season & weekly planning</td><td class="yes">Yes, local multi-week calendar and proposed schedules</td><td class="yes">Yes, goal-based phases and scheduled workouts</td><td>Can suggest plans, but does not provide a dedicated training calendar by default</td></tr>
+        <tr><td>Smart-trainer control</td><td class="yes">Built in: ERG, resistance and grade simulation</td><td class="yes">Built-in indoor player with ERG</td><td>No built-in trainer control</td></tr>
+        <tr><td>Workout formats</td><td>Built-in workouts, ZWO import and FIT recording/export</td><td>Workouts created in the service and delivered to supported devices</td><td>Can draft workouts in text or files when prompted</td></tr>
+        <tr><td>Sensor support</td><td>FTMS, FE-C over BLE, Wahoo CPS and ANT+ FE-C; power, cadence and heart-rate recording</td><td>Bluetooth FTMS trainer and optional heart-rate strap in its indoor player</td><td>No direct sensor control as a general chat interface</td></tr>
+        <tr><td>Offline use</td><td class="yes">Best-effort offline use after assets are cached</td><td>Mobile service; synchronization features require connectivity</td><td>Generally requires service access</td></tr>
+        <tr><td>Privacy model</td><td>Local browser storage, no Athlima login, no external AI provider</td><td>Cloud account with synchronized training history</td><td>Cloud service; handling depends on account, settings and connected features</td></tr>
+        <tr><td>Open source / self-hosting</td><td class="yes">Yes, AGPL-3.0 and Docker deployment</td><td>No self-hosted version stated</td><td>No self-hosted consumer service</td></tr>
+        <tr><td>Price</td><td class="yes">Free</td><td>Free limited use; Pro pricing varies by region</td><td>Free and paid plans</td></tr>
+        <tr><td>Platform</td><td>Compatible Chromium-based browsers; trainer path is not supported on iOS</td><td>iPhone, iPad and Android; Apple-silicon Mac via the iPad app; no web version</td><td>Web and supported apps</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Which one should you choose?</h2>
+    <div class="choice">
+      <article class="card"><h3>Choose Athlima if…</h3><p>You value local data, self-hosting, open source, direct trainer control and a cycling-first workout screen. It is also the only option here that combines a browser workout player with a fully local rule-based coach.</p><a class="cta" href="./">Start Athlima</a></article>
+      <article class="card"><h3>Choose RestOrTrain if…</h3><p>You want a managed coaching experience that automatically syncs training and recovery data, adapts plans and sends workouts to supported devices.</p></article>
+      <article class="card"><h3>Choose ChatGPT if…</h3><p>You want a flexible general assistant for explanations, brainstorming and analysis across training and unrelated topics, and you are comfortable supplying the necessary context.</p></article>
+    </div>
+  </section>
+
+  <section class="note">
+    <p><strong>Sources and scope.</strong> Athlima details are based on the project documentation and current repository. RestOrTrain and ChatGPT descriptions were checked against RestOrTrain's public comparison page on 26 November 2026. Features and prices can change. This comparison focuses on product workflow, not medical or safety advice.</p>
+    <p><a href="https://<scrubbed-url-domain>/tomvlf/Athlima">Athlima source code</a> · <a href="https://<scrubbed-url-domain>/compare/restortrain-vs-chatgpt" rel="noopener noreferrer">RestOrTrain vs ChatGPT source comparison</a></p>
+  </section>
+</main>
+</body>
+</html>
