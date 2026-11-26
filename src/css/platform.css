@@ -284,6 +284,10 @@ coaching-panel [hidden] { display: none !important; }
 .coach-upcoming li:first-child { border-top: 0; }
 .coach-upcoming li > span:first-child { color: var(--platform-muted); font-size: 13px; }
 .coach-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+#microcycle-day-rules, [data-microcycle-day-rules] { display: grid; gap: 12px; }
+.microcycle-disruption-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; border: 1px solid var(--platform-border); padding: 12px; min-width: 0; }
+.microcycle-disruption-row label { min-width: 0; }
+.microcycle-disruption-row input, .microcycle-disruption-row select, .microcycle-disruption-row button { width: 100%; max-width: 100%; }
 #platform .coach-actions p { margin: 8px 0 0; }
 #platform .coach-actions button + button { margin-left: 8px; }
 #legacy-slot coaching-panel details.coach-card > summary { font-weight: 650; font-size: 16px; padding: 0; min-height: 0; }
