@@ -62,6 +62,31 @@ describe('Adaptive Microcycle Engine Phase 3 service boundary', () => {
         service.data.plan.status = 'active';
         expect(() => reviewMicrocycle(service, '2025-12-31')).toThrow(/inside/);
     });
+
+    test('rejects manipulated availability input when rebuilding the candidate', async () => {
+        const {service} = await setup();
+        const review = reviewMicrocycle(service, start, undefined, {
+            unavailableDates: [start],
+            environmentByDate: {[start]: 'indoor'},
+        });
+        review.disruptions.environmentByDate[start] = 'outdoor';
+        await expect(acceptMicrocycle(service, review)).rejects.toThrow(/changed after review|stale/);
+    });
+
+    test('persists only minimal dismiss and seen review status', async () => {
+        const {service} = await setup();
+        const trigger = {fingerprint: 'plan:1:state:2026-01-01:safe:unknown',
+            kind: 'weekly', reason: 'Due', today: '2026-01-08'};
+        await service.setMicrocycleReviewStatus(trigger, 'seen');
+        await service.setMicrocycleReviewStatus(trigger, 'dismissed');
+        expect(service.data.microcycleReviews[0]).toMatchObject({
+            fingerprint: trigger.fingerprint, status: 'dismissed',
+            planId: service.data.plan.id, revision: service.data.plan.revision,
+        });
+        expect(JSON.stringify(service.data.microcycleReviews)).not.toMatch(/candidate|workouts|snapshot/i);
+        await service.archive();
+        expect(service.data.microcycleReviews).toEqual([]);
+    });
 });
 
 function clone(value) {

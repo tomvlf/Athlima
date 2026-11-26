@@ -103,7 +103,10 @@ const originalPlanView = CoachingPanel.prototype.planView;
 CoachingPanel.prototype.planView = function(data, plan) {
     const trigger = microcycleReviewTrigger({data});
     if(trigger && !this.microcycleReview && this.dismissedMicrocycleFingerprint !== trigger.fingerprint) {
-        try { this.microcycleReview = reviewMicrocycle(coachingService(), trigger.today, undefined, {}, trigger); }
+        try {
+            this.microcycleReview = reviewMicrocycle(coachingService(), trigger.today, undefined, {}, trigger);
+            void coachingService().setMicrocycleReviewStatus(trigger, 'seen');
+        }
         catch(error) { console.warn('Automatic Coach review could not be prepared:', error); }
     }
     return `${todayRecommendationView(todayRecommendation({data}))}${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}${microcycleHistoryView(data)}`;
@@ -164,7 +167,13 @@ CoachingPanel.prototype.click = async function(event) {
             return;
         }
         if(action === 'microcycle-accept') { if(!this.microcycleReview) throw new Error('Review the current plan before accepting an update.'); await acceptMicrocycle(service, this.microcycleReview); this.microcycleReview = null; this.dismissedMicrocycleFingerprint = null; this.notice = 'The reviewed seven-day update was accepted and saved.'; }
-        if(action === 'microcycle-dismiss') { this.dismissedMicrocycleFingerprint = this.microcycleReview?.automaticTrigger?.fingerprint ?? null; this.microcycleReview = null; this.notice = 'Coach proposal dismissed. Your plan was not changed.'; }
+        if(action === 'microcycle-dismiss') {
+            const trigger = this.microcycleReview?.automaticTrigger;
+            this.dismissedMicrocycleFingerprint = trigger?.fingerprint ?? null;
+            if(trigger) await service.setMicrocycleReviewStatus(trigger, 'dismissed');
+            this.microcycleReview = null;
+            this.notice = 'Coach proposal dismissed. Your plan was not changed.';
+        }
         this.changed();
         if(action === 'microcycle-dismiss') {
             this.querySelector('[data-coach=microcycle-review]')?.focus();

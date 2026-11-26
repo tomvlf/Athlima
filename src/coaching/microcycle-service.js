@@ -64,6 +64,10 @@ export async function acceptMicrocycle(service, review) {
     next.snapshots.push(clone(review.state));
     next.plan = clone(review.candidatePlan);
     next.revisions.push(clone(review.candidatePlan));
+    if(review.automaticTrigger?.fingerprint) {
+        next.microcycleReviews = (next.microcycleReviews || []).filter(entry =>
+            entry.fingerprint !== review.automaticTrigger.fingerprint);
+    }
     await service.commit(next);
     return service.data.plan;
 }

@@ -34,3 +34,15 @@ test('records accepted automatic-review provenance in the existing adaptation', 
     expect(markAutomaticReview(plan, trigger, '2026-01-08T10:00:00Z').adaptations[0].observations.microcycleReview)
         .toEqual({kind: 'weekly', reason: 'Due', date: '2026-01-08', reviewedAt: '2026-01-08T10:00:00Z'});
 });
+
+test('a dismissed fingerprint stays quiet until the fingerprint changes', () => {
+    const input = data();
+    const trigger = microcycleReviewTrigger({data: {...input, microcycleReviews: []},
+        now: '2026-01-08T10:00:00Z'});
+    expect(trigger.kind).toBe('weekly');
+    const dismissed = {...input, microcycleReviews: [{fingerprint: trigger.fingerprint,
+        status: 'dismissed', planId: 'plan', revision: 1}]};
+    expect(microcycleReviewTrigger({data: dismissed, now: '2026-01-08T10:00:00Z'})).toBeNull();
+    const changed = {...dismissed, plan: {...dismissed.plan, revision: 2}};
+    expect(microcycleReviewTrigger({data: changed, now: '2026-01-08T10:00:00Z'})).not.toBeNull();
+});

@@ -29,6 +29,9 @@ export function microcycleReviewTrigger({data, now = new Date().toISOString()} =
     const lastReview = latestDecision?.observations?.microcycleReview ?? null;
     const fingerprint = [data.plan.id, data.plan.revision, state?.id ?? 'none', today,
         data.safetyStatus ?? 'safe', state?.readiness?.status ?? 'unknown'].join(':');
+    const status = (data.microcycleReviews || []).find(entry => entry.status === 'dismissed' &&
+        entry.fingerprint === fingerprint);
+    if(status) return null;
 
     if(data.safetyStatus || data.plan.trainingPaused) {
         return {kind: 'safety', reason: REVIEW_TRIGGERS.safety, today, fingerprint};
