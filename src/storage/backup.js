@@ -7,6 +7,7 @@
 
 import { CoachingService } from '../coaching/service.js';
 import { openCoachingStorage } from '../coaching/storage.js';
+import { microcycleAuditTrail } from '../coaching/microcycle-history.js';
 
 const SETTINGS = ['ftp', 'weight', 'theme', 'dockMode', 'measurement', 'volume', 'dataTileSwitch'];
 
@@ -98,6 +99,7 @@ export async function createBackup(library = []) {
         try { coaching = new CoachingService(storage).data; }
         finally { storage.close(); }
         return {version: 2, savedAt: new Date().toISOString(), workouts, activities, coaching,
+            microcycleAudit: microcycleAuditTrail(coaching),
             settings: Object.fromEntries(SETTINGS.map(key => [key, accountStorage.getItem(key)])),
             calendar, planned};
     } finally { database.close(); }
@@ -123,6 +125,11 @@ export async function restoreBackup(backup) {
     if(backup.version === 2) {
         if(!backup.coaching || typeof backup.coaching !== 'object') throw new Error('Invalid coaching backup.');
         new CoachingService({getItem: () => JSON.stringify(backup.coaching)});
+        if(backup.microcycleAudit != null &&
+           (!Array.isArray(backup.microcycleAudit) ||
+            backup.microcycleAudit.some(entry => !isPlainObject(entry)))) {
+            throw new Error('Invalid microcycle audit backup.');
+        }
         if(backup.planned && (!Array.isArray(backup.planned.workouts) ||
             backup.planned.workouts.some(workout => !workout?.id || !isPlainObject(workout.meta) || !Array.isArray(workout.intervals)))) {
             throw new Error('Invalid planned workout backup.');
