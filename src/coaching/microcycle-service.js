@@ -47,6 +47,24 @@ export function reviewMicrocycle(service, asOf = null, days = undefined, disrupt
  */
 export async function acceptMicrocycle(service, review) {
     if(!review?.source || !review.state || !review.context || !review.candidatePlan) throw new Error('A complete reviewed microcycle candidate is required.');
+    const persisted = service.storage?.getItem?.('athlima-coaching-v1');
+    if(persisted) {
+        try {
+            const stored = JSON.parse(persisted);
+            if(stored.plan?.id !== service.data.plan?.id ||
+               stored.plan?.revision !== service.data.plan?.revision ||
+               JSON.stringify(stored.snapshots) !== JSON.stringify(service.data.snapshots)) {
+                throw new Error('Microcycle candidate is stale; another tab changed the Coach plan.');
+            }
+        } catch(error) {
+            if(error.message?.includes('another tab')) {
+                recordMicrocycleEvent({type: 'stale_review_rejected', timestamp: service.clock(),
+                    planRevision: service.data.plan?.revision ?? null,
+                    trigger: review.automaticTrigger?.kind ?? null, errorCode: MICROCYCLE_ERROR_CODES.stale});
+                throw error;
+            }
+        }
+    }
     const current = service.data;
     if(!current.plan || current.plan.status !== 'active' || review.source.planId !== current.plan.id ||
        review.source.revision !== current.plan.revision || review.source.stateId !== review.state.id) {
@@ -56,6 +74,19 @@ export async function acceptMicrocycle(service, review) {
         throw new Error('Microcycle candidate is stale; review the current plan again.');
     }
     if(review.state.athleteId !== current.profile.id || review.context.goalId !== current.goal.id) throw new Error('Microcycle candidate does not belong to the configured athlete and goal.');
+    if(review.state.safetyStatus !== current.safetyStatus) {
+        recordMicrocycleEvent({type: 'stale_review_rejected', timestamp: service.clock(),
+            planRevision: current.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+            errorCode: MICROCYCLE_ERROR_CODES.stale});
+        throw new Error('Safety status changed during the microcycle review.');
+    }
+    const acceptanceDay = date(localDay(service.clock(), current.profile.timeZone));
+    if(acceptanceDay > current.plan.endDate) {
+        recordMicrocycleEvent({type: 'stale_review_rejected', timestamp: service.clock(),
+            planRevision: current.plan.revision, trigger: review.automaticTrigger?.kind ?? null,
+            errorCode: MICROCYCLE_ERROR_CODES.stale});
+        throw new Error('The Coach plan ended during this microcycle review.');
+    }
     const expected = buildMicrocycleCandidate({context: review.context, plan: current.plan,
         profile: current.profile, state: review.state, timestamp: review.reviewedAt,
         disruptions: review.disruptions});

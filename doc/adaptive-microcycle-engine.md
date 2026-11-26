@@ -18,6 +18,11 @@ extends the deterministic Coach rather than creating a second planning system.
 - **Phase 8:** transparent current-versus-candidate forecast comparison.
 - **Phase 9:** compact accepted-review history over immutable plan revisions.
 - **Phase 10:** repeatable temporary availability, duration, environment and per-day context rules.
+- **Phase 11:** accessible, centralised review presentation and formatting.
+- **Phase 12:** exportable, derived microcycle audit trail in coaching backups.
+- **Phase 13:** minimal persisted dismissal and seen status by fingerprint.
+- **Phase 14:** privacy-safe local diagnostics with stable error codes.
+- **Phase 15:** end-to-end stale, tamper, storage and plan-boundary hardening.
 
 ## Phase 10: extended temporary availability
 
