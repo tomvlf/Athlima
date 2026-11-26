@@ -17,14 +17,10 @@ raw activity
   -> snapshots and plan revisions
 ```
 
-The existing domain vocabulary remains authoritative: `CAPABILITIES` express goal demand, workout
-`FAMILIES` express prescribed training, `estimateState()` produces dated athlete-state snapshots and
-plans retain phases, weeks, workouts, adaptations and revisions.
-
 ## Phase 0: projection boundary
 
 `projectMicrocycle()` provides a deterministic, read-only view over an existing plan and state
-snapshot. It retains existing workout identities and does not persist or modify anything.
+snapshot while retaining existing workout identities.
 
 ## Phase 1: planning context
 
@@ -33,28 +29,31 @@ evidence-backed gaps, readiness/safety constraints, phase/week context and the c
 
 ## Phase 2: candidate window
 
-`buildMicrocycleCandidate()` asks the existing `adaptPlan()` engine to create an uncommitted candidate
-revision. Caution and safety contexts use the established recovery adaptation; other contexts use a
-feedback review. The result contains:
+`buildMicrocycleCandidate()` uses the existing `adaptPlan()` engine to create an uncommitted candidate
+revision, candidate projection, stable workout diff, reasoning and validation warnings.
 
-- the unchanged current projection;
-- a candidate seven-day projection;
-- a stable add/remove/modify diff keyed by workout ID;
-- the validated candidate plan revision and its existing adaptation reasoning;
-- validation warnings for review.
+## Phase 3: review and atomic acceptance
 
-Candidate generation rejects stale contexts, preserves resolved and pre-window workouts, and verifies
-that source plan and state objects were not mutated. It does not write to storage. This retains one
-source of truth for workout rebuilding, load budgets, progression, return-to-training and validation.
+`reviewMicrocycle()` creates a fresh state snapshot and candidate on a cloned CoachingService state.
+It does not change memory or storage. `acceptMicrocycle()` then:
+
+1. rejects stale plan revisions and mismatched athlete, goal or snapshot identities;
+2. deterministically rebuilds the proposal to detect tampering after review;
+3. verifies revision and source-snapshot continuity;
+4. stores the snapshot, accepted plan and immutable revision in one `CoachingService.commit()` call.
+
+A failed storage write leaves the previous in-memory and persisted Coach state active. Candidates are
+not accepted automatically, and a reviewed candidate becomes stale as soon as another plan revision
+is committed.
 
 ## Future phases
 
-1. constrain candidate rebuilding to richer availability and disruption scenarios;
-2. present the candidate diff through existing explanation structures;
-3. let `CoachingService` atomically accept a reviewed candidate as a normal revision;
-4. add the Coach UI for "what changed" and today's recommendation.
+1. expose review reasoning and changes through a Coach UI;
+2. add today's recommendation and explicit accept/reject controls;
+3. add richer availability and disruption input;
+4. schedule automatic review triggers without automatic unsafe acceptance.
 
 ## Non-goals
 
 The current phases do not add persistent duplicate domain models, a second Coach facade, an IndexedDB
-migration, UI changes, Train Now changes or LLM planning decisions.
+migration, Train Now changes or LLM planning decisions.
