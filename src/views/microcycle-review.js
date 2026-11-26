@@ -1,16 +1,28 @@
 /**
- * Extends the existing coaching panel with explicit Adaptive Microcycle Engine review controls. The
- * panel keeps ownership of page rendering and messages; this module only adds a review card and
- * routes review, accept and dismiss actions through the Phase 3 service boundary.
+ * Extends the Coach dashboard with explicit microcycle review controls, today's recommendation and
+ * a concise change summary. Acceptance remains delegated to the Phase 3 service boundary.
  */
 
 import { CoachingPanel } from './coaching-panel.js';
 import { coachingService } from '../coaching/service.js';
 import { reviewMicrocycle, acceptMicrocycle } from '../coaching/microcycle-service.js';
+import { microcycleChangeSummary, todayRecommendation } from '../coaching/microcycle-summary.js';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
 const minutes = seconds => `${Math.round((seconds || 0) / 60)} min`;
+
+export function todayRecommendationView(recommendation) {
+    if(!recommendation) return '';
+    const session = recommendation.session;
+    return `<section class="coach-card" data-today-recommendation>
+        <p class="eyebrow">Today</p><h3>${escape(recommendation.title)}</h3>
+        ${session ? `<p><strong>${escape(session.family)}</strong> · ${minutes(session.duration)} · Effort ${escape(session.expectedRpe ?? '—')}/10</p>` : ''}
+        <p>${escape(recommendation.reason)}</p>
+        ${recommendation.status === 'review'
+            ? '<button type="button" class="secondary" data-coach="microcycle-review">Review before training</button>' : ''}
+    </section>`;
+}
 
 /** Render the candidate diff as a review card; no proposal means an invitation to review. */
 export function microcycleReviewView(review) {
@@ -20,21 +32,21 @@ export function microcycleReviewView(review) {
         <p class="muted">Nothing changes until you inspect and accept the proposal.</p>
         <button type="button" class="secondary" data-coach="microcycle-review">Review next 7 days</button>
     </section>`;
-    const changes = review.changes || [];
+    const changes = review.changes || [], summary = microcycleChangeSummary(review);
     return `<section class="coach-card" data-microcycle-review>
         <h3>Proposed week update</h3>
+        <p><strong>${escape(summary.headline)}</strong> · ${escape(summary.detail)}</p>
         <p>${escape(review.reasoning)}</p>
-        <p class="muted">${escape(review.window.startDate)} to ${escape(review.window.endDate)} ·
-            ${changes.length} change${changes.length === 1 ? '' : 's'} · based on revision ${escape(review.source.revision)}</p>
+        <p class="muted">${escape(review.window.startDate)} to ${escape(review.window.endDate)} · based on revision ${escape(review.source.revision)}</p>
         ${changes.length ? `<ul class="coach-upcoming">${changes.map(change => {
             const previous = change.previous, current = change.current;
             const date = current?.date || previous?.date;
-            const summary = change.action === 'removed'
+            const description = change.action === 'removed'
                 ? `${escape(previous.family)} removed (${minutes(previous.duration)})`
                 : change.action === 'added'
                     ? `${escape(current.family)} added (${minutes(current.duration)})`
                     : `${escape(previous.family)} ${minutes(previous.duration)} → ${escape(current.family)} ${minutes(current.duration)}`;
-            return `<li><span>${escape(date)}</span><strong>${summary}</strong></li>`;
+            return `<li><span>${escape(date)}</span><strong>${description}</strong></li>`;
         }).join('')}</ul>` : '<p class="muted">The review found no session changes. You can dismiss it without creating a revision.</p>'}
         ${review.validationWarnings?.length ? `<details><summary>Validation warnings</summary><ul>${
             review.validationWarnings.map(warning => `<li>${escape(warning)}</li>`).join('')}</ul></details>` : ''}
@@ -47,7 +59,8 @@ export function microcycleReviewView(review) {
 
 const originalPlanView = CoachingPanel.prototype.planView;
 CoachingPanel.prototype.planView = function(data, plan) {
-    return `${originalPlanView.call(this, data, plan)}${microcycleReviewView(this.microcycleReview)}`;
+    return `${todayRecommendationView(todayRecommendation({data}))}${originalPlanView.call(this, data, plan)}${
+        microcycleReviewView(this.microcycleReview)}`;
 };
 
 const originalClick = CoachingPanel.prototype.click;

@@ -3,59 +3,36 @@
 ## Purpose
 
 The Adaptive Microcycle Engine (AME) continuously reviews the next seven days of an existing Athlima
-Coach plan. It extends the current local, deterministic Coach rather than creating a second Coach,
-plan store or remote AI service.
+Coach plan. It extends the current deterministic Coach rather than creating a second planning system.
 
-## Existing architecture
+## Phases
 
-```text
-raw activity
-  -> normalizeActivity()
-  -> estimateState()
-  -> generatePlan() / adaptPlan()
-  -> CoachingService commit
-  -> snapshots and plan revisions
-```
+- **Phase 0:** `projectMicrocycle()` provides a read-only seven-day projection.
+- **Phase 1:** `buildMicrocycleContext()` combines validated plan, goal, state and readiness evidence.
+- **Phase 2:** `buildMicrocycleCandidate()` creates an uncommitted candidate through `adaptPlan()`.
+- **Phase 3:** review is side-effect free and acceptance is stale-safe, tamper-checked and atomic.
+- **Phase 4:** the Coach dashboard exposes explicit review, accept and dismiss controls.
+- **Phase 5:** the dashboard shows today's existing planned recommendation and a concise change summary.
 
-## Phase 0: projection boundary
+## Phase 5: today and what changed
 
-`projectMicrocycle()` provides a deterministic, read-only view over an existing plan and state
-snapshot while retaining existing workout identities.
+`todayRecommendation()` selects today's existing scheduled session. It does not create an ad-hoc
+workout or replace Train Now. Safety status pauses the recommendation; readiness caution asks the
+rider to review the seven-day proposal before starting a non-recovery session; an empty day remains a
+rest day rather than becoming catch-up work.
 
-## Phase 1: planning context
-
-`buildMicrocycleContext()` combines profile, goal, snapshot and plan into validated goal demand,
-evidence-backed gaps, readiness/safety constraints, phase/week context and the current projection.
-
-## Phase 2: candidate window
-
-`buildMicrocycleCandidate()` uses the existing `adaptPlan()` engine to create an uncommitted candidate
-revision, candidate projection, stable workout diff, reasoning and validation warnings.
-
-## Phase 3: review and atomic acceptance
-
-`reviewMicrocycle()` performs a side-effect-free review. `acceptMicrocycle()` rejects stale or altered
-proposals and atomically stores the snapshot, accepted plan and immutable revision.
-
-## Phase 4: Coach review UI
-
-The existing `<coaching-panel>` now exposes a Coach review card. The rider can:
-
-1. request a fresh review of the next seven days;
-2. inspect reasoning, the source revision, warnings and per-session add/remove/modify changes;
-3. explicitly accept the verified proposal or dismiss it without changing the plan.
-
-The UI never accepts automatically. Acceptance still passes through the Phase 3 stale-context,
-identity, tamper and atomic-storage checks. All candidate text is escaped before rendering.
+`microcycleChangeSummary()` reports stable add/modify/remove counts and the net duration difference of
+the Phase 2 diff. The UI presents this summary before detailed per-session changes. All rendered data
+remains escaped, and acceptance still uses the Phase 3 verification boundary.
 
 ## Future phases
 
-1. add today's recommendation and a concise "what changed" summary;
-2. add richer availability and disruption input;
-3. schedule automatic review triggers without automatic unsafe acceptance;
-4. add forecast comparisons for current versus candidate microcycles.
+1. add richer availability and disruption input;
+2. schedule automatic review triggers without automatic unsafe acceptance;
+3. add forecast comparisons for current versus candidate microcycles;
+4. add a compact plan-revision history view.
 
 ## Non-goals
 
-The current phases do not add persistent duplicate domain models, a second Coach facade, an IndexedDB
-migration, Train Now changes or LLM planning decisions.
+The AME does not add duplicate persistent domain models, a second Coach facade, an IndexedDB schema
+migration, automatic acceptance, Train Now replacement or LLM planning decisions.
