@@ -12,7 +12,14 @@ const REVIEW_TRIGGERS = Object.freeze({
     weekly: 'A new seven-day review is due.',
 });
 
-/** Return a stable trigger or null when no automatic review is needed. */
+/**
+ * Return a stable trigger or null when no automatic review is needed.
+ *
+ * @param {object} [input] - Trigger inputs.
+ * @param {object} input.data - Current Coach data.
+ * @param {string} [input.now] - ISO timestamp used for trigger evaluation.
+ * @returns {object|null} Trigger with kind, reason, date and stable fingerprint.
+ */
 export function microcycleReviewTrigger({data, now = new Date().toISOString()} = {}) {
     if(!data?.plan || data.plan.status !== 'active' || !data.profile) return null;
     const today = localDay(now, data.profile.timeZone);
@@ -39,7 +46,14 @@ export function microcycleReviewTrigger({data, now = new Date().toISOString()} =
     return null;
 }
 
-/** Add review provenance to the accepted adaptation without introducing a persistence model. */
+/**
+ * Add review provenance to an accepted adaptation.
+ *
+ * @param {object} candidatePlan - Candidate plan containing the adaptation to annotate.
+ * @param {object|null} trigger - Automatic review trigger details.
+ * @param {string} reviewedAt - ISO timestamp for the review.
+ * @returns {object} The same candidate plan with provenance attached.
+ */
 export function markAutomaticReview(candidatePlan, trigger, reviewedAt) {
     if(!trigger) return candidatePlan;
     const adaptation = candidatePlan.adaptations?.at(-1);

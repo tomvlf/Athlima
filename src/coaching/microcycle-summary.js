@@ -7,7 +7,15 @@
 import { localDay } from './domain.js';
 import { microcycleReadiness } from './microcycle-context.js';
 
-/** Select today's existing planned session and explain whether it remains actionable. */
+/**
+ * Select today's existing planned session and explain whether it remains actionable.
+ *
+ * @param {object} [input] - Recommendation inputs.
+ * @param {object} input.data - Current Coach data.
+ * @param {object} [input.state] - Latest athlete-state snapshot.
+ * @param {string} [input.now] - ISO timestamp used to resolve the local day.
+ * @returns {object|null} Conservative action recommendation or null outside a configured Coach.
+ */
 export function todayRecommendation({data, state = data?.snapshots?.at(-1), now = new Date().toISOString()} = {}) {
     if(!data?.profile || !data.plan || data.plan.status !== 'active') return null;
     const day = localDay(now, data.profile.timeZone);
@@ -28,7 +36,12 @@ export function todayRecommendation({data, state = data?.snapshots?.at(-1), now 
         reason: session.description || session.reason || 'This is today’s existing planned session.'};
 }
 
-/** Summarise a Phase 2/3 review without adding interpretations beyond its stable diff. */
+/**
+ * Summarise stable review diff counts and net duration.
+ *
+ * @param {object} review - Microcycle review containing session changes.
+ * @returns {object} Counts, net-minute change, headline and detail.
+ */
 export function microcycleChangeSummary(review) {
     const changes = review?.changes || [];
     const counts = {added: 0, modified: 0, removed: 0};

@@ -5,9 +5,17 @@
 
 import { microcycleChangeSummary } from './microcycle-summary.js';
 
+/** Clone JSON-compatible history entries before returning them to callers. */
 const clone = value => JSON.parse(JSON.stringify(value));
 
-/** Identify revisions created by accepted microcycle reviews and summarise their existing evidence. */
+/**
+ * Identify accepted microcycle revisions and return compact read-only summaries.
+ *
+ * @param {object} data - Coach data containing immutable plan revisions.
+ * @param {number} [limit=10] - Maximum history entries, from 1 through 50.
+ * @returns {Array<object>} Newest-first accepted microcycle history entries.
+ * @throws {Error} When revision history or the limit is invalid.
+ */
 export function microcycleRevisionHistory(data, limit = 10) {
     if(!data || !Array.isArray(data.revisions)) throw new Error('Coach revision history is required.');
     if(!Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('History limit must be between 1 and 50.');

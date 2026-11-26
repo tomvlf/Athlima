@@ -5,9 +5,22 @@ import { buildMicrocycleContext } from './microcycle-context.js';
 import { buildMicrocycleCandidate } from './microcycle-candidate.js';
 import { markAutomaticReview } from './microcycle-triggers.js';
 
+/** Clone JSON-compatible CoachingService data for isolated review calculations. */
 const clone = value => JSON.parse(JSON.stringify(value));
+/** Compare JSON-compatible values for stale or tampered candidate detection. */
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
+/**
+ * Prepare a side-effect-free microcycle review for an active Coach plan.
+ *
+ * @param {object} service - CoachingService instance.
+ * @param {string|null} [asOf] - Optional in-plan review date.
+ * @param {number} [days] - Optional 1-14 day projection window.
+ * @param {object} [disruptions] - Optional temporary availability constraints.
+ * @param {object|null} [trigger] - Optional automatic review trigger provenance.
+ * @returns {object} Complete review context, candidate and source snapshot.
+ * @throws {Error} When no active in-range plan or valid candidate is available.
+ */
 export function reviewMicrocycle(service, asOf = null, days = undefined, disruptions = {}, trigger = null) {
     if(!service?.data?.plan || service.data.plan.status !== 'active') throw new Error('An active Coach plan is required to review a microcycle.');
     const working = clone(service.data);
@@ -23,6 +36,14 @@ export function reviewMicrocycle(service, asOf = null, days = undefined, disrupt
     return {...proposal, state, context, reviewedAt: timestamp, automaticTrigger: trigger};
 }
 
+/**
+ * Revalidate and atomically accept a previously reviewed microcycle candidate.
+ *
+ * @param {object} service - CoachingService instance.
+ * @param {object} review - Complete, unmodified review returned by reviewMicrocycle().
+ * @returns {Promise<object>} Newly accepted active plan.
+ * @throws {Error} When the review is stale, tampered or storage rejects the commit.
+ */
 export async function acceptMicrocycle(service, review) {
     if(!review?.source || !review.state || !review.context || !review.candidatePlan) throw new Error('A complete reviewed microcycle candidate is required.');
     const current = service.data;

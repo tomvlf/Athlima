@@ -4,10 +4,18 @@
  * prediction, performance promise or new planning model.
  */
 
+/** Round aggregate values to one decimal place. */
 const round = value => Math.round(value * 10) / 10;
+/** Treat an unknown scheduled load as zero contribution. */
 const loadOf = session => Number.isFinite(session.scheduledLoad) ? session.scheduledLoad : 0;
 
-/** Aggregate one bounded projection into stable review metrics. */
+/**
+ * Aggregate one bounded projection into stable review metrics.
+ *
+ * @param {object} projection - Microcycle projection to aggregate.
+ * @returns {object} Scheduled-session forecast counts and totals.
+ * @throws {Error} When projection sessions are missing or invalid.
+ */
 export function microcycleForecast(projection) {
     if(!projection?.sessions || !Array.isArray(projection.sessions)) {
         throw new Error('A projected microcycle with sessions is required.');
@@ -26,6 +34,14 @@ export function microcycleForecast(projection) {
 }
 
 /** Compare two projections and label only directly observable scheduling changes. */
+/**
+ * Compare current and candidate projections with observable aggregate scheduling deltas.
+ *
+ * @param {object} current - Existing microcycle projection.
+ * @param {object} candidate - Candidate microcycle projection.
+ * @returns {object} Before/after forecasts, deltas and a transparent comparison headline.
+ * @throws {Error} When either projection is missing scheduled session data.
+ */
 export function compareMicrocycleForecasts(current, candidate) {
     const before = microcycleForecast(current), after = microcycleForecast(candidate);
     const delta = {

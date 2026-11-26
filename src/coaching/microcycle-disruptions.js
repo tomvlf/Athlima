@@ -7,9 +7,17 @@
 import { sum, round } from './domain.js';
 import { progressWorkout } from './workouts.js';
 
+/** Clone JSON-compatible plans before applying bounded temporary disruptions. */
 const clone = value => JSON.parse(JSON.stringify(value));
 
-/** Validate and normalise rider-supplied temporary constraints. */
+/**
+ * Validate and normalise rider-supplied temporary constraints.
+ *
+ * @param {object} [disruptions] - Unavailable dates, per-day limits and optional note.
+ * @param {object} window - Inclusive microcycle review window.
+ * @returns {object} Normalised disruption input.
+ * @throws {Error} When a date or minute limit falls outside the accepted bounds.
+ */
 export function normalizeDisruptions(disruptions = {}, window) {
     const unavailableDates = [...new Set(disruptions.unavailableDates || [])].sort();
     const maxMinutesByDate = Object.fromEntries(Object.entries(disruptions.maxMinutesByDate || {})
@@ -26,7 +34,18 @@ export function normalizeDisruptions(disruptions = {}, window) {
         note: String(disruptions.note || '').trim().slice(0, 240)};
 }
 
-/** Apply only conservative changes to scheduled sessions in the bounded review window. */
+/**
+ * Apply conservative availability changes to an already validated candidate plan.
+ *
+ * @param {object} input - Disruption inputs.
+ * @param {object} input.plan - Candidate Coach plan.
+ * @param {object} input.profile - Athlete profile.
+ * @param {object} input.state - Current athlete-state snapshot.
+ * @param {object} input.window - Inclusive review window.
+ * @param {object} input.disruptions - Rider disruption constraints.
+ * @returns {object} Updated plan and recorded disruption changes.
+ * @throws {Error} When disruption values are invalid.
+ */
 export function applyMicrocycleDisruptions({plan, profile, state, window, disruptions}) {
     const normalized = normalizeDisruptions(disruptions, window);
     const next = clone(plan), changes = [];

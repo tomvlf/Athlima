@@ -8,10 +8,18 @@ import { compareMicrocycleForecasts } from '../coaching/microcycle-forecast.js';
 import { microcycleRevisionHistory } from '../coaching/microcycle-history.js';
 import { microcycleReviewTrigger } from '../coaching/microcycle-triggers.js';
 
+/** Escape dynamic values before inserting them into Coach HTML. */
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
+/** Format a duration in seconds as UI-safe whole minutes. */
 const minutes = seconds => `${Math.round((seconds || 0) / 60)} min`;
 
+/**
+ * Render today's conservative Coach recommendation.
+ *
+ * @param {object|null} recommendation - Today recommendation data.
+ * @returns {string} Safe HTML fragment.
+ */
 export function todayRecommendationView(recommendation) {
     if(!recommendation) return '';
     const session = recommendation.session;
@@ -20,6 +28,12 @@ export function todayRecommendationView(recommendation) {
         <p>${escape(recommendation.reason)}</p>${recommendation.status === 'review' ? '<button type="button" class="secondary" data-coach="microcycle-review">Review before training</button>' : ''}</section>`;
 }
 
+/**
+ * Render the transparent current-versus-candidate forecast comparison.
+ *
+ * @param {object} review - Reviewed microcycle proposal.
+ * @returns {string} Safe HTML fragment.
+ */
 export function microcycleForecastView(review) {
     const forecast = compareMicrocycleForecasts(review.current, review.candidate);
     const rows = [['Sessions', 'sessions'], ['Training days', 'trainingDays'], ['Minutes', 'minutes'], ['Planned load', 'load'],
@@ -29,6 +43,12 @@ export function microcycleForecastView(review) {
         <p class="muted">${escape(forecast.disclaimer)}</p></section>`;
 }
 
+/**
+ * Render accepted microcycle revisions from the existing plan history.
+ *
+ * @param {object} data - Current Coach data containing immutable revisions.
+ * @returns {string} Safe HTML fragment.
+ */
 export function microcycleHistoryView(data) {
     const history = microcycleRevisionHistory(data, 10);
     if(!history.length) return '';
@@ -40,6 +60,12 @@ export function microcycleHistoryView(data) {
         </details></li>`).join('')}</ol></details>`;
 }
 
+/**
+ * Render either the review form or a complete candidate proposal.
+ *
+ * @param {object|null} review - Review proposal or null for the initial form.
+ * @returns {string} Safe HTML fragment.
+ */
 export function microcycleReviewView(review) {
     if(!review) return `<section class="coach-card" data-microcycle-review><h3>Coach review</h3><p>Review the next seven days against your latest training history, recovery and temporary availability.</p>
         <form data-microcycle-disruptions><label>Unavailable dates <input name="unavailableDates" placeholder="YYYY-MM-DD, YYYY-MM-DD"></label>

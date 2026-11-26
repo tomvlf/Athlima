@@ -6,6 +6,12 @@ import { IDBFactory } from 'fake-indexeddb';
 import { initializeCoaching } from '../../src/coaching/service.js';
 import { CoachingPanel } from '../../src/views/coaching-panel.js';
 import '../../src/views/microcycle-review.js';
+import {
+    todayRecommendationView,
+    microcycleForecastView,
+    microcycleHistoryView,
+    microcycleReviewView,
+} from '../../src/views/microcycle-review.js';
 import { profile, goal, start, timestamp, history } from './fixtures.js';
 
 async function setup() {
@@ -22,6 +28,49 @@ async function setup() {
 }
 
 describe('Adaptive Microcycle Engine review UI', () => {
+    test('renders direct view helpers for recommendation, forecast and history', () => {
+        expect(todayRecommendationView(null)).toBe('');
+        expect(todayRecommendationView({
+            status: 'review',
+            title: '<b>Today</b>',
+            reason: '<img src=x>',
+            session: {family: 'threshold', duration: 2700, expectedRpe: 7},
+        })).not.toContain('<b>');
+
+        const forecast = microcycleForecastView({
+            current: {sessions: [{
+                workoutId: 'a', date: '2026-01-01', role: 'quality', duration: 3600,
+                scheduledLoad: 60, status: 'scheduled',
+            }]},
+            candidate: {sessions: [{
+                workoutId: 'a', date: '2026-01-01', role: 'recovery', duration: 1800,
+                scheduledLoad: 15, status: 'scheduled',
+            }]},
+        });
+        expect(forecast).toContain('Seven-day plan comparison');
+
+        expect(microcycleHistoryView({revisions: []})).toBe('');
+        expect(microcycleHistoryView({revisions: [{
+            id: 'plan', revision: 2, sourceSnapshot: 'state-2',
+            adaptations: [{
+                previousRevision: 1, newRevision: 2, trigger: 'feedback',
+                timestamp: '2026-01-02T10:00:00Z', reasoning: 'Evidence review',
+                observations: {microcycleReview: {kind: 'weekly', reason: 'Seven days passed.'}},
+                changes: [{action: 'modified', previous: {duration: 3600}, current: {duration: 2700}}],
+                validationWarnings: [],
+            }],
+        }]})).toContain('Adaptive review history');
+        expect(microcycleReviewView(null)).toContain('Unavailable dates');
+        expect(microcycleReviewView({
+            reasoning: '<b>Review</b>',
+            source: {revision: 2},
+            window: {startDate: '2026-01-01', endDate: '2026-01-07'},
+            changes: [],
+            current: {sessions: []},
+            candidate: {sessions: []},
+        })).not.toContain('<b>');
+    });
+
     test('shows today guidance and review/dismiss remains side-effect free', async () => {
         const {service, panel} = await setup();
         const before = JSON.stringify(service.data);

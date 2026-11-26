@@ -9,8 +9,12 @@ import { analyzeGaps, modelGoalDemand } from './demands.js';
 import { projectMicrocycle } from './microcycle.js';
 
 /**
- * Convert existing readiness and safety evidence into a conservative planning gate. Unknown
- * readiness remains unknown and never becomes proof that quality training is appropriate.
+ * Convert existing readiness and safety evidence into a conservative planning gate.
+ *
+ * Unknown readiness remains unknown and never becomes proof that quality training is appropriate.
+ *
+ * @param {object} state - Dated athlete-state snapshot.
+ * @returns {object} Readiness status, quality gate and volume factor.
  */
 export function microcycleReadiness(state) {
     if(state.safetyStatus) {

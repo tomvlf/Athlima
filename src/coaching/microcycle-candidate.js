@@ -4,9 +4,18 @@ import { adaptPlan } from './adaptation.js';
 import { projectMicrocycle } from './microcycle.js';
 import { applyMicrocycleDisruptions, normalizeDisruptions } from './microcycle-disruptions.js';
 
+/** Deep-clone JSON-compatible Coach values without mutating their sources. */
 const clone = value => JSON.parse(JSON.stringify(value));
+/** Compare JSON-compatible values in canonical object insertion order. */
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
+/**
+ * Compare current and candidate sessions by workout identity.
+ *
+ * @param {object} current - Existing microcycle projection.
+ * @param {object} candidate - Candidate microcycle projection.
+ * @returns {Array<object>} Stable added, removed and modified session changes.
+ */
 export function diffMicrocycles(current, candidate) {
     const before = new Map(current.sessions.map(session => [session.workoutId, session]));
     const after = new Map(candidate.sessions.map(session => [session.workoutId, session]));
@@ -17,6 +26,19 @@ export function diffMicrocycles(current, candidate) {
     });
 }
 
+/**
+ * Build an uncommitted candidate through existing adaptation and disruption rules.
+ *
+ * @param {object} input - Candidate inputs.
+ * @param {object} input.context - Validated current microcycle context.
+ * @param {object} input.plan - Current active plan.
+ * @param {object} input.profile - Configured athlete profile.
+ * @param {object} input.state - Current dated athlete-state snapshot.
+ * @param {string} input.timestamp - ISO timestamp for the candidate revision.
+ * @param {object} [input.disruptions] - Optional bounded availability constraints.
+ * @returns {object} Candidate plan, projection, diff and review provenance.
+ * @throws {Error} When inputs are stale or the candidate changes frozen work.
+ */
 export function buildMicrocycleCandidate({context, plan, profile, state, timestamp, disruptions = {}}) {
     if(!context || context.planId !== plan?.id || context.revision !== plan?.revision ||
        context.stateId !== state?.id || context.athleteId !== profile?.id) {
