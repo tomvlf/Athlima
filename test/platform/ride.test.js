@@ -3,7 +3,7 @@
  * while interval/countdown state determines position through pauses and skips. Free rides and
  * distance-only courses must not gain an invented timed power chart.
  */
-import { rideTimeline, ridePosition, rideProfile } from '../../src/platform/ride.js';
+import { ridePowerZone, rideTimeline, ridePosition, rideProfile } from '../../src/platform/ride.js';
 
 const watts = (power, ftp) => power < 9 ? Math.round(power * ftp) : power;
 const workout = {intervals: [
@@ -18,9 +18,18 @@ test('power timeline uses exact timed steps, absolute watts and cadence rather t
     expect(timeline.intervals.map(interval => interval.start)).toEqual([0, 120]);
     expect(timeline.intervals.flatMap(interval => interval.steps.map(step => step.power))).toEqual([100, 150, 300]);
     const graph = String(rideProfile(timeline));
-    expect(graph).toContain('1:00 / 150 W / 90 rpm');
+    expect(graph).toContain('1:00 / 150 W / Z3 · Tempo / 90 rpm');
+    expect(graph).toContain('Z1 · Recovery');
+    expect(graph).toContain('data-zone="Z7 · Neuromuscular"');
     expect(graph).toContain('id="ride-profile-cursor"');
     expect(graph).not.toMatch(/NaN|Infinity|undefined/);
+});
+
+test('classifies absolute power against the rider FTP', () => {
+    expect(ridePowerZone(100, 200).name).toBe('Z1 · Recovery');
+    expect(ridePowerZone(200, 200).name).toBe('Z5 · VO2');
+    expect(ridePowerZone(300, 200).name).toBe('Z7 · Neuromuscular');
+    expect(ridePowerZone(200, null)).toBeNull();
 });
 
 test('position follows the workout timeline through steps, pause, skip, recovery and completion', () => {

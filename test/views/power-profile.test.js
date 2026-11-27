@@ -19,6 +19,8 @@ test('renders planned interval steps as a wattage profile', () => {
     expect(String(markup)).toContain('class="power-profile--target"');
     expect(String(markup)).toContain('Threshold &lt;ride&gt;');
     expect(String(markup)).toContain('role="img"');
+    expect(String(markup)).toContain('fill="url(#power-profile-gradient-');
+    expect(String(markup)).toContain('stop-color="#F8C73A"');
 });
 
 test('renders sampled ride power and omits unavailable profiles', () => {
@@ -28,6 +30,8 @@ test('renders sampled ride power and omits unavailable profiles', () => {
 });
 
 test('does not show an invented FTP reference on recorded profiles', () => {
-    expect(String(renderPowerProfile({samples: [100, 120, 180]}))).not.toContain('power-profile--ftp');
-    expect(String(renderPowerProfile({samples: [100, 120, 180], ftp: 250}))).toContain('power-profile--ftp');
+    const withoutFtp = String(renderPowerProfile({samples: [100, 120, 180]}));
+    expect(withoutFtp).not.toContain('power-profile--ftp');
+    expect(String(renderPowerProfile({samples: [100, 120, 240], ftp: 200}))).toContain('power-profile--ftp');
+    expect(withoutFtp).toContain('stroke="url(#power-profile-gradient-');
 });

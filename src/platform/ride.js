@@ -6,6 +6,21 @@
 import { time } from './format.js';
 import { html } from '../html.js';
 
+const powerZones = [
+    {max: 0.54, name: 'Z1 · Recovery', color: '#636468'},
+    {max: 0.75, name: 'Z2 · Endurance', color: '#328AFF'},
+    {max: 0.87, name: 'Z3 · Tempo', color: '#44A5AB'},
+    {max: 0.94, name: 'Z4 · Threshold', color: '#57C057'},
+    {max: 1.05, name: 'Z5 · VO2', color: '#F8C73A'},
+    {max: 1.20, name: 'Z6 · Anaerobic', color: '#FF663A'},
+    {max: Infinity, name: 'Z7 · Neuromuscular', color: '#FE340B'},
+];
+
+export function ridePowerZone(power, ftp) {
+    if(!Number.isFinite(power) || !Number.isFinite(ftp) || ftp <= 0) return null;
+    return powerZones.find(zone => power / ftp < zone.max) || powerZones.at(-1);
+}
+
 /**
  * Flatten valid timed steps into cumulative starting seconds and absolute power targets. Return
  * null when there is no usable timed profile; retain missing power as missing, not zero.
@@ -55,11 +70,11 @@ export function rideProfile(timeline) {
     const {duration, intervals, maximumPower} = timeline;
     const bars = intervals.flatMap(interval => interval.steps.map(step => {
         const height = step.power == null ? 3 : Math.max(3, step.power / maximumPower * 180);
-        const share = (step.power || 0) / (timeline.ftp || maximumPower);
-        const color = share > 1.05 ? '#f5ad65' : share > 0.75 ? '#9a99ff' : '#52d9b2';
+        const zone = ridePowerZone(step.power, timeline.ftp);
         return html`<rect x="${step.start / duration * 1000}" y="${180 - height}"
-            width="${step.duration / duration * 1000}" height="${height}" fill="${color}">
-            <title>${time(step.start)} / ${step.power == null ? 'No power target' : `${step.power} W`}${step.cadence > 0 ? ` / ${step.cadence} rpm` : ''}</title></rect>`;
+            width="${step.duration / duration * 1000}" height="${height}"
+            fill="${zone?.color || '#526276'}"${zone ? html` data-zone="${zone.name}"` : ''}>
+            <title>${time(step.start)} / ${step.power == null ? 'No power target' : `${step.power} W${zone ? ` / ${zone.name}` : ''}`}${step.cadence > 0 ? ` / ${step.cadence} rpm` : ''}</title></rect>`;
     }));
     return html`<div class="ride-profile-axis" aria-hidden="true"><span>${maximumPower} W</span><span>${maximumPower / 2} W</span><span>0 W</span></div>
         <div class="ride-profile-plot">

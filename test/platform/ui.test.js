@@ -129,7 +129,8 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     await go('coach');
     expect(root.textContent).toContain('on-device Coach');
     await go('devices');
-    expect(root.textContent).toContain('BLE / ANT+ engine');
+    expect(root.textContent).toContain('Connect the equipment that powers your ride');
+    expect(root.querySelectorAll('[data-device]')).toHaveLength(4);
     await go('editor');
     expect(document.body.dataset.route).toBe('editor');
 
@@ -261,6 +262,8 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(workoutLink.getAttribute('href')).toBe('#/library');
     expect(root.querySelector('#ride-power').textContent).toBe('180');
     expect(root.querySelector('#ride-target').textContent).toBe('200');
+    expect(root.querySelector('#ride-target-zone').textContent).toBe('Z3 Tempo');
+    expect(root.querySelector('#ride-power-state').textContent).toBe('20 W low');
     expect(root.querySelector('#ride-cadence-target').textContent).toBe('88');
     expect(root.querySelector('#ride-cadence-prescription').hidden).toBe(false);
     expect(root.querySelector('#ride-cadence-label').textContent).toBe('Cadence target');
@@ -330,7 +333,7 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(root.querySelector('#ride-cadence-label').textContent).toBe('Cadence target');
     db.cadenceTarget = 0;
     xf.dispatch('db:cadenceTarget', db);
-    expect(root.querySelector('#ride-remaining').textContent).toBe('1:00 remaining');
+    expect(root.querySelector('#ride-remaining').textContent).toBe('1:00');
     root.querySelector('[data-action="target-up"]').click();
     await settle();
     expect(dispatch).toHaveBeenCalledWith('ui:power-target-inc');

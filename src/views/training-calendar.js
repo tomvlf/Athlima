@@ -52,6 +52,16 @@ function weekNumber(date) {
     return Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
 }
 
+function navigationIcon(direction) {
+    const path = direction === 'previous'
+        ? 'M15 18l-6-6 6-6'
+        : 'M9 6l6 6-6 6';
+    return `<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+        <path d="${path}" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>`;
+}
+
 // Read saved JSON text into lightweight date/workout-ID references.
 // Accept older embedded-workout entries, but reject malformed data instead of overwriting it.
 function parseEntries(value) {
@@ -366,7 +376,7 @@ class TrainingCalendar extends HTMLElement {
         );
     }
 
-    // Return the month heading/grid; phones use chronological weeks, desktops reverse them.
+    // Return the month heading/grid in standard chronological order on every viewport.
     renderMonth() {
         const dates = this.monthDates();
         const weeks = [];
@@ -377,22 +387,24 @@ class TrainingCalendar extends HTMLElement {
             month: 'long',
             year: 'numeric',
         });
-        const mobile = window.innerWidth <= 700;
-
         return `
             <header class="training-calendar--header">
                 <h2 class="list--sub-heading">${heading}</h2>
                 <div class="training-calendar--navigation">
-                    <button type="button" data-action="previous" aria-label="Previous month">‹</button>
+                    <button type="button" data-action="previous" aria-label="Previous month">
+                        ${navigationIcon('previous')}
+                    </button>
                     <button type="button" data-action="today">Today</button>
-                    <button type="button" data-action="next" aria-label="Next month">›</button>
+                    <button type="button" data-action="next" aria-label="Next month">
+                        ${navigationIcon('next')}
+                    </button>
                     <button type="button" data-action="week">Week</button>
                 </div>
             </header>
             <details class="mobile-details" data-mobile-details="calendar-month"
                 ${(this.querySelector('[data-mobile-details="calendar-month"]')?.open ?? true) ? 'open' : ''}>
                 <summary>Month overview</summary>
-                <div class="mobile-details-body">${this.renderCalendarTable(mobile ? weeks : weeks.reverse(), heading, this.displayMonth.getMonth())}</div>
+                <div class="mobile-details-body">${this.renderCalendarTable(weeks, heading, this.displayMonth.getMonth())}</div>
             </details>`;
     }
 
@@ -635,22 +647,34 @@ class TrainingCalendar extends HTMLElement {
     // Total completed activities only. "Known load" warns when some rides lack load values;
     // fitness/fatigue/form are model estimates, separate from time and distance totals.
     weekSummary(dates, entriesByDate) {
-        const activities = dates.flatMap(date => (entriesByDate?.get(date) || this.activityEntriesForDate(date))
+        const entries = dates.flatMap(date => (entriesByDate?.get(date) || this.entriesForDate(date)));
+        const activities = entries
             .filter(entry => entry.source === 'activity')
-            .map(entry => entry.activity));
-        const duration = activities.reduce((sum, activity) => sum + Number(activity.duration || 0), 0);
-        const distance = activities.reduce((sum, activity) => sum + Number(activity.distance || 0), 0);
+            .map(entry => entry.activity);
+        const planned = entries.length - activities.length;
+        const durations = activities.map(activity => activity.duration)
+            .filter(duration => Number.isFinite(duration) && duration > 0);
+        const distances = activities.map(activity => activity.distance)
+            .filter(distance => Number.isFinite(distance) && distance > 0);
+        const duration = durations.reduce((sum, value) => sum + value, 0);
+        const distance = distances.reduce((sum, value) => sum + value, 0);
         const loadMetrics = activities.map(activity => activity.loadMetrics?.power?.value ?? activity.load)
             .filter(Number.isFinite);
         const state = this.weeklyState(dates);
         const minutes = Math.round(duration / 60);
         const durationText = `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
         const metrics = [
-            ['Activities', activities.length],
-            ['Time', durationText],
-            ['Distance', `${(distance / 1000).toFixed(1)} km`],
+            activities.length ? ['Completed', activities.length] : null,
+            durations.length
+                ? [durations.length === activities.length ? 'Time' : 'Known time', durationText]
+                : null,
+            distances.length
+                ? [distances.length === activities.length ? 'Distance' : 'Known distance',
+                    `${(distance / 1000).toFixed(1)} km`]
+                : null,
             loadMetrics.length ? [loadMetrics.length === activities.length ? 'Load' : 'Known load',
                 Math.round(loadMetrics.reduce((sum, value) => sum + value, 0))] : null,
+            planned ? ['Planned', planned] : null,
             Number.isFinite(state?.chronicLoad) ? ['Fitness', Math.round(state.chronicLoad)] : null,
             Number.isFinite(state?.acuteLoad) ? ['Fatigue', Math.round(state.acuteLoad)] : null,
             Number.isFinite(state?.formBalance) ? ['Form', Math.round(state.formBalance)] : null,
@@ -658,7 +682,10 @@ class TrainingCalendar extends HTMLElement {
         const source = {power: 'power', sessionRpe: 'session RPE', heartRate: 'heart rate', duration: 'duration'};
         return `<div class="training-calendar--week-summary" aria-label="Week ${weekNumber(dates[0])} training metrics">
             <h3>Week ${weekNumber(dates[0])}</h3>
-            ${metrics.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('')}
+            ${metrics.length
+                ? metrics.map(([label, value]) =>
+                    `<div><span>${label}</span><strong>${value}</strong></div>`).join('')
+                : '<p class="training-calendar--week-empty">No sessions</p>'}
             ${state ? `<p>Model: ${source[state.loadSource]}</p>` : ''}
         </div>`;
     }
@@ -674,14 +701,15 @@ class TrainingCalendar extends HTMLElement {
             : `${startDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} – ${endDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}`;
         return `
             <header class="training-calendar--header">
-                <div>
-                    <h2 class="list--sub-heading">Training calendar</h2>
-                    <p class="training-calendar--week-label">${escapeHTML(heading)}</p>
-                </div>
+                <h2 class="list--sub-heading">${escapeHTML(heading)}</h2>
                 <div class="training-calendar--navigation">
-                    <button type="button" data-action="week-previous" aria-label="Previous week">‹</button>
+                    <button type="button" data-action="week-previous" aria-label="Previous week">
+                        ${navigationIcon('previous')}
+                    </button>
                     <button type="button" data-action="week-today">Today</button>
-                    <button type="button" data-action="week-next" aria-label="Next week">›</button>
+                    <button type="button" data-action="week-next" aria-label="Next week">
+                        ${navigationIcon('next')}
+                    </button>
                     <button type="button" data-action="month">Month</button>
                 </div>
             </header>
@@ -702,7 +730,10 @@ class TrainingCalendar extends HTMLElement {
         ).join('');
         const items = entries.length
             ? entries.map(entry => this.renderEntry(entry)).join('')
-            : '<li class="training-calendar--empty">No workouts planned for this day.</li>';
+            : `<li class="training-calendar--empty">
+                   <strong>Nothing scheduled</strong>
+                   <span>Choose a workout below to add it to this day.</span>
+               </li>`;
         const form = this.workouts.length
             ? `<form class="training-calendar--form">
                    <label for="training-calendar-workout">Add a workout</label>
@@ -717,7 +748,12 @@ class TrainingCalendar extends HTMLElement {
 
         return `
             <section class="training-calendar--day" aria-label="Workouts for ${heading}">
-                <h3>${heading}</h3>
+                <header class="training-calendar--day-header">
+                    <h3>${heading}</h3>
+                    <span class="training-calendar--day-count">
+                        ${entries.length} ${entries.length === 1 ? 'session' : 'sessions'}
+                    </span>
+                </header>
                 ${mobile ? '' : form}
                 ${this.storageError
                     ? `<p class="training-calendar--error" role="alert">${escapeHTML(this.storageError)}</p>`

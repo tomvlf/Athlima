@@ -19,7 +19,7 @@ import { html, raw, setHTML, insertHTML } from '../html.js';
 import { activityLists, historyActivityRow, localActivityRow, renderActivityOverview, renderActivityStreamData } from './activities.js';
 import { initialLibraryFilters, renderLibrary } from './library.js';
 import { renderPlan } from './plan-view.js';
-import { rideTimeline, ridePosition, rideProfile } from './ride.js';
+import { ridePowerZone, rideTimeline, ridePosition, rideProfile } from './ride.js';
 import { mountVersions, versionMarkup } from './version.js';
 import { requestPersistentStorage, storageStatus } from '../storage/persist.js';
 import { routes, mobileTabs, moreRoutes, openOnMobile, parsePlatformRoute } from './router.js';
@@ -223,8 +223,32 @@ export async function launchPlatform(root) {
         await coachingService().advance();
         xf.dispatch('coaching:changed');
     };
+    const deviceState = id => sensorStatus[id]?.startsWith('Connected') ? 'connected'
+        : sensorStatus[id]?.startsWith('Connecting') ? 'connecting' : 'disconnected';
     const deviceButtons = () => html`<div class="device-buttons">${Object.entries(devices).map(([id, name]) =>
-        html`<button class="secondary" data-device="${id}">${name}<span data-sensor="${id}">${sensorStatus[id] || 'Not connected'}</span></button>`)}</div>`;
+        html`<button class="secondary device-connect" data-device="${id}" data-state="${deviceState(id)}">
+            <span class="device-connect--name"><i class="device-connect--dot" aria-hidden="true"></i>${name}</span>
+            <span data-sensor="${id}">${sensorStatus[id] || 'Not connected'}</span>
+        </button>`)}</div>`;
+    const devicesView = () => html`<section class="devices-overview">
+        <div><p class="eyebrow">Connection console</p>
+            <h2>Connect the equipment that powers your ride.</h2>
+            <p>Select a trainer or sensor. After it connects, choose which measurements it should supply in the device rows below.</p></div>
+        <div class="devices-overview--status"><strong>${Object.values(sensorStatus).filter(status => status === 'Connected').length}</strong>
+            <span>devices connected</span></div>
+    </section>
+    <section class="devices-connect-panel" aria-labelledby="devices-connect-title">
+        <div><h2 id="devices-connect-title">Quick connect</h2>
+            <p class="muted">Tap a device to open its browser pairing prompt.</p></div>
+        ${deviceButtons()}
+    </section>
+    ${!navigator.bluetooth ? html`<p class="devices-browser-warning" role="alert">
+        <strong>Web Bluetooth is unavailable.</strong>
+        Use Chrome or Edge on a supported device and open Athlima over HTTPS or localhost. ANT+ requires Web Serial or WebUSB.
+    </p>` : ''}
+    <div class="devices-source-heading"><div><p class="eyebrow">Measurement sources</p>
+        <h2>Choose the data you trust.</h2></div>
+        <p class="muted">Select one source per metric. A connected device can stay paired without supplying every reading.</p></div>`;
     const workoutRow = workout => html`<li class="session-row"><div><span class="eyebrow">${workout.date} / ${workout.family}</span>
         <strong>${workout.title}</strong><span>${minutes(workout.duration)} · ${workout.status}</span></div>
         ${link(`workout/${encodeURIComponent(workout.id)}`, 'View session', 'button secondary')}</li>`;
@@ -551,19 +575,27 @@ export async function launchPlatform(root) {
             <span id="ride-status" role="status"></span></div>
             ${db.workout?.trainNow ? html`<details class="ride-train-now" open><summary>Why this workout?</summary><p>${db.workout.trainNow.reasoning}</p></details>` : ''}
             <div class="ride-metrics">
-                <div class="ride-metric primary"><span>Target power</span><div><strong id="ride-target">--</strong><small>W</small></div>
-                    <span class="ride-reading">Actual <b id="ride-power">--</b> W</span></div>
-                <div class="ride-metric"><span>Interval left</span><strong id="ride-countdown">--</strong><span id="ride-interval"></span></div>
+                <div class="ride-metric primary"><span class="ride-metric-label">Live power</span>
+                    <div class="ride-live-value"><strong id="ride-power">--</strong><small>W</small></div>
+                    <div class="ride-target-row"><span>Target</span><b id="ride-target">--</b><small>W</small></div>
+                    <span id="ride-power-state" class="ride-power-state">Waiting for power</span></div>
+                <div class="ride-metric countdown"><span class="ride-metric-label">Interval left</span>
+                    <strong id="ride-countdown">--</strong><span id="ride-interval"></span></div>
                 <div class="ride-metric"><span id="ride-cadence-label">Cadence</span><div id="ride-cadence-prescription" hidden><strong id="ride-cadence-target"></strong><small id="ride-cadence-unit">rpm</small></div>
                     <span class="ride-reading">Actual <b id="ride-cadence">--</b> rpm</span></div>
             </div>
-            <div class="ride-summary"><span>Heart rate <strong id="ride-hr">--</strong> bpm</span>
-                <span>Elapsed <strong id="ride-elapsed">--</strong></span><strong id="ride-remaining"></strong></div>
+            <div class="ride-summary"><span><small>Heart rate</small><strong id="ride-hr">--</strong><b>bpm</b></span>
+                <span><small>Elapsed</small><strong id="ride-elapsed">--</strong></span>
+                <span><small>Workout left</small><strong id="ride-remaining">--</strong></span>
+                <span><small>Intensity</small><strong id="ride-target-zone">--</strong></span></div>
             <section class="ride-workout-profile" aria-labelledby="ride-profile-heading">
-                <div class="ride-profile-heading"><h3 id="ride-profile-heading">Workout power profile</h3><span id="ride-position-label"></span></div>
+                <div class="ride-profile-heading"><div><h3 id="ride-profile-heading">Workout power profile</h3>
+                    <span class="ride-profile-zone-summary">FTP-relative intensity zones</span></div><span id="ride-position-label"></span></div>
                 <div id="ride-profile" class="ride-profile" role="img" aria-label="Workout target power profile">${rideProfile(timeline)}</div>
                 <progress id="ride-progress" max="1" value="0" aria-label="Workout progress" ${timeline ? '' : 'hidden'}></progress>
-                <div class="interval-context"><span class="muted">Blocks: target power · marker: your position</span><strong id="ride-next"></strong></div>
+                <div class="interval-context"><div class="ride-zone-legend" aria-label="Power zone legend">
+                    <span><i class="zone-one"></i>Easy</span><span><i class="zone-four"></i>Threshold</span>
+                    <span><i class="zone-five"></i>Hard</span><span><i class="zone-seven"></i>Peak</span></div><strong id="ride-next"></strong></div>
             </section>
             <p id="ride-instruction" class="ride-instruction" hidden></p>
             <div class="ride-actions"><button data-action="ride-toggle" id="ride-toggle">Start workout</button>
@@ -722,9 +754,7 @@ export async function launchPlatform(root) {
             : route === 'workout' ? details(data) : route === 'plan' ? plan(data)
                 : route === 'activities' ? activities(data) : route === 'progress' ? progress(data)
                     : route === 'player' ? player() : route === 'settings' ? settings()
-                        : route === 'devices' ? html`<p class="muted">Select your trainer and sensors below, then choose which device supplies each measurement.
-                            Connections and controls use the existing BLE / ANT+ engine.</p>
-                            ${!navigator.bluetooth ? html`<p role="alert">Web Bluetooth is unavailable in this browser. Use Chrome/Edge on a supported platform and HTTPS or localhost. ANT+ requires Web Serial or WebUSB.</p>` : ''}`
+                        : route === 'devices' ? devicesView()
                             : route === 'coach' ? html`<p class="muted">Your on-device Coach plans around your goal, schedule and ride history.</p>` : html``);
         updateMobileSections();
         if(route === 'settings') void refreshStorageStatus();
@@ -765,10 +795,19 @@ export async function launchPlatform(root) {
         const cadence = finished ? null : running && db.cadenceTarget > 0 ? db.cadenceTarget : step?.cadence;
         const cadenceTarget = Number.isFinite(cadence) && cadence > 0 ? cadence : null;
         const connected = metric => !db.connectedDevices || db.connectedDevices[db.sources?.[metric]] === true;
+        const livePower = connected('power') && Number.isFinite(db.power1s) ? db.power1s : null;
+        const target = finished || step?.power == null ? null
+            : running ? db.powerTarget : targetPower(step.power, db.ftp);
+        const targetWatts = Number.isFinite(target) && target > 0 ? target : null;
+        const targetZone = ridePowerZone(targetWatts, db.ftp);
+        const delta = livePower != null && targetWatts != null ? Math.round(livePower - targetWatts) : null;
+        const tolerance = targetWatts == null ? 0 : Math.max(5, targetWatts * 0.03);
+        const powerState = delta == null ? 'Waiting for power' : Math.abs(delta) <= tolerance
+            ? 'On target' : delta < 0 ? `${Math.abs(delta)} W low` : `${delta} W high`;
         const values = {
-            power: connected('power') ? number(db.power1s) : '--',
-            target: finished ? '--' : number(running ? db.powerTarget
-                : step?.power == null ? null : targetPower(step.power, db.ftp)),
+            power: livePower == null ? '--' : number(livePower),
+            target: targetWatts == null ? '--' : number(targetWatts),
+            'power-state': powerState,
             countdown: time(finished ? 0 : running || !timeline ? db.lapTime : timeline.intervals[db.intervalIndex]?.duration),
             cadence: connected('cadence') ? number(db.cadence) : '--',
             'cadence-label': cadenceTarget == null ? 'Cadence' : 'Cadence target',
@@ -777,7 +816,8 @@ export async function launchPlatform(root) {
             hr: connected('heartRate') && db.heartRate > 0 ? number(db.heartRate) : '--', elapsed: time(db.elapsed),
             interval: intervals.length ? `Interval ${Math.min(intervals.length, db.intervalIndex + 1)} / ${intervals.length}` : 'Free ride',
             next: !finished && nextStep ? `Next: ${time(next.duration)} / ${nextStep.power == null ? 'No power target' : `${number(targetPower(nextStep.power, db.ftp))} W`}${nextStep.cadence > 0 ? ` / ${number(nextStep.cadence)} rpm` : ''}` : 'No next interval',
-            remaining: duration ? `${time(remaining)} remaining` : '',
+            remaining: duration ? time(remaining) : '--',
+            'target-zone': targetZone?.name.replace(' · ', ' ') || '--',
             'position-label': duration ? `${time(position)} / ${time(duration)}` : 'Free ride',
             status: db.workoutStatus === 'done' ? 'Workout complete - finish to save' : db.watchStatus,
             toggle: db.watchStatus === 'started' ? 'Pause' : db.elapsed > 0 ? 'Resume' : 'Start workout',
@@ -788,6 +828,9 @@ export async function launchPlatform(root) {
             const element = root.querySelector(`#ride-${key}`);
             if(element) element.textContent = value;
         });
+        const powerMetric = root.querySelector('.ride-metric.primary');
+        powerMetric.dataset.targetState = delta == null ? 'waiting' : Math.abs(delta) <= tolerance
+            ? 'on-target' : delta < 0 ? 'low' : 'high';
         const progress = root.querySelector('#ride-progress');
         if(progress) progress.value = duration ? position / duration : 0;
         root.querySelector('#ride-cadence-prescription').hidden = cadenceTarget == null;
@@ -1318,7 +1361,15 @@ export async function launchPlatform(root) {
                 }
                 if(label !== 'Connecting...') requestedDevices.delete(id);
                 queueMicrotask(updateRide);
+                root.querySelectorAll(`[data-device="${id}"]`).forEach(element => {
+                    element.dataset.state = deviceState(id);
+                });
                 root.querySelectorAll(`[data-sensor="${id}"]`).forEach(element => { element.textContent = label; });
+                if(route === 'devices') {
+                    const count = root.querySelector('.devices-overview--status strong');
+                    if(count) count.textContent = Object.values(sensorStatus)
+                        .filter(status => status === 'Connected').length;
+                }
                 if(label === 'Disconnected' && db?.watchStatus === 'started') {
                     report(`${devices[id]} disconnected. Reconnect the device; workout recording is still active.`, true);
                 }

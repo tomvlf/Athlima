@@ -7,6 +7,35 @@
 
 import { html } from '../html.js';
 
+const powerZoneStops = [
+    [0, '#636468'],
+    [0.54, '#328AFF'],
+    [0.75, '#44A5AB'],
+    [0.87, '#57C057'],
+    [0.94, '#F8C73A'],
+    [1.05, '#FF663A'],
+    [1.2, '#FE340B'],
+];
+
+let gradientSequence = 0;
+
+function renderPowerGradient(id, maxWatts, threshold, top, bottom) {
+    const visibleStops = powerZoneStops.filter(([share]) => share * threshold <= maxWatts);
+    const stops = visibleStops.map(([share, color]) =>
+        html`<stop offset="${share * threshold / maxWatts * 100}%" stop-color="${color}"></stop>`,
+    );
+    const finalColor = visibleStops.at(-1)?.[1] || powerZoneStops[0][1];
+    if(!visibleStops.length || visibleStops.at(-1)[0] * threshold < maxWatts) {
+        stops.push(html`<stop offset="100%" stop-color="${finalColor}"></stop>`);
+    }
+    return html`<defs>
+        <linearGradient id="${id}" gradientUnits="userSpaceOnUse"
+                        x1="0" y1="${bottom}" x2="0" y2="${top}">
+            ${stops}
+        </linearGradient>
+    </defs>`;
+}
+
 /**
  * Prefer planned interval targets; otherwise draw recorded watt samples.
  * FTP is the rider's reference power in watts. Targets use 200 W if it is absent.
@@ -50,13 +79,16 @@ function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power p
         }
         points.push(`L ${right} ${bottom}`, 'Z');
         const ftpY = scale(threshold);
+        const gradientId = `power-profile-gradient-${++gradientSequence}`;
         return html`<figure class="power-profile">
             <figcaption>Power profile</figcaption>
             <svg viewBox="0 0 ${width} ${height}" role="img"
                  aria-label="${label}: target power from 0 to ${Math.round(maxWatts)} watts"
                  preserveAspectRatio="none">
+                ${renderPowerGradient(gradientId, maxWatts, threshold, top, bottom)}
                 <line class="power-profile--ftp" x1="${left}" y1="${ftpY}" x2="${right}" y2="${ftpY}"></line>
-                <path class="power-profile--target" d="${points.join(' ')}"></path>
+                <path class="power-profile--target" d="${points.join(' ')}"
+                      fill="url(#${gradientId})" fill-opacity="0.78"></path>
             </svg>
         </figure>`;
     }
@@ -80,15 +112,19 @@ function renderPowerProfile({intervals = [], samples = [], ftp, label = 'Power p
     ).join(' ');
     const area = `${line} L ${right} ${bottom} L ${left} ${bottom} Z`;
     const ftpY = bottom - (threshold / maxWatts) * (bottom - top);
+    const gradientId = `power-profile-gradient-${++gradientSequence}`;
 
     return html`<figure class="power-profile">
         <figcaption>Power profile</figcaption>
         <svg viewBox="0 0 ${width} ${height}" role="img"
              aria-label="${label}: recorded power from 0 to ${Math.round(maxWatts)} watts"
              preserveAspectRatio="none">
+            ${renderPowerGradient(gradientId, maxWatts, threshold, top, bottom)}
             ${hasThreshold ? html`<line class="power-profile--ftp" x1="${left}" y1="${ftpY}" x2="${right}" y2="${ftpY}"></line>` : ''}
-            <path class="power-profile--recorded-area" d="${area}"></path>
-            <path class="power-profile--recorded" d="${line}"></path>
+            <path class="power-profile--recorded-area" d="${area}"
+                  fill="url(#${gradientId})" fill-opacity="0.2"></path>
+            <path class="power-profile--recorded" d="${line}"
+                  stroke="url(#${gradientId})"></path>
         </svg>
     </figure>`;
 }

@@ -86,8 +86,8 @@ describe('training calendar', () => {
         const rows = [...calendar.querySelectorAll('tbody tr')];
         expect(rows).toHaveLength(6);
         expect(rows.map(row => row.dataset.weekStart)).toEqual([
-            '2026-11-30', '2026-11-23', '2026-11-16',
-            '2026-11-09', '2026-11-02', '2026-10-26',
+            '2026-10-26', '2026-11-02', '2026-11-09',
+            '2026-11-16', '2026-11-23', '2026-11-30',
         ]);
         expect(rows.every(row => row.querySelectorAll('td').length === 7)).toBe(true);
         expect(rows.every(row => row.querySelector('.training-calendar--week-summary'))).toBe(true);
@@ -97,6 +97,10 @@ describe('training calendar', () => {
         expect(day.querySelector('.power-profile--target')).not.toBeNull();
         expect(calendar.querySelector('button figure, button button')).toBeNull();
         expect(calendar.querySelector('[data-action="week"]')).not.toBeNull();
+        const plannedWeek = day.closest('tr').querySelector('.training-calendar--week-summary');
+        expect(plannedWeek.textContent).toMatch(/Planned\s*1/);
+        expect(calendar.querySelector('[data-week-start="2026-10-26"] .training-calendar--week-summary')
+            .textContent).toContain('No sessions');
     });
 
     test('calculates week dates across a year boundary', () => {
@@ -133,7 +137,7 @@ describe('training calendar', () => {
         const nextDay = calendar.querySelector('.calendar-day--select[data-date="2026-11-04"]').closest('td');
         expect(nextDay.textContent).not.toContain('Evening ride');
         const summary = day.closest('tr').querySelector('.training-calendar--week-summary');
-        expect(summary.textContent).toMatch(/Activities\s*1/);
+        expect(summary.textContent).toMatch(/Completed\s*1/);
         expect(summary.textContent).toMatch(/Time\s*1h 0m/);
         expect(summary.textContent).toMatch(/Distance\s*30.0 km/);
     });
@@ -177,7 +181,7 @@ describe('training calendar', () => {
         calendar.render();
 
         const summary = calendar.querySelector('[data-week-start="2026-11-02"] .training-calendar--week-summary');
-        expect(summary.textContent).toMatch(/Activities\s*2/);
+        expect(summary.textContent).toMatch(/Completed\s*2/);
         expect(summary.textContent).toMatch(/Time\s*1h 30m/);
         expect(summary.textContent).toMatch(/Distance\s*40.0 km/);
         expect(summary.textContent).toMatch(/Known load\s*42/);
@@ -201,7 +205,7 @@ describe('training calendar', () => {
         const calendar = createCalendar();
 
         expect(estimateState.mock.calls.map(call => call[2])).toEqual([
-            '2026-11-18', '2026-11-15', '2026-11-08',
+            '2026-11-08', '2026-11-15', '2026-11-18',
         ]);
         const historical = calendar.querySelector('[data-week-start="2026-11-09"] .training-calendar--week-summary');
         expect(historical.textContent).toMatch(/Fitness\s*15/);
@@ -232,7 +236,7 @@ describe('training calendar', () => {
         const calendar = createCalendar();
         const summary = calendar.querySelector('[data-week-start="2026-11-02"] .training-calendar--week-summary');
 
-        expect(summary.textContent).toMatch(/Activities\s*1/);
+        expect(summary.textContent).toMatch(/Completed\s*1/);
         expect(summary.textContent).toMatch(/Load\s*100/);
         expect(summary.textContent).toMatch(/Fitness\s*2/);
         expect(summary.textContent).toMatch(/Fatigue\s*7/);
