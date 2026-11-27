@@ -11,8 +11,8 @@ No source knowledge was replaced with framework-generic guidance. Repository-spe
 - 5 specialized agents
 - 8 repository skills
 - 2 shared standards plus testing, DevOps, and product standards
-- 95 Jest test files
-- 979 active tests across 94 passing suites
+- 97 Jest test files
+- 996 active tests across 96 passing suites
 - 1 skipped suite and 11 skipped tests
 - No snapshots
 - 1 Playwright Chromium test file

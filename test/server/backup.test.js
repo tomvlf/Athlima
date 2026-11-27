@@ -144,6 +144,14 @@ test('backup restore can be prepared and committed as separate stages', async ()
     });
 });
 
+test('backup restore rejects malformed nested coaching state', async () => {
+    const backup = await createBackup();
+    expect(() => prepareBackupRestore({...backup, coaching: {...backup.coaching, profile: []}}))
+        .toThrow('Invalid coaching profile');
+    expect(() => prepareBackupRestore({...backup, coaching: {...backup.coaching, plan: []}}))
+        .toThrow('Invalid coaching plan');
+});
+
 test('local backup restores coaching plans and history without including the Intervals API key', async () => {
     const storage = await openCoachingStorage(indexedDB);
     const coach = new CoachingService(storage);

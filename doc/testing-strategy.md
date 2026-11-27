@@ -16,7 +16,7 @@
 
 ## Existing Coverage Worth Keeping
 
-- 979 passing Jest tests across Coach, platform, storage, BLE/ANT, FIT, workout, model, and view behavior.
+- 996 passing Jest tests across Coach, platform, storage, BLE/ANT, FIT, workout, model, and view behavior.
 - Deliberately skipped historical tests remain explicitly labelled.
 - CSP, Trusted Types, HTML sink, backup, service-worker, mobile, and version-build regressions have dedicated tests.
 - A real Parcel build is covered in the Docker build and version build tests.

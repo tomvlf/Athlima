@@ -32,6 +32,47 @@ describe('IDB', () => {
         expect(created).toEqual(['session', 'workouts', 'activity']);
     });
 
+    test('real IndexedDB upgrade preserves the current store set', async () => {
+        const name = 'migration-regression-store';
+        await new Promise((resolve, reject) => {
+            const request = window.indexedDB.open(name, 1);
+            request.onupgradeneeded = () => {
+                request.result.createObjectStore('session');
+                request.result.createObjectStore('workouts');
+                request.result.createObjectStore('activity');
+            };
+            request.onsuccess = () => { request.result.close(); resolve(); };
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise((resolve, reject) => {
+            const request = window.indexedDB.open(name, 3);
+            request.onupgradeneeded = event => {
+                runMainDatabaseMigrations({
+                    oldVersion: event.oldVersion,
+                    newVersion: event.newVersion,
+                    createStore: storeName => {
+                        if(!request.result.objectStoreNames.contains(storeName)) {
+                            request.result.createObjectStore(storeName);
+                        }
+                    },
+                    storeNames: ['session', 'workouts', 'activity'],
+                });
+            };
+            request.onsuccess = () => {
+                expect(Array.from(request.result.objectStoreNames).sort())
+                    .toEqual(['activity', 'session', 'workouts']);
+                request.result.close();
+                resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise(resolve => {
+            const request = window.indexedDB.deleteDatabase(name);
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+        });
+    });
+
     global.console = {
         log: jest.fn(),
         error: console.error,

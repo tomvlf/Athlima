@@ -113,9 +113,9 @@ function DeviceControl(args = {}) {
             'doNotChange': 0,
             '2sDataSmoothing': 1, // Default
             '2sNoDataSmoothing': 2,
-            '1sNoDataSmoothing': 3,
+            '1sDataSmoothing': 3,
             '0.5sNoDataSmoothing': 4,
-            '1sDataSmoothing': 5,
+            '5HzDataSmoothing': 5,
         },
         antProfile: {
             doNotChange: 0,
@@ -156,7 +156,7 @@ function DeviceControl(args = {}) {
 
         view.setUint8(0, dataControl, true);
         view.setUint8(1, updateType, true);
-        view.setUint8(1, compound, true);
+        view.setUint8(2, compound, true);
 
         return view.buffer;
     }

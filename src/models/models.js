@@ -818,14 +818,12 @@ class Activity extends Model {
      */
     async upload(service, id) {
         let record = await idb.get('activity', id);
-
+        if(!record) throw new Error('Activity not found.');
         if(service === 'intervals') {
-
             const res = await this.api[service].uploadWorkout(record);
-            record = await idb.get('activity', id);
+            record.summary.status = record.summary.status || {};
             record.summary.status[service] = res.substring(1);
             await idb.putChecked('activity', record);
-
             xf.dispatch(`action:activity:${id}`, `:${service}:upload${res}`);
         }
         return;

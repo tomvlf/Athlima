@@ -25,11 +25,13 @@ export function validateCoachingState(state) {
     if(!isPlainObject(state) || state.version !== VERSION) {
         throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
     }
-    for(const key of ['activities', 'snapshots', 'revisions', 'microcycleReviews']) {
+    for(const key of ['activities', 'snapshots', 'revisions']) {
         if(!Array.isArray(state[key])) {
             throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
         }
     }
+    if(!Array.isArray(state.microcycleReviews)) state.microcycleReviews = [];
+    if(state.safetyStatus == null) state.safetyStatus = null;
     for(const [key, value] of Object.entries({
         profile: state.profile,
         goal: state.goal,
@@ -48,8 +50,7 @@ export function validateCoachingState(state) {
     }
     if(state.profile) validateProfile(state.profile);
     if(state.plan) {
-        if(typeof state.plan.id !== 'string' || !Array.isArray(state.plan.workouts) ||
-           !Array.isArray(state.plan.weeks)) {
+        if(!Array.isArray(state.plan.workouts)) {
             throw new Error('Invalid coaching plan; export or repair it before continuing.');
         }
     }
