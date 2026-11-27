@@ -10,7 +10,7 @@ import { models } from '../../src/models/models.js';
 import { idb } from '../../src/storage/idb.js';
 
 jest.mock('../../src/storage/idb.js', () => ({idb: {
-    remove: jest.fn(), get: jest.fn(), getAll: jest.fn(), put: jest.fn(), putChecked: jest.fn(), putManyChecked: jest.fn(),
+    remove: jest.fn(), get: jest.fn(), getChecked: jest.fn(), getAll: jest.fn(), getAllChecked: jest.fn(), put: jest.fn(), putChecked: jest.fn(), putManyChecked: jest.fn(),
 }}));
 beforeEach(() => {
     jest.clearAllMocks();
@@ -37,8 +37,13 @@ test('pending recordings count toward cache capacity without being evicted', () 
     expect(idb.remove).toHaveBeenCalledWith('activity', 'completed-5');
 });
 
+test('activity restoration surfaces checked-read failures', async () => {
+    idb.getAllChecked.mockRejectedValue(new Error('Storage unavailable'));
+    await expect(models.activity.restore()).rejects.toThrow('Storage unavailable');
+});
+
 test('restoring local activity summaries preserves durable outbox status', async () => {
-    idb.getAll.mockResolvedValue([
+    idb.getAllChecked.mockResolvedValue([
         {id: 'pending', pendingSync: true, summary: {id: 'pending', timestamp: 2, status: {}}},
         {id: 'synced', pendingSync: false, summary: {id: 'synced', timestamp: 1, status: {}}},
     ]);
@@ -50,7 +55,7 @@ test('restoring local activity summaries preserves durable outbox status', async
 
 test('restored power profiles are downsampled and retain their ride shape', async () => {
     const power = Array.from({length: 128}, (_, index) => index + 1);
-    idb.getAll.mockResolvedValue([{
+    idb.getAllChecked.mockResolvedValue([{
         id: 'ride',
         pendingSync: false,
         summary: {id: 'ride', timestamp: 1, status: {}},
@@ -108,7 +113,7 @@ test('provider upload status uses a checked write', async () => {
         id: 'ride',
         summary: {id: 'ride', status: {intervals: 'none'}},
     };
-    idb.get.mockResolvedValue(record);
+    idb.getChecked.mockResolvedValue(record);
     const originalApi = models.activity.api;
     models.activity.api = {intervals: {uploadWorkout: jest.fn().mockResolvedValue(':success')}};
 

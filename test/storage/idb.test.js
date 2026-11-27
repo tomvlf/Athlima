@@ -151,6 +151,11 @@ describe('IDB', () => {
         expect(resGetAll).toEqual([]);
     });
 
+    test('checked reads reject an unavailable store instead of returning empty success', async () => {
+        await expect(idb.getChecked('missing', 'id')).rejects.toThrow('IndexedDB store is unavailable');
+        await expect(idb.getAllChecked('missing')).rejects.toThrow('IndexedDB store is unavailable');
+    });
+
     test('checked writes commit recording and cleared checkpoint atomically', async () => {
         await idb.open('recording-atomic', 1, ['activity', 'session']);
         await idb.putChecked('session', {id: 0, elapsed: 60});

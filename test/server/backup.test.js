@@ -150,6 +150,12 @@ test('backup restore rejects malformed nested coaching state', async () => {
         .toThrow('Invalid coaching profile');
     expect(() => prepareBackupRestore({...backup, coaching: {...backup.coaching, plan: []}}))
         .toThrow('Invalid coaching plan');
+    expect(() => prepareBackupRestore({...backup, coaching: {
+        ...backup.coaching, plan: {workouts: []}, revisions: [],
+    }})).toThrow('Invalid coaching plan');
+    expect(() => prepareBackupRestore({...backup, coaching: {
+        ...backup.coaching, revisions: [{workouts: [], weeks: []}],
+    }})).toThrow('Invalid coaching plan history');
 });
 
 test('local backup restores coaching plans and history without including the Intervals API key', async () => {

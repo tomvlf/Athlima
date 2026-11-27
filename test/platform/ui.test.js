@@ -44,7 +44,7 @@ jest.mock('../../src/models/intervals.js', () => ({__esModule: true, default: {
 jest.mock('../../src/coaching/service.js', () => ({
     coachingData: jest.fn(), coachingService: jest.fn(() => ({data: {}, revision: 1})),
 }));
-jest.mock('../../src/storage/idb.js', () => ({idb: {removeChecked: jest.fn()}}));
+jest.mock('../../src/storage/idb.js', () => ({idb: {getChecked: jest.fn(), removeChecked: jest.fn()}}));
 jest.mock('../../src/models/models.js', () => ({models: {
     ftp: {toAbsolute: (value, ftp) => value < 9 ? Math.round(value * ftp) : value},
     activity: {},
