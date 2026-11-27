@@ -53,3 +53,21 @@ test('failed local acknowledgement surfaces the failure so a later idempotent re
     idb.putChecked.mockRejectedValueOnce(new Error('Quota exceeded'));
     await expect(syncRecordedRides({recordRide: jest.fn().mockResolvedValue(null)})).rejects.toThrow('Quota exceeded');
 });
+
+test('outbox report counts only records that remain pending after partial success', async () => {
+    idb.getAll.mockResolvedValue([
+        {id: 'one', pendingSync: true, ride: {id: 'one'}},
+        {id: 'two', pendingSync: true, ride: {id: 'two'}},
+        {id: 'three', pendingSync: false, ride: null},
+    ]);
+    idb.putChecked.mockResolvedValueOnce();
+    const {drainRideOutbox} = await import('../../src/storage/ride-outbox.js');
+    const report = await drainRideOutbox({
+        recordRide: jest.fn()
+            .mockResolvedValueOnce(null)
+            .mockRejectedValueOnce(new Error('Coach unavailable')),
+    });
+    expect(report.synced).toBe(1);
+    expect(report.failed).toBe(1);
+    expect(report.pending).toBe(1);
+});

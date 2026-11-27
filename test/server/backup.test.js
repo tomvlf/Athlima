@@ -9,7 +9,7 @@
 
 import { indexedDB } from 'fake-indexeddb';
 import { Blob as NodeBlob } from 'node:buffer';
-import { createBackup, restoreBackup } from '../../src/storage/backup.js';
+import { createBackup, prepareBackupRestore, commitBackupRestore, restoreBackup } from '../../src/storage/backup.js';
 import { openCoachingStorage } from '../../src/coaching/storage.js';
 import { CoachingService } from '../../src/coaching/service.js';
 import { profile, goal } from '../coaching/fixtures.js';
@@ -125,6 +125,23 @@ test('a failed restore transaction does not partially merge workouts', async () 
     backup.workouts = [workout, {...workout, id: {invalid: 'indexedDB key'}}];
     await expect(restoreBackup(backup)).rejects.toThrow();
     expect((await createBackup()).workouts).toEqual([]);
+});
+
+test('backup restore can be prepared and committed as separate stages', async () => {
+    const backup = await createBackup();
+    backup.workouts = [workout];
+    backup.activities = [];
+    const prepared = prepareBackupRestore(backup);
+    expect(prepared.workouts).toEqual([workout]);
+    const report = await commitBackupRestore(prepared);
+    expect(report).toMatchObject({
+        version: 2,
+        workoutCount: 1,
+        activityCount: 0,
+        settingsRestored: true,
+        calendarRestored: true,
+        coachingRestored: true,
+    });
 });
 
 test('local backup restores coaching plans and history without including the Intervals API key', async () => {

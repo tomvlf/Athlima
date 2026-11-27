@@ -19,7 +19,7 @@
         "check": "npm run lint && npm run test:coverage && npm run build && npm run check:links",
         "start": "parcel",
         "starttls": "parcel --cert ./dev_cert/cert.pem --key ./dev_cert/key.pem",
-        "build": "parcel build && node scripts/rename-build-output.mjs"
+        "build": "node scripts/clean-build-output.mjs && parcel build && node scripts/rename-build-output.mjs && node scripts/write-offline-manifest.mjs"
     },
     "devDependencies": {
         "@babel/core": "^7.29.7",

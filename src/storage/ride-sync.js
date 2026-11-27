@@ -4,7 +4,7 @@
  * until the Coach has accepted it.
  */
 
-import { idb } from '../storage/idb.js';
+import { drainRideOutbox } from './ride-outbox.js';
 
 /**
  * Import each pending recording into the Coach, then persist its completed hand-off marker. Return
@@ -13,16 +13,13 @@ import { idb } from '../storage/idb.js';
  * stable ride IDs prevent duplicate coaching history.
  */
 export async function syncRecordedRides(service) {
-    const records = await idb.getAll('activity');
-    let synced = 0;
-    let planReviewRequired = false;
-    for(const record of records) {
-        if(!record.pendingSync || !record.ride) continue;
-        await service.recordRide(record.ride, record.coachingWorkoutId);
-        await idb.putChecked('activity', {...record, pendingSync: false,
-            summary: {...record.summary, pendingSync: false}});
-        synced++;
-        if(record.ride.trainNow !== true) planReviewRequired = true;
+    const report = await drainRideOutbox(service);
+    if(report.failed) {
+        const failure = report.results.find(result => result.status === 'failed');
+        throw new Error(failure?.error || 'Some rides are still waiting for their Coach hand-off.');
     }
-    return {synced, planReviewRequired: synced === 0 || planReviewRequired};
+    return {
+        synced: report.synced,
+        planReviewRequired: report.synced === 0 || report.planReviewRequired,
+    };
 }

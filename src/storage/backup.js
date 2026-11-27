@@ -5,7 +5,7 @@
  * excluded.
  */
 
-import { CoachingService } from '../coaching/service.js';
+import { CoachingService, validateCoachingState } from '../coaching/service.js';
 import { openCoachingStorage } from '../coaching/storage.js';
 import { microcycleAuditTrail } from '../coaching/microcycle-history.js';
 
@@ -111,7 +111,7 @@ export async function createBackup(library = []) {
  * cannot be updated as one operation; a later coaching failure is reported explicitly. Version 1
  * has no coaching state.
  */
-export async function restoreBackup(backup) {
+export function prepareBackupRestore(backup) {
     if(![1, 2].includes(backup?.version) || !Array.isArray(backup.workouts) || !Array.isArray(backup.activities) ||
        !Array.isArray(backup.calendar) || !isPlainObject(backup.settings) ||
        backup.workouts.length > MAX_RECORDS || backup.activities.length > MAX_RECORDS ||
@@ -124,7 +124,7 @@ export async function restoreBackup(backup) {
     }
     if(backup.version === 2) {
         if(!backup.coaching || typeof backup.coaching !== 'object') throw new Error('Invalid coaching backup.');
-        new CoachingService({getItem: () => JSON.stringify(backup.coaching)});
+        validateCoachingState(JSON.parse(JSON.stringify(backup.coaching)));
         if(backup.microcycleAudit != null &&
            (!Array.isArray(backup.microcycleAudit) ||
             backup.microcycleAudit.some(entry => !isPlainObject(entry)))) {
@@ -145,33 +145,68 @@ export async function restoreBackup(backup) {
         if(totalBytes > MAX_TOTAL_ACTIVITY_BYTES) throw new Error('This backup contains too much activity data.');
         return {...record, blob: new Blob([bytes], {type: 'application/octet-stream'})};
     });
+    return {
+        version: backup.version,
+        workouts: backup.workouts,
+        activities,
+        settings: backup.settings,
+        calendar: backup.calendar,
+        planned: backup.planned ?? null,
+        coaching: backup.coaching ?? null,
+        microcycleAudit: backup.microcycleAudit ?? null,
+    };
+}
+
+export async function commitBackupRestore(prepared) {
     const database = await openDatabase();
+    const report = {
+        version: prepared.version,
+        workoutCount: prepared.workouts.length,
+        activityCount: prepared.activities.length,
+        settingsRestored: false,
+        calendarRestored: false,
+        coachingRestored: prepared.version === 1,
+        plannedRestored: prepared.planned !== null,
+    };
     try {
         await new Promise((resolve, reject) => {
             const transaction = database.transaction(['workouts', 'activity'], 'readwrite');
             transaction.oncomplete = resolve;
             transaction.onabort = () => reject(transaction.error || new Error('Restore failed.'));
             try {
-                for(const workout of backup.workouts) transaction.objectStore('workouts').put(workout);
-                for(const activity of activities) transaction.objectStore('activity').put(activity);
+                for(const workout of prepared.workouts) transaction.objectStore('workouts').put(workout);
+                for(const activity of prepared.activities) transaction.objectStore('activity').put(activity);
             } catch(error) {
                 transaction.abort();
                 reject(error);
             }
         });
-        for(const [key, value] of Object.entries(backup.settings)) {
+        for(const [key, value] of Object.entries(prepared.settings)) {
             if(value === null) accountStorage.removeItem(key);
             else accountStorage.setItem(key, value);
         }
-        accountStorage.setItem('training-calendar', JSON.stringify(backup.calendar));
-        if(backup.planned) accountStorage.setItem('planned', JSON.stringify(backup.planned));
-        if(backup.version === 2) {
+        report.settingsRestored = true;
+        accountStorage.setItem('training-calendar', JSON.stringify(prepared.calendar));
+        report.calendarRestored = true;
+        if(prepared.planned) accountStorage.setItem('planned', JSON.stringify(prepared.planned));
+        if(prepared.version === 2) {
             const storage = await openCoachingStorage(window.indexedDB);
-            try { await storage.setItem('too-many-watts-coaching-v1', JSON.stringify(backup.coaching)); }
+            try {
+                await storage.setItem('too-many-watts-coaching-v1', JSON.stringify(prepared.coaching));
+                report.coachingRestored = true;
+            }
             catch(error) {
-                throw new Error(`Files and settings were restored, but coaching could not be restored. Retry: ${error.message}`);
+                const restoreError = new Error(`Files and settings were restored, but coaching could not be restored. Retry: ${error.message}`);
+                restoreError.restoreReport = report;
+                throw restoreError;
             } finally { storage.close(); }
         }
+        return report;
     } finally { database.close(); }
+}
+
+export async function restoreBackup(backup) {
+    const prepared = prepareBackupRestore(backup);
+    return commitBackupRestore(prepared);
 }
 import { accountDatabase, accountStorage } from '../storage/account.js';

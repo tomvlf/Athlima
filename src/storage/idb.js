@@ -11,6 +11,7 @@
 
 import { exists, existance, empty, } from '../functions.js';
 import { uuid } from './uuid.js';
+import { runMainDatabaseMigrations } from './migrations.js';
 
 /**
  * Turn a browser request with success/error callbacks into a Promise, so callers can wait for its
@@ -65,13 +66,12 @@ function IDB(args = {}) {
                 setDB(openReq.result);
                 console.log(`:idb :version ${db.version} :old ${e.oldVersion}`);
 
-                switch(e.oldVersion) {
-                // switch(db.version) {
-                case 0: createStores(storeNames);
-                case 1: update(storeNames);
-                case 2: update(storeNames);
-                case 3: latest(storeNames);
-                }
+                runMainDatabaseMigrations({
+                    oldVersion: e.oldVersion,
+                    newVersion: db.version,
+                    createStore,
+                    storeNames,
+                });
             };
             openReq.onerror = function() {
                 console.error(`:idb :error :open :db '${name}'`, openReq.error);

@@ -17,6 +17,7 @@ import { toAppWorkout } from './coaching/workouts.js';
 import { accountDatabase } from './storage/account.js';
 import intervals from './models/intervals.js';
 import { syncRecordedRides } from './storage/ride-sync.js';
+import { APP_EVENTS, DB_EVENTS, COACH_EVENTS, ACTIVITY_EVENTS } from './state/events.js';
 
 // import { trainerMock } from './simulation-scripts.js';
 
@@ -528,7 +529,7 @@ xf.reg('services', (x, db) => {
  * Restore settings, open local storage, load history, retry saved-ride hand-offs and restore any
  * unfinished session. Announce app:ready only after this sequence; errors become app:error.
  */
-xf.reg('app:start', async function(_, db) {
+xf.reg(APP_EVENTS.start, async function(_, db) {
     try {
 
     db.dockMode = models.dockMode.set(models.dockMode.restore());
@@ -552,7 +553,7 @@ xf.reg('app:start', async function(_, db) {
         const sync = await syncRecordedRides(coachingService());
         coachingService().syncPending = intervals.status().connected;
         if(!coachingService().syncPending && sync.planReviewRequired) await coachingService().advance();
-        xf.dispatch('coaching:changed');
+        xf.dispatch(COACH_EVENTS.changed);
     } catch(error) {
         console.error('Unable to review coaching plan:', error);
         xf.dispatch('coaching:error', error.message);
@@ -575,7 +576,7 @@ xf.reg('app:start', async function(_, db) {
     const sound = Sound({volume: db.volume});
     sound.start();
 
-    xf.dispatch('app:ready');
+    xf.dispatch(APP_EVENTS.ready);
     // TODO: remove
     // xf.dispatch(`ui:page-set`, 'workouts');
 
@@ -583,7 +584,7 @@ xf.reg('app:start', async function(_, db) {
     // trainerMock.init();
     } catch(error) {
         console.error('Application startup failed:', error);
-        xf.dispatch('app:error', error.message);
+        xf.dispatch(APP_EVENTS.error, error.message);
     }
 });
 

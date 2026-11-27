@@ -20,7 +20,12 @@ export async function registerPwa() {
         });
         await navigator.serviceWorker.ready;
         const worker = registration.active;
-        if(worker) worker.postMessage({type: 'CACHE_ASSETS', urls: performance.getEntriesByType('resource').map(entry => entry.name)});
+        if(worker) {
+            worker.postMessage({
+                type: 'CACHE_ASSETS',
+                urls: performance.getEntriesByType('resource').map(entry => entry.name),
+            });
+        }
     } catch(error) {
         window.dispatchEvent(new CustomEvent('pwa:error', {detail: `Offline app caching is unavailable: ${error.message}`}));
     }

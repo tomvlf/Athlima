@@ -11,6 +11,7 @@
 import { idb } from '../../src/storage/idb.js';
 import indexedDB from 'fake-indexeddb';
 import { serialize, deserialize } from 'node:v8';
+import { runMainDatabaseMigrations, mainDatabaseMigrations } from '../../src/storage/migrations.js';
 
 window.indexedDB = indexedDB;
 if(!globalThis.structuredClone) {
@@ -18,6 +19,18 @@ if(!globalThis.structuredClone) {
 }
 
 describe('IDB', () => {
+
+    test('main database migrations are named and create the current stores once', () => {
+        expect(mainDatabaseMigrations.map(migration => migration.version)).toEqual([1, 2, 3]);
+        const created = [];
+        runMainDatabaseMigrations({
+            oldVersion: 0,
+            newVersion: 3,
+            createStore: name => created.push(name),
+            storeNames: ['session', 'workouts', 'activity'],
+        });
+        expect(created).toEqual(['session', 'workouts', 'activity']);
+    });
 
     global.console = {
         log: jest.fn(),

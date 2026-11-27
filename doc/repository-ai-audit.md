@@ -98,3 +98,12 @@ Remaining external settings:
 - A lint gate and Playwright gate now exist.
 - Architecture decision records remain optional and should be created only for significant lasting decisions.
 
+## Architecture Implementation Status
+
+- Ride hand-offs are exposed through a separate outbox service and structured result report.
+- Hash-route parsing is isolated in a reusable router module.
+- State and event names have centralized constants and state-slice definitions.
+- IndexedDB upgrades use a named migration registry.
+- Backup restore now has validation, preparation, commit, and report stages.
+- Parcel builds generate a current build asset manifest for service-worker offline caching.
+

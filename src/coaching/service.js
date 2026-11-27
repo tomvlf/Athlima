@@ -18,6 +18,44 @@ const KEY = 'too-many-watts-coaching-v1';
 const empty = () => ({version: VERSION, profile: null, goal: null, activities: [],
     snapshots: [], revisions: [], plan: null, safetyStatus: null, microcycleReviews: []});
 
+const isPlainObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/** Validate the Coach state shape before it reaches rendering or planning logic. */
+export function validateCoachingState(state) {
+    if(!isPlainObject(state) || state.version !== VERSION) {
+        throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
+    }
+    for(const key of ['activities', 'snapshots', 'revisions', 'microcycleReviews']) {
+        if(!Array.isArray(state[key])) {
+            throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
+        }
+    }
+    for(const [key, value] of Object.entries({
+        profile: state.profile,
+        goal: state.goal,
+        plan: state.plan,
+        safetyStatus: state.safetyStatus,
+    })) {
+        if(value != null && !isPlainObject(value)) {
+            throw new Error(`Invalid coaching ${key}; export or repair it before continuing.`);
+        }
+    }
+    if(!state.activities.every(isPlainObject) ||
+       !state.snapshots.every(isPlainObject) ||
+       !state.revisions.every(isPlainObject) ||
+       !state.microcycleReviews.every(isPlainObject)) {
+        throw new Error('Invalid coaching history; export or repair it before continuing.');
+    }
+    if(state.profile) validateProfile(state.profile);
+    if(state.plan) {
+        if(typeof state.plan.id !== 'string' || !Array.isArray(state.plan.workouts) ||
+           !Array.isArray(state.plan.weeks)) {
+            throw new Error('Invalid coaching plan; export or repair it before continuing.');
+        }
+    }
+    return state;
+}
+
 /**
  * Stores the athlete profile, training goal, imported activities, and generated plan.
  *
@@ -37,11 +75,7 @@ export class CoachingService {
         this.clock = clock;
         this.rules = validateCoachingConfig(rules);
         const stored = storage.getItem(KEY);
-        this.data = stored ? JSON.parse(stored) : empty();
-        if(this.data.version !== VERSION || !Array.isArray(this.data.activities) ||
-           !Array.isArray(this.data.snapshots) || !Array.isArray(this.data.revisions)) {
-            throw new Error('Unsupported or corrupt coaching storage; export or repair it before continuing.');
-        }
+        this.data = stored ? validateCoachingState(JSON.parse(stored)) : empty();
         this.data.safetyStatus ??= null;
         if(!Array.isArray(this.data.microcycleReviews)) this.data.microcycleReviews = [];
     }

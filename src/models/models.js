@@ -824,7 +824,7 @@ class Activity extends Model {
             const res = await this.api[service].uploadWorkout(record);
             record = await idb.get('activity', id);
             record.summary.status[service] = res.substring(1);
-            await idb.put('activity', record);
+            await idb.putChecked('activity', record);
 
             xf.dispatch(`action:activity:${id}`, `:${service}:upload${res}`);
         }

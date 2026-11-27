@@ -10,7 +10,7 @@ import { models } from '../../src/models/models.js';
 import { idb } from '../../src/storage/idb.js';
 
 jest.mock('../../src/storage/idb.js', () => ({idb: {
-    remove: jest.fn(), getAll: jest.fn(), put: jest.fn(), putManyChecked: jest.fn(),
+    remove: jest.fn(), getAll: jest.fn(), put: jest.fn(), putChecked: jest.fn(), putManyChecked: jest.fn(),
 }}));
 beforeEach(() => {
     jest.clearAllMocks();
@@ -101,4 +101,23 @@ test('local write failure retains the complete recording and retries the same id
     expect(idb.putManyChecked).toHaveBeenLastCalledWith([
         ['activity', retained], ['session', {id: 0, elapsed: 0}],
     ]);
+});
+
+test('provider upload status uses a checked write', async () => {
+    const record = {
+        id: 'ride',
+        summary: {id: 'ride', status: {intervals: 'none'}},
+    };
+    idb.get.mockResolvedValue(record);
+    models.activity.api = models.activity.api || {};
+    models.activity.api.intervals = {uploadWorkout: jest.fn().mockResolvedValue(':success')};
+
+    await models.activity.upload('intervals', 'ride');
+
+    expect(idb.putChecked).toHaveBeenCalledWith('activity', expect.objectContaining({
+        id: 'ride',
+        summary: expect.objectContaining({
+            status: expect.objectContaining({intervals: 'success'}),
+        }),
+    }));
 });

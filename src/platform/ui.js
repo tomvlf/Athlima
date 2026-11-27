@@ -22,24 +22,8 @@ import { renderPlan } from './plan-view.js';
 import { rideTimeline, ridePosition, rideProfile } from './ride.js';
 import { mountVersions, versionMarkup } from './version.js';
 import { requestPersistentStorage, storageStatus } from '../storage/persist.js';
-
-const routes = {
-    dashboard: ['Overview', 'Your training, in focus'],
-    calendar: ['Training calendar', 'Make room for progress'],
-    plan: ['Training plan', 'A purposeful path to your goal'],
-    coach: ['Coach', 'Guidance grounded in your training'],
-    library: ['Workout library', 'Find your next session'],
-    workout: ['Workout details', 'Know the work ahead'],
-    player: ['Ride', 'One interval at a time'],
-    activities: ['Activities', 'Every ride is part of the story'],
-    progress: ['Progress', 'Consistency, made visible'],
-    devices: ['Devices', 'Connected and ready to ride'],
-    settings: ['Settings', 'Your profile and integrations'],
-};
-const mobileTabs = [['dashboard', 'Today'], ['calendar', 'Calendar'], ['player', 'Ride'], ['coach', 'Coach']];
-const moreRoutes = ['plan', 'library', 'activities', 'progress', 'devices', 'settings'];
-// Disclosures that start open on mobile; the rest stay collapsed until the rider opens them.
-const openOnMobile = new Set(['Up next', 'workout-notes', 'calendar-month']);
+import { routes, mobileTabs, moreRoutes, openOnMobile, parsePlatformRoute } from './router.js';
+import { APP_EVENTS, COACH_EVENTS, ACTIVITY_EVENTS, DB_EVENTS } from '../state/events.js';
 const icon = paths => html`<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none"
     stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${raw(paths)}</svg>`;
 const dot = (x, y) => html`<circle cx="${x}" cy="${y}" r="1.6" fill="currentColor" stroke="none"/>`;
@@ -741,10 +725,9 @@ export async function launchPlatform(root) {
      */
     function navigate() {
         setMoreMenu(false);
-        const [name, id] = window.location.hash.replace(/^#\/?/, '').split('/');
-        route = Object.hasOwn(routes, name) || name === 'editor' ? name : 'dashboard';
-        try { selectedId = decodeURIComponent(id || ''); }
-        catch { selectedId = ''; }
+        const destination = parsePlatformRoute(window.location.hash);
+        route = destination.route;
+        selectedId = destination.selectedId;
         report(profileSyncError || coachingError, Boolean(profileSyncError || coachingError));
         render();
         if(route === 'settings') void loadIntegration();
@@ -1340,7 +1323,7 @@ export async function launchPlatform(root) {
      * Discard older asynchronous state-calculation results when a newer coaching update arrives,
      * and avoid rebuilding active ride/settings/Coach forms unnecessarily.
      */
-    xf.sub('coaching:changed', () => {
+    xf.sub(COACH_EVENTS.changed, () => {
         if(!ready) return;
         const data = coachingData();
         const version = ++stateVersion;
@@ -1358,18 +1341,18 @@ export async function launchPlatform(root) {
         }
         if(!['player', 'settings', 'coach'].includes(route)) render();
     });
-    xf.sub('activity:saving', () => { savingRide = true; updateRide(); });
-    xf.sub('activity:discarded', () => {
+    xf.sub(ACTIVITY_EVENTS.saving, () => { savingRide = true; updateRide(); });
+    xf.sub(ACTIVITY_EVENTS.discarded, () => {
         report('Ride discarded.');
         updateRide();
     });
-    xf.sub('activity:save:success', ride => {
+    xf.sub(ACTIVITY_EVENTS.saveSuccess, ride => {
         savingRide = false;
         lastRide = ride;
         void requestPersistentStorage();
         if(route === 'player') window.location.hash = '/activities';
     });
-    xf.sub('activity:save:fail', () => {
+    xf.sub(ACTIVITY_EVENTS.saveFail, () => {
         savingRide = false;
         report('Ride could not be saved. Keep this page open and download the unsaved FIT recording.', true);
         if(route !== 'player') window.location.hash = '/player';
@@ -1401,8 +1384,8 @@ export async function launchPlatform(root) {
      * the platform.
      */
     const started = new Promise((resolve, reject) => {
-        window.addEventListener('app:ready', resolve, {once: true});
-        window.addEventListener('app:error', event => reject(new Error(event.detail.data)), {once: true});
+        window.addEventListener(APP_EVENTS.ready, resolve, {once: true});
+        window.addEventListener(APP_EVENTS.error, event => reject(new Error(event.detail.data)), {once: true});
     });
     await import('../index.js');
     ({db} = await import('../db.js'));
