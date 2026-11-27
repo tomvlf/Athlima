@@ -465,7 +465,7 @@ class TrainingCalendar extends HTMLElement {
             : entry.source === 'coaching' ? 'Coach'
                 : entry.source === 'planned' ? 'Intervals' : 'Planned';
         const metrics = this.workoutMetrics(entry);
-        return `<li class="calendar-event ${entry.source === 'activity' ? 'is-activity' : ''}">
+        return `<li class="calendar-event is-${entry.source}">
             <button type="button" class="calendar-event--select" data-date="${date}"
                     data-card-index="${index}" aria-label="View ${escapeHTML(entry.name || 'Workout')} on ${date}">
                 <span class="calendar-event--source">${entry.source === 'activity'

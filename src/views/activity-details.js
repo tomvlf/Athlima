@@ -121,11 +121,21 @@ export function renderActivityDetails(activity) {
     const description = typeof activity?.details?.description === 'string' ? activity.details.description.trim() : '';
     const trainNow = typeof activity?.trainNowReasoning === 'string' ? activity.trainNowReasoning.trim() : '';
     if(!rows.length && !description && !trainNow) return '';
-    return html`<details class="activity-details">
-        <summary>All metrics</summary>
+    const highlightLabels = ['Elapsed time', 'Distance', 'Average power', 'Normalized power',
+        'Average heart rate', 'Work', 'Training load (Intervals)', 'RPE'];
+    const highlights = highlightLabels.flatMap(label => {
+        const row = rows.find(item => item[0] === label);
+        return row ? [row] : [];
+    }).slice(0, 6);
+    return html`<section class="activity-insight">
+        ${highlights.length ? html`<dl class="activity-insight--metrics">${highlights.map(([label, value]) =>
+            html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>` : ''}
         ${description ? html`<p class="activity-details--description">${description}</p>` : ''}
         ${trainNow ? html`<p class="activity-details--description"><strong>Why Train Now:</strong> ${trainNow}</p>` : ''}
-        <dl>${rows.map(([label, value]) =>
-            html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
-    </details>`;
+        <details class="activity-details">
+            <summary>All metrics</summary>
+            <dl>${rows.map(([label, value]) =>
+                html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
+        </details>
+    </section>`;
 }

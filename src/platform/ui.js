@@ -55,6 +55,40 @@ const link = (route, text, className = '') => html`<a class="${className}" href=
 const empty = (text, route = 'library', action = 'Browse workouts') =>
     html`<div class="empty-state"><p>${text}</p>${link(route, action, 'button secondary')}</div>`;
 const stat = (label, value, unit = '') => html`<div class="stat"><span>${label}</span><strong>${value}<small>${unit}</small></strong></div>`;
+const stepSignature = step => [step.power, step.cadence, step.slope].map(value =>
+    Number.isFinite(value) ? value : '').join(':');
+
+function workoutBlocks(workout) {
+    const steps = (workout?.intervals || []).flatMap(interval => interval.steps || []);
+    const blocks = [];
+    for(let index = 0; index < steps.length;) {
+        let best = null;
+        for(const patternSize of [2, 1]) {
+            if(index + patternSize > steps.length) continue;
+            const pattern = steps.slice(index, index + patternSize).map(stepSignature);
+            let repeats = 0;
+            while(index + (repeats + 1) * patternSize <= steps.length &&
+                pattern.every((signature, offset) =>
+                    stepSignature(steps[index + repeats * patternSize + offset]) === signature)) {
+                repeats += 1;
+            }
+            if(repeats >= 2 && (!best || repeats * patternSize > best.steps.length * best.repeats)) {
+                best = {steps: steps.slice(index, index + patternSize), repeats,
+                    totalDuration: steps.slice(index, index + repeats * patternSize)
+                        .reduce((total, step) => total + step.duration, 0)};
+            }
+        }
+        if(best) {
+            blocks.push(best);
+            index += best.steps.length * best.repeats;
+            continue;
+        }
+        const step = steps[index];
+        blocks.push({steps: [step], repeats: 1, totalDuration: step.duration});
+        index += 1;
+    }
+    return blocks;
+}
 /**
  * Launches the main training platform shell and hosts the navigation routing logic.
  *
@@ -514,16 +548,68 @@ export async function launchPlatform(root) {
         const target = step => run ? paces ? formatPace(paceForIntensity(data.profile.thresholdPace, step.power), data.profile.unitSystem)
             : `${number(step.power * 100)}% of threshold speed`
             : step.power == null ? `Slope ${number(step.slope, 1)}%` : `${number(targetPower(step.power, db.ftp))} W`;
-        return card(workout.meta.name, html`<p class="eyebrow">${workout.meta.category} / ${minutes(workout.meta.duration || 0)}</p>
-            ${profileGraph(workout)}
-            ${planned ? html`<p>${planned.date} · ${planned.status} · Expected RPE ${planned.expectedRpe}/10</p>` : ''}
-            ${run ? html`<p>${paces ? `Pace guide: ${paces}.` : 'Set a threshold pace in Coach to see pace targets; run by effort (RPE) until then.'}</p>` : ''}
-            <div class="button-row">${canStart ? html`<button data-action="start-workout">Start workout</button>` : run
-                ? html`<p class="muted">Run this session outdoors or on a treadmill, or export the ZWO from the calendar to your watch. Recorded runs are matched automatically.</p>`
-                : html`<p class="muted">${blocked}</p>`}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
-            ${mobileDetails('workout-notes', 'Workout notes', html`<p class="description">${workout.meta.description || 'No description supplied.'}</p>`)}
-            ${mobileDetails('workout-intervals', 'Intervals', html`<ol class="interval-list">${(workout.intervals || []).flatMap(interval => interval.steps || []).map(step => html`<li>
-                ${time(step.duration)} · ${target(step)}${run ? '' : ` · Cadence: ${cadenceSummary([step])}`}</li>`)}</ol>`)}`);
+        const steps = (workout.intervals || []).flatMap(interval => interval.steps || []);
+        const powers = steps.map(step => targetPower(step.power, db.ftp))
+            .filter(value => Number.isFinite(value));
+        const blocks = workoutBlocks(workout);
+        const metrics = [
+            ['Duration', minutes(workout.meta.duration || 0)],
+            ['Intervals', number(blocks.length)],
+            ['Target range', powers.length
+                ? `${number(Math.min(...powers))}–${number(Math.max(...powers))} W` : 'Free ride'],
+            ['Cadence', run ? 'By effort' : cadenceSummary(steps)],
+        ];
+        const status = planned
+            ? `${planned.date} · ${planned.status} · Expected RPE ${planned.expectedRpe}/10`
+            : 'Ready from your local workout library';
+        const action = canStart
+            ? html`<button class="workout-detail--start" data-action="start-workout">Start workout</button>`
+            : run
+                ? html`<p class="workout-detail--blocked">Run this session outdoors or on a treadmill, or export the ZWO from the calendar to your watch.</p>`
+                : html`<p class="workout-detail--blocked">${blocked}</p>`;
+        return html`<article class="workout-detail">
+            <header class="workout-detail--hero">
+                <div class="workout-detail--hero-copy">
+                    <p class="eyebrow">${workout.meta.category || 'Workout'} · ${run ? 'Outdoor' : 'Indoor cycling'}</p>
+                    <h2>${workout.meta.name}</h2>
+                    <p class="workout-detail--status">${status}</p>
+                </div>
+                <dl class="workout-detail--metrics">${metrics.map(([label, value]) =>
+                    html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
+                <div class="workout-detail--actions">${action}${run ? '' : link('devices', 'Connect devices', 'button secondary')}</div>
+            </header>
+            <section class="workout-detail--profile" aria-labelledby="workout-detail-profile-title">
+                <div class="workout-detail--section-head"><div><p class="eyebrow">Session shape</p>
+                    <h3 id="workout-detail-profile-title">Power profile</h3></div>
+                    <span>${run ? 'Pace / effort prescription' : 'FTP-relative targets'}</span></div>
+                ${profileGraph(workout)}
+                ${run ? html`<p class="workout-detail--pace">${paces ? `Pace guide: ${paces}.` : 'Set a threshold pace in Coach to see pace targets; run by effort (RPE) until then.'}</p>` : ''}
+            </section>
+            <div class="workout-detail--grid">
+                <section class="workout-detail--notes">
+                    <div class="workout-detail--section-head"><div><p class="eyebrow">Coach brief</p><h3>Workout notes</h3></div></div>
+                    <p>${workout.meta.description || 'No description supplied.'}</p>
+                </section>
+                <section class="workout-detail--blocks">
+                    <div class="workout-detail--section-head"><div><p class="eyebrow">${blocks.length} stages</p><h3>Workout structure</h3></div></div>
+                    <ol>${blocks.map((block, index) => {
+                        const primary = block.steps[0];
+                        const secondary = block.steps[1];
+                        const zone = ridePowerZone(targetPower(primary.power, db.ftp), db.ftp);
+                        return html`<li>
+                            <span class="workout-detail--block-number">${String(index + 1).padStart(2, '0')}</span>
+                            <span class="workout-detail--block-dot" style="--block-zone:${zone?.color || '#8b9aaa'}"></span>
+                            <div><strong>${block.repeats > 1
+                                ? `${block.repeats} × ${block.steps.map(step => time(step.duration)).join(' / ')}`
+                                : time(primary.duration)}</strong>
+                                <span>${target(primary)}${secondary ? ` / ${target(secondary)}` : ''}</span></div>
+                            <span class="workout-detail--block-time">${time(block.totalDuration)}</span>
+                            <span class="workout-detail--block-cadence">${run ? 'Effort' : cadenceSummary(block.steps)}</span>
+                        </li>`;
+                    })}</ol>
+                </section>
+            </div>
+        </article>`;
     }
     function plan(data) {
         return renderPlan(data, today(data));

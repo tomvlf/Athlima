@@ -99,6 +99,38 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 .workout-card .profile-graph, .workout-card .course-profile { width: 100%; height: 64px; margin: 0; }
 .workout-card .profile-graph > span { min-width: 0; }
 #platform .workout-card-profile p { margin: 0 0 18px; }
+.workout-detail { min-width: 0; }
+.workout-detail--hero { display: grid; grid-template-columns: minmax(260px, 1.1fr) minmax(420px, 1.6fr) auto; gap: 24px; align-items: center; padding: 28px; border: 1px solid var(--platform-border); border-radius: 18px; background: #fff; box-shadow: 0 12px 34px rgba(7, 24, 39, .055); }
+#platform .workout-detail--hero h2 { margin: 3px 0 8px; color: var(--tmw-navy); font-size: clamp(30px, 3vw, 46px); letter-spacing: -.05em; }
+.workout-detail--status { margin: 0; color: var(--platform-muted); font-size: 12px; }
+.workout-detail--metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; border: 1px solid var(--platform-border); border-radius: 12px; background: #f7fafc; }
+.workout-detail--metrics > div { min-width: 0; padding: 12px 14px; border-right: 1px solid var(--platform-border); }
+.workout-detail--metrics > div:last-child { border-right: 0; }
+.workout-detail--metrics dt { color: var(--platform-muted); font-size: 10px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.workout-detail--metrics dd { margin: 4px 0 0; color: var(--tmw-navy); font-size: 17px; font-weight: 760; font-variant-numeric: tabular-nums; }
+.workout-detail--actions { display: grid; gap: 8px; min-width: 145px; }
+#platform .workout-detail--start { min-height: 52px; }
+.workout-detail--blocked { margin: 0; color: var(--platform-muted); font-size: 12px; line-height: 1.4; }
+.workout-detail--profile { margin-top: 14px; padding: 22px 24px 20px; border: 1px solid var(--platform-border); border-radius: 18px; background: #fff; }
+.workout-detail--section-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.workout-detail--section-head .eyebrow { margin-bottom: 3px; }
+.workout-detail--section-head h3 { margin: 0; color: var(--tmw-navy); font-size: 18px; }
+.workout-detail--section-head > span { color: var(--platform-muted); font-size: 11px; }
+.workout-detail--profile .profile-graph { height: 190px; padding-top: 0; border-bottom: 1px solid #bdcbd6; background: linear-gradient(#f7fafc 1px, transparent 1px) 0 0 / 100% 25%; }
+.workout-detail--profile .profile-graph > span { min-width: 2px; }
+.workout-detail--pace { margin: 14px 0 0; color: var(--platform-muted); }
+.workout-detail--grid { display: grid; grid-template-columns: minmax(250px, .8fr) minmax(0, 1.7fr); gap: 14px; margin-top: 14px; }
+.workout-detail--notes, .workout-detail--blocks { min-width: 0; padding: 22px 24px; border: 1px solid var(--platform-border); border-radius: 18px; background: #fff; }
+.workout-detail--notes > p { margin: 0; color: var(--tmw-slate); font-size: 14px; line-height: 1.65; }
+.workout-detail--blocks ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.workout-detail--blocks li { display: grid; grid-template-columns: 24px 8px minmax(160px, 1fr) auto minmax(90px, auto); gap: 10px; align-items: center; min-height: 52px; padding: 8px 10px; border: 1px solid #e1e8ee; border-radius: 10px; background: #f9fbfc; }
+.workout-detail--block-number { color: #8b9aaa; font-size: 10px; font-variant-numeric: tabular-nums; }
+.workout-detail--block-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--block-zone); }
+.workout-detail--blocks li > div { display: grid; min-width: 0; }
+.workout-detail--blocks strong { color: var(--tmw-navy); font-size: 13px; font-variant-numeric: tabular-nums; }
+.workout-detail--blocks li > div span { color: var(--platform-muted); font-size: 11px; }
+.workout-detail--block-time { color: var(--tmw-navy); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.workout-detail--block-cadence { color: var(--platform-muted); font-size: 11px; text-align: right; }
 .library-empty { grid-column: 1 / -1; padding: 30px; border: 1px solid var(--platform-border); border-radius: 16px; background: var(--platform-panel); color: var(--platform-muted); }
 .profile-graph { display: flex; align-items: end; height: 110px; gap: 2px; margin: 24px 0; overflow: hidden; border-bottom: 1px solid #465766; }
 .profile-graph > span { min-width: 1px; background: var(--bar); border-radius: 3px 3px 0 0; }
@@ -113,7 +145,11 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 .phase-track > div { flex: 1; min-width: 160px; padding-top: 12px; border-top: 3px solid #65e4be; }
 .phase-track small { display: block; }
 .description { white-space: pre-wrap; }
-.interval-list { columns: 2; padding-left: 22px; color: var(--platform-muted); }
+.activity-insight--metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 12px; }
+.activity-insight--metrics > div { padding: 12px; border: 1px solid var(--platform-border); border-radius: 10px; background: #f7fafc; }
+.activity-insight--metrics dt { color: var(--platform-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.activity-insight--metrics dd { margin: 4px 0 0; color: var(--tmw-navy); font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.activity-details { margin-top: 12px; border-top: 1px solid var(--platform-border); padding-top: 10px; }
 .table-scroll { overflow-x: auto; }
 #platform table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 #platform th { color: var(--platform-muted); font-weight: 500; padding: 12px; white-space: nowrap; }
@@ -626,8 +662,20 @@ html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-i
 .mobile-app .workout-card-metrics dd { margin-top: 2px; font-size: 15px; }
 .mobile-app .workout-card-profile { min-height: 0; padding: 0 14px; }
 .mobile-app .workout-card-profile .profile-graph, .mobile-app .workout-card-profile .course-profile { height: 44px; margin: 4px 0 10px; }
+.mobile-app .workout-detail--hero { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 18px; }
+.mobile-app .workout-detail--hero-copy { min-width: 0; }
+.mobile-app #platform .workout-detail--hero h2 { font-size: 30px; }
+.mobile-app .workout-detail--metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mobile-app .workout-detail--metrics > div:nth-child(2) { border-right: 0; }
+.mobile-app .workout-detail--metrics > div:nth-child(-n+2) { border-bottom: 1px solid var(--platform-border); }
+.mobile-app .workout-detail--actions { grid-template-columns: 1fr 1fr; }
+.mobile-app .workout-detail--profile, .mobile-app .workout-detail--notes, .mobile-app .workout-detail--blocks { padding: 16px; }
+.mobile-app .workout-detail--profile .profile-graph { height: 116px; }
+.mobile-app .workout-detail--grid { grid-template-columns: minmax(0, 1fr); }
+.mobile-app .workout-detail--blocks li { grid-template-columns: 20px 7px minmax(0, 1fr) auto; }
+.mobile-app .workout-detail--block-cadence { grid-column: 3 / -1; text-align: left; }
+.mobile-app .activity-insight--metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .mobile-app .profile-graph, .mobile-app .course-profile { height: 76px; margin: 12px 0; }
-.mobile-app .interval-list { columns: 1; margin: 8px 0; font-size: 13px; }
 .mobile-app .session-row { padding: 10px 0; gap: 10px; }
 .mobile-app .session-row .button-row { flex-wrap: wrap; }
 /* Sized by its bars (up to 100px) so a full bar never overlaps the stats above and an empty week stays compact. */
