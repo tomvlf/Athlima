@@ -198,9 +198,12 @@ test('includes every sport in totals and shows type icons and all imported metri
     expect(gravel.querySelector('.power-profile--recorded')).not.toBeNull();
     expect(run.querySelector('.activity-icon--running')).not.toBeNull();
     expect(run.textContent).toContain('Trail run');
+    const insight = run.querySelector('.activity-insight');
     const details = run.querySelector('details.activity-details');
     expect(details.querySelector('b')).toBeNull();
-    expect(details.textContent).toContain('<b>Hills</b>');
+    expect(insight.querySelector('b')).toBeNull();
+    expect(insight.querySelector('.activity-details--description').textContent)
+        .toContain('<b>Hills</b>');
     const value = label => [...details.querySelectorAll('dt')].find(term => term.textContent === label)?.nextElementSibling.textContent;
     expect(value('Training load (Intervals)')).toBe('61');
     expect(value('Max heart rate')).toBe('181 bpm');

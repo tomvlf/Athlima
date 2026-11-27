@@ -86,7 +86,8 @@ test('mobile guests can ride and use local features without a backend version di
     await go('coach');
     expect(root.textContent).toContain('on-device Coach');
     await go('devices');
-    expect(root.textContent).toContain('BLE / ANT+');
+    expect(root.textContent).toContain('Quick connect');
+    expect(root.textContent).toContain('Measurement sources');
     await go('settings');
     expect(root.textContent).toContain('stored only on this device');
     expect(root.querySelector('#profile-form')).not.toBeNull();
