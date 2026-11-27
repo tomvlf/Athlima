@@ -102,8 +102,9 @@ class CoachingPanel extends HTMLElement {
             setHTML(this, html`
                 ${this.error ? html`<p class="coach-alert" role="alert">${this.error}</p>` : ''}
                 ${this.notice ? html`<p class="coach-notice" role="status">${this.notice}</p>` : ''}
-                ${data.profile ? raw(this.safetyForm(data)) : ''}
+                ${data.profile && !plan ? raw(this.safetyForm(data)) : ''}
                 ${plan ? raw(this.planView(data, plan)) : raw(this.setupForm(data))}
+                ${data.profile && plan ? raw(this.safetyForm(data)) : ''}
                 <p class="coach-disclaimer">Training decision support, not medical advice. Recommendations are
                     conservative, deterministic rules, not guarantees.</p>`);
             this.notice = '';
@@ -146,17 +147,16 @@ class CoachingPanel extends HTMLElement {
         const adultConfirmed = profile.adultAthleteConfirmed === true;
         const next = plan.trainingPaused || !adultConfirmed ? null : upcoming[0];
         return `
-            <header class="coach-hero">
-                <div>
-                    <p class="eyebrow">Your goal</p>
+            <header class="coach-hero coach-hero--active">
+                <div class="coach-hero-copy">
                     <h2>${escape(goal.name || 'Training plan')}</h2>
                     <p class="muted">${escape(goalLabel(goal.type))} · ${escape(dayLabel(goal.date || plan.endDate,
                         {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}))}</p>
                 </div>
                 <div class="coach-stats">
-                    <div><strong>${daysLeft}</strong><span>days to go</span></div>
-                    <div><strong>${done}/${workouts.length}</strong><span>sessions done</span></div>
-                    <div><strong>${week ? Math.round(week.scheduledMinutes) : 0}</strong><span>min this week</span></div>
+                    <div><span>Goal in</span><strong>${daysLeft}<small> days</small></strong></div>
+                    <div><span>Completed</span><strong>${done}<small> / ${workouts.length}</small></strong></div>
+                    <div><span>This week</span><strong>${week ? Math.round(week.scheduledMinutes) : 0}<small> min</small></strong></div>
                 </div>
                 <div class="coach-progress" role="progressbar" aria-label="Plan progress" aria-valuemin="0"
                     aria-valuemax="100" aria-valuenow="${progress}"><i style="width: ${progress}%"></i></div>
@@ -175,7 +175,7 @@ class CoachingPanel extends HTMLElement {
                     ${running ? 'Runs and activities' : 'Rides'} you recorded are matched automatically. Review the rest so the coach can adapt; missed training is never made up.</p>
                 <button type="button" data-coach="review">Review missed sessions</button></div>` : ''}
             <div class="coach-grid">
-                <section class="coach-card">
+                <section class="coach-card coach-card--next">
                     <h3>Next session</h3>
                     ${next ? `
                         <p class="coach-next-date">${next.date === today ? 'Today' : escape(dayLabel(next.date, {weekday: 'long', day: 'numeric', month: 'long'}))}</p>
@@ -188,7 +188,7 @@ class CoachingPanel extends HTMLElement {
                         : plan.trainingPaused || !adultConfirmed ? '<p class="muted">No session is offered until the safety and adult-confirmation requirements are met.</p>'
                             : '<p class="muted">No more sessions are planned. Archive this plan and set a new goal to continue.</p>'}
                 </section>
-                <section class="coach-card">
+                <section class="coach-card coach-card--upcoming">
                     <h3>Coming up</h3>
                     ${upcoming.length > 1 ? `<ol class="coach-upcoming">${upcoming.slice(1, 7).map(w => `
                         <li><span>${escape(dayLabel(w.date))}</span><strong>${escape(w.title)}</strong>
@@ -301,10 +301,17 @@ class CoachingPanel extends HTMLElement {
         const pace = profile?.thresholdPace ? formatPace(profile.thresholdPace, unit).split('/')[0] : '';
         return `
             <header class="coach-intro">
-                <h2>${hasHistory ? 'Set up your next plan' : 'Create your training plan'}</h2>
-                <p>Answer a few questions and the coach builds a day-by-day cycling or running plan towards your goal.
-                    It fits your schedule and adapts automatically after every session. Takes about two minutes.</p>
-                ${hasHistory ? `<p class="muted">Your previous plan ended (${escape(data.plan.status)}). Its history is kept.</p>` : ''}
+                <div class="coach-intro-copy">
+                    <h2>${hasHistory ? 'Set up your next plan' : 'Build a plan that fits your life'}</h2>
+                    <p>Tell the Coach your goal and training rhythm. It creates a day-by-day cycling or running plan,
+                        then adapts it as your sessions and feedback come in.</p>
+                    ${hasHistory ? `<p class="coach-intro-note">Your previous plan ended (${escape(data.plan.status)}). Its history is kept.</p>` : ''}
+                </div>
+                <div class="coach-intro-points" aria-label="Coach setup highlights">
+                    <span><strong>2 min</strong>setup</span>
+                    <span><strong>Local</strong>and private</span>
+                    <span><strong>Adaptive</strong>week by week</span>
+                </div>
             </header>
             <form data-coach-form="setup" class="coach-setup">
                 <section class="coach-step">
@@ -367,9 +374,9 @@ class CoachingPanel extends HTMLElement {
                     <h3><span class="coach-step-number">3</span>When can you train?</h3>
                     <p class="muted">Enter the longest session you can do on each day, in minutes. Use 0 for rest days.</p>
                     <div class="coach-days">${DAYS.map((day, index) => `
-                        <div class="coach-day">
-                            <label>${day.slice(0, 3)}<input name="day${index}" type="number" min="0" max="1440" step="5"
-                                value="${escape(limits[index] || 0)}" aria-label="${day} minutes" required></label>
+                        <div class="coach-day ${limits[index] ? 'coach-day--active' : ''}">
+                            <label>${day.slice(0, 3)}<span class="coach-day-input"><input name="day${index}" type="number" min="0" max="1440" step="5"
+                                value="${escape(limits[index] || 0)}" aria-label="${day} minutes" required><span aria-hidden="true">min</span></span></label>
                             <select name="env${index}" aria-label="${day} indoor or outdoor">${['either', 'indoor', 'outdoor'].map(v =>
                                 `<option value="${v}" ${selected(v === (profile?.dayPreferences?.[index] || 'either'))}>${label(v)}</option>`).join('')}</select>
                         </div>`).join('')}</div>
@@ -386,7 +393,7 @@ class CoachingPanel extends HTMLElement {
                     </div>
                 </section>
 
-                <section class="coach-step">
+                <section class="coach-step coach-step--finish">
                     <h3><span class="coach-step-number">4</span>Create your plan</h3>
                     <p class="muted">Rides recorded in Too Many Watts are included automatically. For runs and better targets, connect
                         Intervals.icu in <a href="#/settings">Settings</a> before creating the plan; you can also import activities later.</p>
