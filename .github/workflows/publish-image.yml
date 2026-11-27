@@ -156,7 +156,7 @@ jobs:
           set -euo pipefail
           docker run --rm -d --name too-many-watts-validation -p 18080:8080 too-many-watts:scan
           trap 'docker rm -f too-many-watts-validation >/dev/null 2>&1 || true' EXIT
-          for attempt in $(seq 1 20); do
+          for ((attempt=1; attempt<=20; attempt++)); do
             if curl -fsS http://127.0.0.1:18080/ >/dev/null; then break; fi
             sleep 1
           done
@@ -278,7 +278,7 @@ jobs:
           docker pull "$IMAGE"
           docker run --rm -d --name too-many-watts-published -p 18081:8080 "$IMAGE"
           trap 'docker rm -f too-many-watts-published >/dev/null 2>&1 || true' EXIT
-          for attempt in $(seq 1 20); do
+          for ((attempt=1; attempt<=20; attempt++)); do
             if curl -fsS http://127.0.0.1:18081/ >/dev/null; then break; fi
             sleep 1
           done

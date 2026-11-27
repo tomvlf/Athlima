@@ -24,7 +24,10 @@ RUN npm test -- --runInBand \
 # Stage 2 serves only the built files. Use the maintained NGINX unprivileged registry; the former
 # nginxinc registry is archived. Pin the patched stable release and let the vulnerability gate verify
 # its complete runtime package set before publication.
-FROM docker.io/nginx/nginx-unprivileged:1.30.8-alpine@sha256:637c35e46af7bc0dd3d3bcf7162e004e13ab3b370fde7cd416e2ac410b5a985a
+FROM docker.io/nginx/nginx-unprivileged:1.31.10-alpine3.24@sha256:86628f2c9eaa5e84e3b98d25e26563c4a4f9b0ead9cf5656da4731d86e0621de
+
+USER root
+RUN apk upgrade --no-cache libxml2
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/security-headers.conf /etc/nginx/security-headers.conf

@@ -1,0 +1,18 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documentation examples and browser storage identifiers"
+paths = [
+  '''(?i)\.github/instructions/.*\.md$''',
+  '''^src/coaching/storage\.js$''',
+  '''^src/coaching/service\.js$''',
+  '''^src/models/intervals\.js$''',
+  '''^test/models/intervals\.test\.js$'''
+]
+regexes = [
+  '''sk_live_[A-Za-z0-9]+''',
+  '''<redacted-api-key>''',
+  '''too-many-watts-coaching-v1''',
+  '''too-many-watts-intervals-v1'''
+]
