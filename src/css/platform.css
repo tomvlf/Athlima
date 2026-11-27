@@ -558,7 +558,7 @@ html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-i
 .mobile-app .skip-link { left: 12px; }
 .mobile-app #main-content { margin: 0 auto; max-width: 900px; padding: 20px 16px 100px; }
 .mobile-app .platform-header { margin-bottom: 8px; }
-.mobile-app #platform .mobile-brand-mark { display: block; flex: none; width: 38px; height: 28px; background: url('../images/logo/too-many-watts-mark.png') center / contain no-repeat; }
+.mobile-app #platform .mobile-brand-mark { display: block; flex: none; width: 48px; height: 34px; background: url('../images/logo/too-many-watts-mark.png') center / contain no-repeat; }
 .mobile-app #platform .app-versions { margin-bottom: 14px; }
 .mobile-app .platform-header .eyebrow { display: none; }
 .mobile-app .panel { padding: 22px; }

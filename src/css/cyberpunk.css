@@ -151,30 +151,34 @@ body.platform-app::before {
 
 #platform .brand {
     position: relative;
-    display: flex;
-    align-items: center;
+    display: block;
     width: 100%;
-    height: 72px;
-    padding: 0 8px 0 76px;
-    background: url("../images/logo/too-many-watts-mark-white.png") 8px center / 60px auto no-repeat;
-    color: #fff;
-    text-indent: 0;
-    overflow: visible;
-    font-size: 12px;
-    font-weight: 850;
-    letter-spacing: .08em;
-    line-height: 1.15;
-    text-transform: uppercase;
+    height: 78px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 13px;
+    background: #fff url("../images/logo/too-many-watts-sidebar.png") center / calc(100% - 16px) auto no-repeat;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .16);
+    color: transparent;
+    text-indent: -9999px;
+    overflow: hidden;
+    transition: transform .16s ease, box-shadow .16s ease;
+}
+
+#platform .brand:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, .2);
 }
 
 #platform .brand::after {
     content: "";
     position: absolute;
-    bottom: 0;
-    left: 8px;
-    width: 42px;
+    bottom: 9px;
+    left: 50%;
+    width: 44px;
     height: 3px;
     background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan));
+    transform: translateX(-50%);
 }
 
 .sidebar nav {
@@ -1622,8 +1626,8 @@ body.platform-app[data-route="player"] #platform textarea {
     }
     .mobile-app .platform-header::after { inset: auto 0 -12px; }
     .mobile-app #platform .mobile-brand-mark {
-        width: 56px;
-        height: 36px;
+        width: 62px;
+        height: 42px;
         background: url("../images/logo/too-many-watts-mark.png") left center / contain no-repeat;
     }
     .mobile-app #platform h1 {
