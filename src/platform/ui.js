@@ -56,14 +56,6 @@ const empty = (text, route = 'library', action = 'Browse workouts') =>
     html`<div class="empty-state"><p>${text}</p>${link(route, action, 'button secondary')}</div>`;
 const stat = (label, value, unit = '') => html`<div class="stat"><span>${label}</span><strong>${value}<small>${unit}</small></strong></div>`;
 /**
- * Offer the ad-hoc session without implying that it replaces the plan. The explanation appears on
- * the ride screen after generation.
- */
-const trainNowCard = () => card('Train Now', html`<p>Get the session that fits this moment. The Coach ignores today's plan and uses your recent training, readiness and goal.</p>
-    <div class="button-row"><button data-action="train-now">Train Now</button>${link('coach', 'Review Coach', 'button secondary')}</div>
-    <p class="muted">The reason for the choice appears when the ride opens. This does not change planned or calendar sessions.</p>`);
-
-/**
  * Launches the main training platform shell and hosts the navigation routing logic.
  *
  * This is the app-level UI entry point: it creates the side navigation, bootstraps the
@@ -322,16 +314,26 @@ export async function launchPlatform(root) {
         </section>`;
     };
     const dailyGoalCard = data => {
-        if(!data?.goal) return quickGoalEditorView(data);
+        if(!data?.goal) return html`<button type="button" class="daily-goal-card overview-goal-card panel" data-action="daily-edit" data-today-goal-card aria-label="Set a training goal">
+            <span class="daily-choice-icon" aria-hidden="true">${icon('<path d="M4 20V5"/><path d="M4 6h12l-3 4 3 4H4"/>')}</span>
+            <span class="overview-goal-copy">
+                <span class="eyebrow">Your direction</span>
+                <strong>Give your training a target.</strong>
+                <small>Set a cycling or running goal and turn the next weeks into a clear plan.</small>
+            </span>
+            <span class="overview-goal-action">Set a goal <span aria-hidden="true">→</span></span>
+        </button>`;
         const goal = data.goal;
         const day = today(data);
         const remaining = remainingGoalDays(goal, day);
-        return html`<button type="button" class="daily-goal-card panel" data-action="daily-edit" data-today-goal-card aria-label="Edit your goal">
+        return html`<button type="button" class="daily-goal-card overview-goal-card panel" data-action="daily-edit" data-today-goal-card aria-label="Edit your goal">
             <span class="daily-choice-icon" aria-hidden="true">${icon('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4V2M20 12h2"/>')}</span>
-            <span class="eyebrow">${data.profile?.sport === 'running' ? 'Running goal' : 'Cycling goal'}</span>
-            <strong>${visibleText(goal.name || quickGoalName(goal.type))}</strong>
-            <span>${goal.date ? `${new Date(`${goal.date}T12:00:00Z`).toLocaleDateString(undefined, {day: 'numeric', month: 'long', year: 'numeric'})} · ${remaining} days remaining` : 'No goal date'}</span>
-            ${goal.distanceKm || goal.elevationM ? html`<small>Event details are saved. Open the full Coach to refine them.</small>` : html`<small>More goal details are available in the full Coach.</small>`}
+            <span class="overview-goal-copy">
+                <span class="eyebrow">${data.profile?.sport === 'running' ? 'Running goal' : 'Cycling goal'}</span>
+                <strong>${visibleText(goal.name || quickGoalName(goal.type))}</strong>
+                <small>${goal.date ? `${new Date(`${goal.date}T12:00:00Z`).toLocaleDateString(undefined, {day: 'numeric', month: 'long', year: 'numeric'})} · ${remaining} days remaining` : 'No goal date yet'}</small>
+            </span>
+            <span class="overview-goal-action">Edit goal <span aria-hidden="true">→</span></span>
         </button>`;
     };
 
@@ -339,35 +341,45 @@ export async function launchPlatform(root) {
      * Combine today's Coach, manual-calendar and imported sessions with recent cycling totals. A
      * missing Coach shows a recovery message while local riding remains available.
      */
-    const dailyPrimaryView = daily => {
-        if(!daily) return card('Today', html`<p>Refresh your Coach state to get today's recommendation.</p>`);
+    const todayCard = (label, title, reason, actions, snapshot = '') => html`<section class="panel overview-today hero">
+        <p class="eyebrow">${label}</p>
+        <h2 class="hero-title">${title}</h2>
+        <p class="overview-today-copy">${reason}</p>
+        ${snapshot}
+        <div class="button-row overview-today-actions">${actions}</div>
+    </section>`;
+    const dailyPrimaryView = (data, daily) => {
+        const unconfiguredActions = html`<button type="button" data-action="train-now">Train now</button>
+            ${link('library', 'Browse workouts', 'button secondary')}`;
+        if(!daily) return todayCard('Ready when you are', 'Make today count.',
+            'Start a focused ride now, or explore a workout that fits the time and energy you have.', unconfiguredActions);
         const snapshot = daily.snapshotDate
             ? html`<p class="muted">Evidence snapshot: ${daily.snapshotDate}</p>` : '';
         const title = visibleText(daily.title);
         const reason = visibleText(daily.reason);
         if(daily.status === 'planned' && daily.session) {
             const run = (daily.session.sport ?? 'cycling') === 'running';
-            return card('Today', html`<p class="eyebrow">${escape(daily.session.family)} · ${minutes(daily.session.duration)}</p>
-                <h2 class="hero-title">${escape(title)}</h2>
-                <p>${escape(reason)}</p>${snapshot}
-                ${run ? link(`workout/${encodeURIComponent(daily.session.id)}`, 'View run', 'button')
+            return todayCard(`Today · ${escape(daily.session.family)} · ${minutes(daily.session.duration)}`, escape(title), escape(reason),
+                run ? link(`workout/${encodeURIComponent(daily.session.id)}`, 'View run', 'button')
                     : html`<button type="button" data-action="start-workout" data-workout-id="${escape(daily.session.id)}">Start training</button>
-                        ${link(`workout/${encodeURIComponent(daily.session.id)}`, 'View training', 'button secondary')}`}`);
+                        ${link(`workout/${encodeURIComponent(daily.session.id)}`, 'View training', 'button secondary')}`, snapshot);
         }
         if(daily.status === 'review') {
-            return card('Today', html`<p class="eyebrow">Review before training</p><h2 class="hero-title">${escape(title)}</h2>
-                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Review Coach proposal', 'button')}`);
+            return todayCard('Review before training', escape(title), escape(reason),
+                link('coach', 'Review Coach proposal', 'button'), snapshot);
         }
         if(daily.status === 'paused') {
-            return card('Today', html`<p class="eyebrow">Training paused</p><h2 class="hero-title">${escape(title)}</h2>
-                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Open Coach safety status', 'button secondary')}`);
+            return todayCard('Training paused', escape(title), escape(reason),
+                link('coach', 'Open Coach safety status', 'button secondary'), snapshot);
         }
         if(daily.status === 'rest') {
-            return card('Today', html`<p class="eyebrow">Recovery today</p><h2 class="hero-title">${escape(title)}</h2>
-                <p>${escape(reason)}</p>${snapshot}${link('coach', 'Open full Coach', 'button secondary')}`);
+            return todayCard('Recovery today', escape(title), escape(reason),
+                html`${link('library', 'Choose an easy session', 'button')}${link('coach', 'Open full Coach', 'button secondary')}`, snapshot);
         }
-        return card('Today', html`<p class="eyebrow">${daily.status === 'unknown' ? 'Evidence needed' : 'Setup needed'}</p>
-            <h2 class="hero-title">${escape(title)}</h2><p>${escape(reason)}</p>${snapshot}${link('coach', 'Open Coach', 'button secondary')}`);
+        if(!data?.goal && !data?.plan) return todayCard('Ready when you are', 'Make today count.',
+            'Start a focused ride in one click, or give Coach a goal and let it build the path ahead.', unconfiguredActions);
+        return todayCard(daily.status === 'unknown' ? 'Evidence needed' : 'Your training', escape(title), escape(reason),
+            html`${link('library', 'Choose a workout', 'button')}${link('coach', 'Open Coach', 'button secondary')}`, snapshot);
     };
     function dashboard(data) {
         if(!data) return card('Training data unavailable', html`<p>${coachingError || 'Your local training data has not loaded.'}</p>
@@ -375,11 +387,6 @@ export async function launchPlatform(root) {
         const summary = trainingSummary(data);
         const daily = todayRecommendation({data, state, now: new Date().toISOString()});
         const calendar = legacy.querySelector('training-calendar');
-        const extras = calendar ? calendar.entriesForDate(today(data)).filter(entry => entry.source !== 'coaching' && entry.workout)
-            .map(entry => ({id: entry.workout.id, family: entry.source === 'planned' ? 'Intervals.icu' : 'Calendar',
-                title: entry.name, description: entry.workout.meta.description, duration: entry.workout.meta.duration,
-                date: entry.date, status: 'scheduled', appWorkout: entry.workout})) : [];
-        const sessions = [...summary.upcoming.filter(w => w.date === today(data)), ...extras];
         const next = [...summary.upcoming.filter(w => w.date > today(data))];
         if(calendar) {
             for(let offset = 1; offset <= 14; offset++) {
@@ -391,39 +398,43 @@ export async function launchPlatform(root) {
             }
             next.sort((a, b) => a.date.localeCompare(b.date));
         }
-        const todayBody = sessions.length ? sessions.map(workout => html`<p class="eyebrow">${workout.family} / ${minutes(workout.duration)}</p>
-            <h2 class="hero-title">${workout.title}</h2><p class="today-description">${workout.description}</p>
-            ${profileGraph(workout.appWorkout || toAppWorkout(workout))}${link(`workout/${encodeURIComponent(workout.id)}`,
-                workout.sport === 'running' ? 'View run' : 'Prepare to ride', 'button')}`)
-            : html`<h2 class="hero-title">${data?.plan?.status === 'active' ? 'Space to recover.' : 'Your next ride starts here.'}</h2>
-                <p>${data?.plan?.status === 'active' ? 'No Coach session scheduled today. Follow your recovery guidance, or choose a ride.' : 'Build a training plan or choose a session from your library.'}</p>
-                ${link(data?.plan ? 'library' : 'coach', data?.plan ? 'Choose a workout' : 'Set up your Coach', 'button')}`;
-        if(mobile) return html`${dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data)}
-            ${dailyPrimaryView(daily)}
-            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(visibleText(data.goal?.name || 'No goal'))}</p>
-                <p><strong>New:</strong> ${escape(visibleText(dailyGoalPreview.goal.name))}</p>
-                <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
-                ${dailyGoalPreview.warnings.length ? html`<div role="alert" class="daily-preview-warnings">${[...new Set(dailyGoalPreview.warnings.map(visibleText))].slice(0, 3).map(warning => html`<p>${escape(warning)}</p>`)}</div>` : ''}
-                <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : ''}
-            ${trainNowCard()}
-            ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`) : ''}
-            ${card('Connect & ride', html`<div class="button-row">${link('player', 'Open ride controls', 'button secondary')}${link('library', 'Choose a workout', 'button secondary')}</div>${mobileDetails('dashboard-devices', 'Trainer & sensors', deviceButtons())}`)}
-            ${card('Up next', next.length ? html`<ul class="session-list">${next.slice(0, 2).map(workoutRow)}</ul>` : html`<p>No upcoming sessions.</p>`, '', true)}`;
-        return html`<div class="dashboard-grid">${dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data)}
-            ${dailyPrimaryView(daily)}
-            ${dailyGoalPreview ? html`<section class="panel" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(visibleText(data.goal?.name || 'No goal'))}</p>
-                <p><strong>New:</strong> ${escape(visibleText(dailyGoalPreview.goal.name))}</p>
-                <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
-                ${dailyGoalPreview.warnings.length ? html`<div role="alert" class="daily-preview-warnings">${[...new Set(dailyGoalPreview.warnings.map(visibleText))].slice(0, 3).map(warning => html`<p>${escape(warning)}</p>`)}</div>` : ''}
-                <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : ''}
-            ${trainNowCard()}
-            ${card('This week', html`<div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
-                ${stat('Plan completed to date', summary.adherence == null ? '--' : `${Math.round(summary.adherence * 100)}%`)}</div>
-                <p class="muted">${summary.due ? `${summary.completed} of ${summary.due} scheduled sessions through today completed or substituted.` : 'No plan sessions due yet.'}</p>
-                ${weekChart(summary)}${link('progress', 'Explore your progress')}`)}
-            ${card('From your Coach', html`<p class="coach-note">${recommendation(data)}</p><p class="muted">Conservative, deterministic guidance. Not medical advice.</p>${link('coach', 'Review guidance')}`)}
-            ${card('Coming next', next.length ? html`<ul class="session-list">${next.slice(0, 3).map(workoutRow)}</ul>${link('calendar', 'Open calendar')}` :
-                empty('No future Coach sessions scheduled.', 'coach', 'Build a plan'))}</div>`;
+        const goalPanel = dailyGoalEditor ? quickGoalEditorView(data) : dailyGoalCard(data);
+        const goalPreview = dailyGoalPreview ? html`<section class="panel overview-goal-preview" tabindex="-1" data-daily-goal-preview><h2>Goal change preview</h2><p><strong>Current:</strong> ${escape(visibleText(data.goal?.name || 'No goal'))}</p>
+            <p><strong>New:</strong> ${escape(visibleText(dailyGoalPreview.goal.name))}</p>
+            <p>Difference: ${Math.round(dailyGoalPreview.forecast.afterMinutes - dailyGoalPreview.forecast.beforeMinutes)} planned minutes · ${Math.round((dailyGoalPreview.forecast.afterLoad - dailyGoalPreview.forecast.beforeLoad) * 10) / 10} load points.</p>
+            ${dailyGoalPreview.warnings.length ? html`<div role="alert" class="daily-preview-warnings">${[...new Set(dailyGoalPreview.warnings.map(visibleText))].slice(0, 3).map(warning => html`<p>${escape(warning)}</p>`)}</div>` : ''}
+            <div class="button-row"><button data-action="daily-accept">Accept new goal</button><button class="secondary" data-action="daily-cancel">Cancel</button></div></section>` : '';
+        const weekly = html`<section class="panel overview-week">
+            <div class="overview-week-heading"><div><p class="eyebrow">Your momentum</p><h2>This week</h2></div>${link('progress', 'Full progress', 'overview-text-link')}</div>
+            <div class="stats">${stat('Ride time', number(summary.seconds / 3600, 1), 'h')}${stat('Rides', summary.week.length)}
+                ${stat('Plan complete', summary.adherence == null ? '--' : `${Math.round(summary.adherence * 100)}%`)}</div>
+            <p class="muted">${summary.due ? `${summary.completed} of ${summary.due} scheduled sessions completed or substituted.` : 'Start with one session. Consistency builds from there.'}</p>
+            ${weekChart(summary)}
+        </section>`;
+        const nextCard = card('Coming next', next.length ? html`<ul class="session-list">${next.slice(0, 3).map(workoutRow)}</ul>${link('calendar', 'Open calendar', 'overview-text-link')}` :
+            html`<p class="overview-empty-title">Your next sessions will appear here.</p><p class="muted">Build a plan around your schedule, then let the calendar keep the next move visible.</p>${link('coach', 'Build my plan', 'button secondary')}`, 'overview-next', true);
+        const coachCard = card('Coach guidance', html`<p class="coach-note">${recommendation(data)}</p><p class="muted">Conservative training guidance. Not medical advice.</p>${link('coach', 'Open Coach', 'overview-text-link')}`, 'overview-coach', true);
+        if(mobile) return html`<div class="overview-page">
+            ${dailyGoalEditor ? html`<div class="overview-editor">${goalPanel}</div>` : ''}
+            ${dailyPrimaryView(data, daily)}
+            ${dailyGoalEditor ? '' : goalPanel}
+            ${goalPreview}
+            ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`, 'overview-recovery') : ''}
+            ${weekly}
+            ${nextCard}
+            ${coachCard}
+        </div>`;
+        return html`<div class="overview-page">
+            ${dailyGoalEditor ? html`<div class="overview-editor">${goalPanel}</div>` : ''}
+            <div class="overview-lead ${dailyGoalEditor ? 'overview-lead-single' : ''}">
+                ${dailyPrimaryView(data, daily)}
+                ${dailyGoalEditor ? '' : html`<div class="overview-side">${goalPanel}</div>`}
+            </div>
+            ${goalPreview}
+            ${db.elapsed > 0 ? card('Ride recovery', html`<p>A ${time(db.elapsed)} ride is saved on this device. Reconnect your trainer before resuming.</p>${link('player', 'Return to ride', 'button')}`, 'overview-recovery') : ''}
+            ${weekly}
+            <div class="overview-bottom">${nextCard}${coachCard}</div>
+        </div>`;
     }
     /**
      * Draw recent daily cycling minutes, scaling against at least one hour so tiny totals do not

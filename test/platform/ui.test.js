@@ -90,6 +90,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(versions.querySelector('[data-frontend-version]').textContent).toBe('development');
     expect(versions.querySelector('[data-backend-version]')).toBeNull();
     expect(versions.querySelector('[data-refresh-version]')).toBeNull();
+    expect(root.textContent).toContain('Give your training a target');
+    expect(root.querySelector('#daily-goal-form')).toBeNull();
+    root.querySelector('[data-today-goal-card]').click();
+    await settle();
     expect(root.textContent).toContain('Set your goal');
     expect(root.querySelectorAll('[data-daily-sport]').length).toBe(2);
     expect(root.innerHTML).not.toContain('&lt;button');

@@ -1,152 +1,1218 @@
 /*
- * Visual theme layered over platform.css: shared colours, angular panels and a
- * bundled city photograph. This file changes appearance, not training-zone values
- * or device behavior; player-specific rules keep the ride screen less decorative.
+ * Too Many Watts visual system. The layout remains owned by base.css and
+ * platform.css; this final layer applies the angular identity from the exact
+ * TMW mark without changing training or device behavior.
  */
 :root {
-    --platform-bg: #080b10;
-    --platform-panel: #121b24;
-    --platform-surface: #101820;
-    --platform-border: #3c5260;
-    --platform-text: #edf4fb;
-    --platform-muted: #b1bfd0;
-    --platform-accent: #f2ed55;
-    --cyber-cyan: #78f5ec;
-    --cyber-magenta: #ff86ba;
-    --city-backdrop: url('/src/images/city-road-1920.webp');
+    --platform-bg: #f4f7fa;
+    --platform-panel: #ffffff;
+    --platform-surface: #edf3f7;
+    --platform-border: #d7e1e9;
+    --platform-text: #0b1f33;
+    --platform-muted: #617083;
+    --platform-accent: #1265ff;
+    --tmw-navy: #071827;
+    --tmw-navy-soft: #0b1f33;
+    --tmw-blue: #1265ff;
+    --tmw-cyan: #00c8f8;
+    --tmw-slate: #53687a;
+    --tmw-paper: #f4f7fa;
+    --tmw-white: #ffffff;
+    --tmw-line: #d7e1e9;
+    --tmw-shadow: 0 18px 45px rgba(7, 24, 39, .07);
+    --tmw-radius: 18px;
 }
 
-body.platform-app {
-    background-color: var(--platform-bg);
-    background-image: linear-gradient(180deg, rgba(8, 11, 16, .82), rgba(8, 11, 16, .68) 48%, rgba(8, 11, 16, .38)),
-        var(--city-backdrop);
-    background-position: center;
-    background-size: cover;
-    background-attachment: fixed;
+body.platform-app,
+body:has(.auth-screen) {
+    --background-color: var(--tmw-paper);
+    --background-color-2: var(--tmw-white);
+    --foreground-color: var(--tmw-navy-soft);
+    --foreground-color-inactive: var(--tmw-slate);
+    --border-color: var(--tmw-line);
+    --progress: rgba(18, 101, 255, .18);
+    --input-color: var(--tmw-navy);
+    --toogle-inactive-color: var(--tmw-slate);
+    --toogle-active-color: var(--tmw-blue);
+    background: var(--tmw-paper);
+    color: var(--platform-text);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.platform-app .sidebar {
-    background: linear-gradient(180deg, #151b24, #080e16);
-    border-color: #48606b;
-    box-shadow: 8px 0 30px rgba(0, 0, 0, .15);
+body.platform-app::before {
+    content: "";
+    position: fixed;
+    top: 112px;
+    right: -110px;
+    width: min(45vw, 720px);
+    aspect-ratio: 830 / 255;
+    z-index: -1;
+    background: url("../images/logo/too-many-watts-mark.png") center / contain no-repeat;
+    opacity: .035;
+    pointer-events: none;
+    transform: rotate(-5deg);
 }
 
-#platform .sidebar nav a { border-radius: 0; }
-#platform .sidebar nav a[aria-current="page"] {
-    background: #2c2e20;
-    box-shadow: inset 3px 0 var(--platform-accent);
+#platform {
+    min-height: 100dvh;
+    color: var(--platform-text);
 }
 
-.platform-app .platform-header { position: relative; }
-.platform-app .platform-header::after {
-    content: '';
+#platform a { color: var(--tmw-blue); }
+#platform a:hover { color: var(--tmw-navy); text-decoration: none; }
+
+#platform button,
+#platform .button {
+    min-height: 46px;
+    padding: 11px 18px;
+    border-radius: 10px;
+    border-color: var(--tmw-navy);
+    background: var(--tmw-navy);
+    color: var(--tmw-white);
+    box-shadow: none;
+    font-weight: 720;
+    letter-spacing: -.01em;
+    transition: transform .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+#platform button.secondary,
+#platform .button.secondary {
+    border-color: var(--platform-border);
+    background: var(--tmw-white);
+    color: var(--tmw-navy);
+}
+
+#platform button.danger {
+    border-color: #b42318;
+    background: #b42318;
+    color: #fff;
+}
+
+#platform :focus-visible,
+.library-import:focus-within {
+    outline: 3px solid var(--tmw-cyan);
+    outline-offset: 3px;
+}
+
+#platform input,
+#platform textarea,
+#platform select {
+    min-height: 46px;
+    border-radius: 10px;
+    border-color: #c5d1dc;
+    background: #fff;
+    color: var(--tmw-navy);
+    box-shadow: inset 0 1px 1px rgba(7, 24, 39, .03);
+}
+
+#platform input:disabled {
+    color: var(--platform-muted);
+    background: var(--platform-surface);
+}
+
+#platform label {
+    color: var(--tmw-slate);
+    letter-spacing: .01em;
+}
+
+#platform h1 {
+    color: var(--tmw-navy);
+    font-size: clamp(34px, 4.8vw, 58px);
+    font-weight: 850;
+    letter-spacing: -.055em;
+    line-height: .98;
+    text-transform: none;
+}
+
+#platform h2 {
+    color: var(--tmw-navy);
+    font-size: 21px;
+    font-weight: 780;
+    letter-spacing: -.035em;
+}
+
+#platform p { line-height: 1.65; }
+#platform .muted, #platform small { color: var(--platform-muted); }
+#platform .eyebrow {
+    color: var(--tmw-blue);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .13em;
+}
+
+.sidebar {
+    width: 248px;
+    padding: 28px 18px 22px;
+    background: var(--tmw-navy);
+    border-right: 0;
+    box-shadow: 16px 0 46px rgba(7, 24, 39, .08);
+}
+
+#platform .brand {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 72px;
+    padding: 0 8px 0 76px;
+    background: url("../images/logo/too-many-watts-mark-white.png") 8px center / 60px auto no-repeat;
+    color: #fff;
+    text-indent: 0;
+    overflow: visible;
+    font-size: 12px;
+    font-weight: 850;
+    letter-spacing: .08em;
+    line-height: 1.15;
+    text-transform: uppercase;
+}
+
+#platform .brand::after {
+    content: "";
     position: absolute;
-    inset: auto 0 -14px;
-    height: 2px;
-    background: linear-gradient(90deg, #f2ed55 0 18%, #78f5ec 18% 65%, #ff86ba 65% 76%, transparent 76%);
+    bottom: 0;
+    left: 8px;
+    width: 42px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan));
+}
+
+.sidebar nav {
+    gap: 3px;
+    margin-top: 38px;
+}
+
+#platform .sidebar nav a {
+    position: relative;
+    min-height: 44px;
+    padding: 11px 16px 11px 20px;
+    border-radius: 10px;
+    color: #afbecb;
+    font-size: 14px;
+    font-weight: 590;
+    transition: transform .16s ease, color .16s ease, background-color .16s ease;
+}
+
+#platform .sidebar nav a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 13px;
+    bottom: 13px;
+    width: 3px;
+    background: transparent;
+}
+
+#platform .sidebar nav a[aria-current="page"] {
+    background: #14283a;
+    color: #fff;
+    box-shadow: none;
+    font-weight: 720;
+}
+
+#platform .sidebar nav a[aria-current="page"]::before {
+    background: linear-gradient(180deg, var(--tmw-blue), var(--tmw-cyan));
+}
+
+.sidebar-bottom {
+    color: #738797;
+    padding: 20px 12px 0;
+    border-top: 1px solid #203447;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+#platform .sidebar .app-versions {
+    border-top-color: #203447;
+    color: #738797;
+}
+
+#platform .sidebar .app-versions strong { color: #c7d3dc; }
+
+#main-content {
+    margin-left: 248px;
+    max-width: 1780px;
+    padding: 46px clamp(30px, 4vw, 68px) 80px;
+}
+
+.platform-app .platform-header {
+    min-height: 90px;
+    margin-bottom: 34px;
+}
+
+.platform-app .platform-header::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -22px;
+    height: 1px;
+    background: var(--platform-border);
+}
+
+#platform .platform-heading { align-items: flex-start; }
+#platform .app-versions { font-family: inherit; color: var(--platform-muted); }
+#platform .app-versions strong { color: var(--platform-text); }
+
+#platform-message:not(:empty),
+#platform-content > p[role="alert"] {
+    padding: 15px 18px;
+    border: 1px solid #b9d7ff;
+    border-left: 4px solid var(--tmw-blue);
+    border-radius: 12px;
+    background: #eef5ff;
+}
+
+#platform-message.error,
+#platform-content > p[role="alert"] {
+    border-color: #fecaca;
+    border-left-color: #b42318;
+    background: #fff3f2;
+    color: #7a271a;
+}
+
+.dashboard-grid { gap: 20px; }
+
+.overview-page {
+    display: grid;
+    gap: 22px;
+    max-width: 1280px;
+}
+
+.overview-editor {
+    max-width: 920px;
+}
+
+.overview-lead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.72fr) minmax(300px, .9fr);
+    gap: 22px;
+    align-items: stretch;
+}
+
+.overview-lead-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.overview-side {
+    display: grid;
+    min-width: 0;
+}
+
+#platform .overview-today {
+    display: flex;
+    min-height: 455px;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(34px, 5vw, 70px);
+    margin: 0;
+    isolation: isolate;
+    background:
+        linear-gradient(112deg, rgba(255, 255, 255, .98) 0%, rgba(244, 249, 255, .96) 58%, rgba(222, 244, 255, .84) 100%);
+}
+
+#platform .overview-today::before {
+    width: 52%;
+    height: auto;
+    aspect-ratio: 830 / 255;
+    top: 42px;
+    right: -9%;
+    bottom: auto;
+    border: 0;
+    background: url("../images/logo/too-many-watts-mark.png") center / contain no-repeat;
+    opacity: .075;
+    transform: rotate(-5deg);
+}
+
+#platform .overview-today::after {
+    position: absolute;
+    inset: auto auto 44px -84px;
+    width: 280px;
+    height: 14px;
+    border: 0;
+    background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan));
+    transform: skewX(-28deg);
+    opacity: .12;
+}
+
+#platform .overview-today > .eyebrow {
+    margin-bottom: 16px;
+    font-size: 12px;
+}
+
+#platform .overview-today .hero-title {
+    max-width: 720px;
+    margin: 0 0 18px;
+    font-size: clamp(44px, 5.1vw, 76px);
+    font-weight: 860;
+    letter-spacing: -.065em;
+    line-height: .96;
+}
+
+#platform .overview-today-copy {
+    max-width: 570px;
+    margin: 0;
+    color: var(--tmw-slate);
+    font-size: 17px;
+    line-height: 1.65;
+}
+
+.overview-today-actions {
+    margin: 28px 0 0;
+    gap: 10px;
+}
+
+#platform .overview-today-actions .button,
+#platform .overview-today-actions button {
+    min-height: 50px;
+    padding: 13px 21px;
+}
+
+#platform .overview-goal-card {
+    display: grid;
+    min-height: 455px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 14px;
+    align-items: center;
+    align-content: center;
+    padding: 24px;
+    margin: 0;
+    border: 1px solid #bcd0e2 !important;
+    border-radius: var(--tmw-radius);
+    background: linear-gradient(135deg, #fff, #f2f7ff) !important;
+    color: var(--tmw-navy) !important;
+    text-align: left;
+    box-shadow: var(--tmw-shadow) !important;
+}
+
+.overview-goal-card .daily-choice-icon {
+    grid-row: 1 / span 2;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: #e8f1ff;
+}
+
+.overview-goal-copy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+#platform .overview-goal-card strong {
+    color: var(--tmw-navy);
+    font-size: 20px;
+    line-height: 1.18;
+}
+
+#platform .overview-goal-card small {
+    color: var(--platform-muted);
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1.45;
+}
+
+.overview-goal-action {
+    grid-column: 2;
+    color: var(--tmw-blue);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.overview-week {
+    display: grid;
+    grid-template-columns: minmax(180px, .55fr) minmax(340px, 1fr) minmax(280px, .85fr);
+    gap: 10px 32px;
+    align-items: end;
+    margin: 0;
+}
+
+.overview-week-heading {
+    grid-row: 1 / span 2;
+    align-self: center;
+}
+
+.overview-week-heading h2 { font-size: 25px; }
+.overview-week .stats { gap: 28px; margin: 8px 0 0; }
+.overview-week .stat { min-width: 0; }
+.overview-week .stat strong { font-size: 38px; }
+.overview-week > .muted {
+    grid-column: 2;
+    max-width: 520px;
+    margin: 0;
+    font-size: 12px;
+}
+
+.overview-week .week-chart {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    height: 128px;
+    margin: 0;
+    padding: 10px 0 0;
+}
+
+.overview-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+    gap: 22px;
+}
+
+#platform .overview-next,
+#platform .overview-coach {
+    min-width: 0;
+    margin: 0;
+}
+
+.overview-next .overview-empty-title {
+    margin: 6px 0 8px;
+    color: var(--tmw-navy);
+    font-size: 19px;
+    font-weight: 720;
+}
+
+.overview-coach .coach-note {
+    font-size: 16px;
+    line-height: 1.55;
+}
+
+.overview-text-link {
+    display: inline-flex;
+    margin-top: 10px;
+    align-items: center;
+    color: var(--tmw-blue) !important;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.overview-goal-preview,
+.overview-recovery {
+    margin: 0;
+}
+
+.panel,
+.platform-app .workout-card,
+.coach-intro,
+.coach-step,
+.coach-card,
+.coach-hero {
+    border: 1px solid var(--platform-border);
+    border-radius: var(--tmw-radius);
+    background: var(--tmw-white);
+    box-shadow: 0 1px 2px rgba(7, 24, 39, .02);
+}
+
+.panel { padding: clamp(22px, 2.5vw, 34px); }
+
+.platform-app .panel,
+.platform-app .workout-card,
+.platform-app .hero {
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--tmw-shadow);
+}
+
+.panel::after,
+.workout-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 64px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan));
     pointer-events: none;
 }
 
-.platform-app .panel, .platform-app .workout-card {
-    border-radius: 0 16px 0 0;
-    border-top-color: #54727d;
-    box-shadow: inset 2px 0 #253e48, 0 12px 28px rgba(0, 0, 0, .18);
-}
-.mobile-app #platform .activity-periods > .activity-period, .mobile-app #platform .activity-periods > .mobile-details,
-.mobile-app #platform .activity-overview > .mobile-details, .mobile-app #platform .activity-overview > .activity-load-state,
-.mobile-app #legacy-slot #view--settings-settings {
-    border-radius: 0 16px 0 0;
-    border-top-color: #54727d;
-    box-shadow: inset 2px 0 #253e48;
-}
-.mobile-app #platform .activity-overview > p, .mobile-app #platform .activity-history + .muted { border-radius: 0 12px 0 0; }
-
-.platform-app .hero {
-    background: linear-gradient(105deg, #13212b 20%, rgba(19, 33, 43, .96) 60%, rgba(19, 33, 43, .78)),
-        var(--city-backdrop) center 70% / cover;
-    border-color: #818348;
-    box-shadow: inset 3px 0 var(--platform-accent), 0 12px 28px rgba(0, 0, 0, .18);
+.platform-app .hero,
+.coach-intro,
+.coach-hero {
+    border-color: #cddae4;
+    background: linear-gradient(135deg, #fff 0%, #f3f8ff 65%, #e8f9ff 100%);
+    box-shadow: var(--tmw-shadow);
 }
 
-#platform h1 { font-weight: 800; letter-spacing: -.035em; text-transform: uppercase; }
-#platform .eyebrow, #platform .sidebar-bottom, #platform .app-versions {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+.hero::before,
+.coach-intro::before,
+.coach-hero::before {
+    content: "";
+    position: absolute;
+    right: -58px;
+    bottom: -78px;
+    width: 250px;
+    height: 160px;
+    border: 34px solid rgba(18, 101, 255, .06);
+    transform: skewX(-22deg) rotate(-8deg);
+    pointer-events: none;
 }
-#platform .eyebrow { color: var(--cyber-cyan); letter-spacing: .16em; }
-#platform .hero > .eyebrow { color: var(--platform-accent); }
-#platform .stat strong { color: var(--cyber-cyan); }
-#platform button, #platform .button { border-radius: 0 10px 0 0; }
-#platform button:not(.secondary):not(.danger), #platform .button:not(.secondary) {
-    color: #09111b;
-    border-color: #f2ed55;
-    box-shadow: inset 0 -3px rgba(0, 0, 0, .15);
+
+#platform .hero-title {
+    max-width: 720px;
+    margin: 16px 0 14px;
+    color: var(--tmw-navy);
+    font-size: clamp(28px, 3.6vw, 44px);
+    font-weight: 850;
+    letter-spacing: -.05em;
 }
-#platform button.secondary, #platform .button.secondary {
-    background: #142731;
-    border-color: #426a75;
+
+.stats { gap: 18px; }
+.stat { min-width: 105px; }
+.stat > span {
+    color: var(--platform-muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
 }
-/* Calendar navigation, day and session buttons sit on dark surfaces, so they must not take the primary button ink. */
-#platform .training-calendar--navigation button:not(.secondary):not(.danger) {
-    background: #142731;
-    border-color: #426a75;
-    color: var(--platform-text);
+.stat strong {
+    color: var(--tmw-navy);
+    font-size: 34px;
 }
-#platform .training-calendar .calendar-day--select:not(.secondary):not(.danger),
-#platform .training-calendar .calendar-event--select:not(.secondary):not(.danger) {
-    color: var(--platform-text);
+#platform .stat strong { color: var(--tmw-navy); }
+
+.week-chart { gap: 7px; border-bottom: 1px solid var(--platform-border); }
+.week-chart i {
+    width: 66%;
+    border-radius: 5px 5px 0 0;
+    background: linear-gradient(180deg, var(--tmw-cyan), var(--tmw-blue));
+}
+
+.session-row { border-color: var(--platform-border); }
+.session-row .eyebrow { margin-bottom: 3px; color: var(--tmw-blue); }
+.coach-note { color: var(--tmw-navy); font-size: 18px; line-height: 1.6; }
+
+.workout-card {
+    border-color: var(--platform-border);
+    background: #fff;
+}
+.workout-card-content { padding: 20px 22px 12px; }
+.workout-card-profile { background: #f2f7fb; }
+#platform .workout-card-link { color: var(--tmw-navy); }
+#platform .workout-card-link:hover { color: var(--tmw-blue); }
+
+.profile-graph,
+.course-profile { border-bottom-color: #b8c6d1; }
+.course-profile polygon {
+    fill: var(--tmw-blue);
+    fill-opacity: .12;
+}
+.course-profile polyline {
+    stroke: var(--tmw-blue);
+    stroke-width: 2;
+}
+.profile-graph > span { border-radius: 3px 3px 0 0; }
+
+.library-layout { gap: 20px; }
+#platform .library-filters {
+    border-color: var(--platform-border);
+    background: #fff;
+    box-shadow: var(--tmw-shadow);
+}
+
+#platform table { color: var(--tmw-navy); }
+#platform th { color: var(--platform-muted); font-weight: 720; }
+#platform td { border-color: var(--platform-border); }
+
+#platform .activity-overview .activity-period {
+    border-color: var(--platform-border);
+    border-radius: var(--tmw-radius);
+    background: #fff;
+    box-shadow: var(--tmw-shadow);
+}
+
+#platform .activity-period h3,
+#platform .activity-period-metrics dd { color: var(--tmw-navy); }
+#platform .activity-stream-data { background: #fff; }
+#platform .activity-route svg,
+#platform .activity-stream-chart svg { background: #f2f7fb; }
+#platform .activity-route path,
+#platform .activity-stream-chart path { stroke: var(--tmw-blue); }
+
+#platform .daily-goal-card {
+    border-color: #bdd0df !important;
+    background: linear-gradient(135deg, #fff, #eff7ff) !important;
+    color: var(--tmw-navy) !important;
+}
+
+#platform .daily-goal-card strong { color: var(--tmw-navy); }
+
+#platform .daily-choice {
+    min-height: 100px;
+    border: 1px solid var(--platform-border);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--tmw-navy);
+    box-shadow: 0 1px 2px rgba(7, 24, 39, .03);
+}
+
+#platform .daily-choice.selected {
+    border-color: var(--tmw-blue);
+    background: #eff5ff;
+    box-shadow: inset 0 0 0 1px var(--tmw-blue);
+}
+
+#platform .daily-choice strong { color: var(--tmw-navy) !important; }
+.daily-choice-icon,
+.daily-goal-card .eyebrow { color: var(--tmw-blue); }
+
+.coach-alert {
+    border-color: #ffd0ca;
+    background: #fff3f2;
+    color: #7a271a;
+}
+.coach-notice {
+    border-color: #bfdcff;
+    background: #f0f6ff;
+    color: var(--tmw-navy);
+}
+.coach-callout {
+    border-color: #c8d7e3;
+    background: #f2f6f9;
+    color: var(--tmw-navy);
+}
+
+.coach-step-number {
+    border-radius: 9px;
+    background: var(--tmw-blue);
+    color: #fff;
+}
+
+#platform .coach-day {
+    border-color: var(--platform-border);
+    border-radius: 12px;
+    background: #f7fafc;
+}
+
+.coach-badge,
+.plan-chip.done,
+#ride-status {
+    border-radius: 999px;
+    background: #eaf2ff;
+    color: var(--tmw-blue);
+}
+
+.coach-progress,
+.plan-week,
+.plan-next,
+.microcycle-disruption-row {
+    border-color: var(--platform-border);
+    background: #f7fafc;
+}
+.coach-progress i { background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan)); }
+.plan-week.current { border-color: #8ebdff; }
+.plan-session.today { background: #eff6ff; }
+.plan-now {
+    background: var(--tmw-blue);
+    box-shadow: 0 0 0 2px var(--platform-bg);
+}
+.plan-chip {
+    background: #edf2f6;
+    color: var(--tmw-navy);
+}
+.plan-chip.missed { background: #fff0ef; color: #b42318; }
+.plan-chip.hard { background: #fff6e6; color: #8a4b08; }
+
+#legacy-slot .wrapper {
+    color: var(--tmw-navy);
+    font-family: inherit;
+}
+
+#legacy-slot coaching-panel {
+    color: var(--tmw-navy);
+}
+
+#legacy-slot coaching-panel input,
+#legacy-slot coaching-panel textarea,
+#legacy-slot coaching-panel select {
+    color: var(--tmw-navy);
+}
+
+#legacy-slot .coach-card,
+#legacy-slot .coach-step,
+#legacy-slot .coach-intro,
+#legacy-slot .coach-hero,
+#legacy-slot .device-card {
+    border-color: var(--platform-border);
+    background: #fff;
+    color: var(--tmw-navy);
+}
+
+#legacy-slot details > summary { color: var(--tmw-navy); }
+
+.training-calendar--header,
+.training-calendar--day,
+.training-calendar--grid-wrap,
+.training-calendar--entry {
+    color: var(--tmw-navy);
+}
+
+.device-card--header--label,
+.list--heading,
+.list--sub-heading,
+.device-card--tile--header {
+    color: var(--tmw-navy);
+}
+
+.device-card--tile,
+.device-card--tile--value,
+.list--row--outer,
+.list--row--inner {
+    color: var(--tmw-navy);
+    border-color: var(--platform-border);
+}
+
+.connection-switch--indicator.on,
+.connection-icon-switch--indicator.on,
+.connection-icon-switch--indicator.success {
+    background: var(--tmw-blue);
+    box-shadow: 0 0 0 3px rgba(18, 101, 255, .16);
+}
+
+#legacy-slot .training-calendar {
+    padding: 26px;
+    border: 1px solid var(--platform-border);
+    border-radius: var(--tmw-radius);
+    background: #fff;
+    box-shadow: var(--tmw-shadow);
+}
+
+#platform .training-calendar--navigation button,
+#platform .training-calendar--navigation button:not(.secondary):not(.danger),
+.training-calendar button,
+.training-calendar select {
+    border-color: var(--platform-border);
+    border-radius: 9px;
+    background: #fff;
+    color: var(--tmw-navy);
     box-shadow: none;
 }
-#platform input, #platform textarea, #platform select {
-    border-radius: 0 6px 0 0;
-    background: #0b141c;
-    border-color: #5b7583;
-}
-#platform input:disabled { color: var(--platform-muted); }
-#platform :focus-visible { outline-color: #a8fff2; }
-#platform .library-import:focus-within { outline-color: #a8fff2; }
-#platform-message:not(:empty), #platform-content > p[role="alert"] { border-radius: 0 10px 0 0; border-left: 3px solid var(--cyber-cyan); }
-#platform-message.error, #platform-content > p[role="alert"] { border-left-color: #ffadb7; }
-#legacy-slot .coach-card { border-radius: 0 16px 0 0; }
 
+#platform .training-calendar--navigation button {
+    min-height: 40px;
+    padding: 8px 14px;
+}
+
+#platform .training-calendar--grid-wrap {
+    border-color: var(--platform-border);
+    border-radius: 14px;
+    background: #fff;
+}
+
+#platform .training-calendar--grid th,
+#platform .training-calendar--grid td {
+    border-right-color: var(--platform-border);
+    border-bottom-color: var(--platform-border);
+}
+
+#platform .training-calendar--grid thead th {
+    background: #edf3f7;
+    color: var(--tmw-slate);
+}
+
+#platform .training-calendar--grid .calendar-week {
+    background: #f4f7fa;
+}
+
+#platform .training-calendar--grid .calendar-day {
+    background: #fff;
+}
+
+#platform .training-calendar--grid .calendar-day.outside-month {
+    background: #f8fafc;
+}
+
+#platform .training-calendar--grid .calendar-day.selected {
+    background: #eff6ff;
+    box-shadow: inset 3px 0 var(--tmw-blue);
+}
+
+#platform .training-calendar .calendar-day--select {
+    color: var(--tmw-navy);
+}
+
+.training-calendar--week-label,
+.training-calendar--week-summary,
+.training-calendar--week-summary > div,
+.calendar-day--month,
+.calendar-event--metrics,
+.training-calendar--source {
+    color: var(--platform-muted);
+}
+
+.training-calendar--week-summary h3,
+.training-calendar--week-summary strong,
+.calendar-event--name {
+    color: var(--tmw-navy);
+}
+
+.calendar-day.today .calendar-day--number {
+    color: var(--tmw-blue);
+}
+
+#platform .calendar-event {
+    border-color: #bed4ed;
+    background: #edf5ff;
+}
+
+#platform .calendar-event.is-activity {
+    border-color: #a8e4ef;
+    background: #edfafe;
+}
+
+#platform .training-calendar .calendar-event--select {
+    color: var(--tmw-navy);
+}
+
+.calendar-event--source { color: var(--tmw-blue); }
+.calendar-event.is-activity .calendar-event--source { color: #008fb4; }
+#platform .training-calendar .activity-icon { color: #008fb4; }
+
+.training-calendar--day {
+    padding-top: 24px;
+    border-top: 1px solid var(--platform-border);
+}
+
+.training-calendar--entry {
+    border-color: var(--platform-border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(7, 24, 39, .05);
+}
+
+.training-calendar--entry.is-activity { border-color: #a8dfea; }
+.training-calendar--eyebrow { color: var(--tmw-blue); }
+.training-calendar--meta span {
+    border-color: #c7d8e7;
+    background: #f1f6fa;
+    color: var(--tmw-navy);
+}
+
+.auth-screen {
+    padding: 32px;
+    background: linear-gradient(135deg, #f4f7fa 0%, #edf5ff 100%);
+}
+
+.auth-screen::before {
+    content: "";
+    position: fixed;
+    inset: auto -5% 0 auto;
+    width: 60vw;
+    height: 14vw;
+    background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan));
+    opacity: .09;
+    transform: skewX(-25deg);
+    pointer-events: none;
+}
+
+.auth-card {
+    border-color: var(--platform-border);
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: var(--tmw-shadow);
+}
+
+.auth-card .brand {
+    width: min(100%, 420px);
+    height: 82px;
+    background-image: url("../images/logo/too-many-watts-horizontal-dark.png");
+    background-position: center;
+    background-size: contain;
+    padding: 0;
+}
+.auth-card .brand::after { display: none; }
+
+.skip-link {
+    left: 268px;
+    border-radius: 8px;
+    background: var(--tmw-navy);
+    color: #fff !important;
+}
+
+/* The rider screen deliberately returns to a low-distraction instrument view. */
 body.platform-app[data-route="player"] {
-    background-image: none;
+    --platform-bg: #050c14;
+    --platform-panel: #0b1723;
+    --platform-surface: #0f1e2c;
+    --platform-border: #274154;
+    --platform-text: #eef6fb;
+    --platform-muted: #8fa5b7;
+    --platform-accent: var(--tmw-cyan);
+    --background-color: #050c14;
+    --background-color-2: #0b1723;
+    --foreground-color: #eef6fb;
+    --foreground-color-inactive: #8fa5b7;
+    --border-color: #274154;
+    --input-color: #eef6fb;
+    background: #050c14;
 }
-body.platform-app[data-route="player"] .platform-header::after { display: none; }
-.platform-app .ride-panel { box-shadow: none; }
-.platform-app .ride-metric strong { text-shadow: none; }
-body.platform-app[data-route="player"] { --platform-accent: #70eadc; }
-body.platform-app[data-route="player"] h1 { text-transform: none; font-weight: 700; }
-body.platform-app[data-route="player"] button:not(.secondary):not(.danger) { border-color: transparent; }
 
-@media (min-width: 701px) and (min-resolution: 1.5dppx), (min-width: 1921px) {
-    :root { --city-backdrop: url('/src/images/city-road-3840.webp'); }
+body.platform-app[data-route="player"]::before { display: none; }
+body.platform-app[data-route="player"] .platform-header::after { background: #203649; }
+body.platform-app[data-route="player"] #platform h1,
+body.platform-app[data-route="player"] #platform h2 { color: #fff; text-transform: none; }
+body.platform-app[data-route="player"] #platform .eyebrow { color: var(--tmw-cyan); }
+body.platform-app[data-route="player"] #platform p { color: #c4d2de; }
+body.platform-app[data-route="player"] #platform .muted { color: #8fa5b7; }
+body.platform-app[data-route="player"] .ride-panel {
+    border-color: #274154;
+    border-radius: 20px;
+    background: #08131f;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .35);
+}
+body.platform-app[data-route="player"] .ride-metric {
+    border: 1px solid #1d3447;
+    background: #0c1c2a;
+}
+body.platform-app[data-route="player"] .ride-metric strong { color: #fff; }
+body.platform-app[data-route="player"] .ride-metric.primary strong { color: var(--tmw-cyan); }
+body.platform-app[data-route="player"] .ride-workout-profile { background: #07111c; border-color: #274154; }
+body.platform-app[data-route="player"] .ride-profile-plot { border-color: #274154; }
+body.platform-app[data-route="player"] .ride-profile-grid { stroke: #294255; }
+body.platform-app[data-route="player"] .ride-instruction {
+    border-left-color: var(--tmw-cyan);
+    background: #0d2a35;
+}
+body.platform-app[data-route="player"] .ride-train-now {
+    border-color: #274154;
+    background: #0b1d2b;
+}
+body.platform-app[data-route="player"] #platform button:not(.secondary):not(.danger) {
+    border-color: var(--tmw-blue);
+    background: var(--tmw-blue);
+    color: #fff;
+}
+body.platform-app[data-route="player"] #platform button.secondary {
+    border-color: #36536a;
+    background: #102535;
+    color: #eef6fb;
+}
+body.platform-app[data-route="player"] #platform input,
+body.platform-app[data-route="player"] #platform select,
+body.platform-app[data-route="player"] #platform textarea {
+    border-color: #36536a;
+    background: #091725;
+    color: #eef6fb;
+}
+
+@keyframes tmw-enter {
+    from { opacity: 0; transform: translate3d(0, 12px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    #platform-content > * {
+        animation: tmw-enter .42s cubic-bezier(.2, .75, .2, 1) both;
+    }
+    #platform-content > :nth-child(2) { animation-delay: 45ms; }
+    #platform-content > :nth-child(3) { animation-delay: 90ms; }
+    #platform-content > :nth-child(4) { animation-delay: 135ms; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+    #platform button:hover,
+    #platform .button:hover { transform: translate3d(0, -1px, 0); }
+    #platform button:not(.secondary):not(.danger):hover,
+    #platform .button:not(.secondary):hover {
+        border-color: var(--tmw-blue);
+        background: var(--tmw-blue);
+    }
+    #platform .sidebar nav a:hover {
+        background: #102436;
+        color: #fff;
+        transform: translate3d(2px, 0, 0);
+    }
+    #platform .workout-card:hover {
+        border-color: #a9c8ee;
+        transform: translate3d(0, -2px, 0);
+    }
+}
+
+@media (max-width: 1100px) {
+    #main-content { padding: 34px 30px 70px; }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .overview-lead { grid-template-columns: minmax(0, 1.35fr) minmax(280px, .8fr); }
+    .overview-week { grid-template-columns: minmax(170px, .6fr) minmax(300px, 1fr); }
+    .overview-week .week-chart { grid-column: 1 / -1; grid-row: 3; height: 105px; }
 }
 
 @media (max-width: 700px) {
-    /* Mobile browsers ignore fixed backgrounds; a fixed layer avoids the tiled seams of a scrolling cover image. */
-    body.platform-app { background-image: none; }
     body.platform-app::before {
-        content: '';
-        position: fixed;
-        inset: 0 0 auto;
-        height: 100vh;
-        height: 100lvh;
-        z-index: -1;
-        pointer-events: none;
-        background: linear-gradient(180deg, rgba(8, 11, 16, .86), rgba(8, 11, 16, .74) 50%, rgba(8, 11, 16, .6)),
-            var(--city-backdrop) center / cover no-repeat;
+        top: 96px;
+        right: -32vw;
+        width: 84vw;
     }
-    body.platform-app[data-route="player"]::before { display: none; }
-    .platform-app .sidebar { box-shadow: none; }
-    .platform-app .hero { background: #13212b; }
-    .platform-app .platform-header::after { opacity: .5; }
+
+    .mobile-app .sidebar {
+        padding: 7px 6px max(7px, env(safe-area-inset-bottom));
+        border: 0;
+        background: rgba(7, 24, 39, .98);
+        box-shadow: 0 -10px 34px rgba(7, 24, 39, .14);
+        backdrop-filter: blur(18px);
+    }
+
+    .mobile-app #platform .sidebar nav .tab {
+        color: #8fa3b5;
+        border-radius: 10px;
+    }
+    .mobile-app #platform .sidebar nav .tab.active { color: #fff; }
+    .mobile-app #platform .sidebar nav .tab.active svg {
+        border-radius: 10px;
+        background: var(--tmw-blue);
+        color: #fff;
+    }
+    .mobile-app #platform .more-menu-panel {
+        border-color: #20384a;
+        border-radius: 22px 22px 0 0;
+        background: var(--tmw-navy);
+        box-shadow: 0 -20px 50px rgba(7, 24, 39, .35);
+    }
+    .mobile-app #platform .sidebar .more-menu a {
+        border-color: #294255;
+        border-radius: 12px;
+        background: #102437;
+        color: #fff;
+    }
+    .mobile-app #platform .sidebar .more-menu a[aria-current="page"] {
+        border-color: var(--tmw-cyan);
+        background: #12304a;
+        color: var(--tmw-cyan);
+    }
+
+    .mobile-app #main-content { padding: 20px 14px calc(var(--tab-bar-height) + 28px); }
+    .mobile-app .platform-header {
+        min-height: 64px;
+        margin-bottom: 22px;
+    }
+    .mobile-app .platform-header::after { inset: auto 0 -12px; }
+    .mobile-app #platform .mobile-brand-mark {
+        width: 56px;
+        height: 36px;
+        background: url("../images/logo/too-many-watts-mark.png") left center / contain no-repeat;
+    }
+    .mobile-app #platform h1 {
+        font-size: 30px;
+        letter-spacing: -.045em;
+    }
+    .mobile-app #platform h2 { font-size: 18px; }
+    .mobile-app .panel,
+    .mobile-app .dashboard-grid > .panel {
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(7, 24, 39, .05);
+    }
+    .overview-page { gap: 14px; }
+    .overview-lead,
+    .overview-bottom { grid-template-columns: minmax(0, 1fr); }
+    #platform .overview-today {
+        min-height: 420px;
+        justify-content: flex-end;
+        padding: 30px 24px;
+    }
+    .overview-today::before {
+        top: 42px;
+        right: -16%;
+        width: 78%;
+    }
+    #platform .overview-today .hero-title {
+        max-width: 10ch;
+        margin-bottom: 14px;
+        font-size: clamp(42px, 13vw, 58px);
+        line-height: .98;
+    }
+    #platform .overview-today-copy {
+        font-size: 15px;
+        line-height: 1.55;
+    }
+    .overview-today-actions { display: grid; grid-template-columns: 1fr; }
+    #platform .overview-today-actions .button,
+    #platform .overview-today-actions button { width: 100%; }
+    #platform .overview-goal-card {
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+        min-height: 0;
+        padding: 20px;
+    }
+    #platform .overview-goal-card strong { font-size: 18px; }
+    .overview-week { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .overview-week-heading { grid-row: auto; }
+    .overview-week .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+    .overview-week .stat strong { font-size: 28px; }
+    .overview-week > .muted,
+    .overview-week .week-chart {
+        grid-column: 1;
+        grid-row: auto;
+    }
+    .overview-week .week-chart { height: 92px; }
+    .mobile-app #platform .hero-title { font-size: 28px; }
+    .mobile-app #platform .overview-today .hero-title {
+        max-width: 10ch;
+        font-size: clamp(42px, 13vw, 58px);
+    }
+    .mobile-app .stat strong { font-size: 27px; }
+    .mobile-app .week-chart { border-bottom: 0; }
+    .mobile-app #platform .daily-choice { min-height: 84px; }
+    .mobile-app #legacy-slot #view--settings-settings {
+        border-color: var(--platform-border);
+        border-radius: 16px;
+        background: #fff;
+    }
+    .mobile-app #platform .activity-overview > .mobile-details,
+    .mobile-app #platform .activity-periods > .mobile-details,
+    .mobile-app #platform .activity-overview .activity-load-state,
+    .mobile-app #platform .activity-overview > p,
+    .mobile-app #platform .activity-history + .muted {
+        border-color: var(--platform-border);
+        border-radius: 14px;
+        background: #fff;
+    }
+    .mobile-app #legacy-slot .training-calendar--day {
+        border-color: var(--platform-border);
+        border-radius: 16px;
+        background: #fff;
+    }
+    .mobile-app #platform .training-calendar .calendar-day.selected .calendar-day--number {
+        background: var(--tmw-blue);
+        color: #fff;
+    }
+    .mobile-app #platform .training-calendar .calendar-day.today .calendar-day--number {
+        box-shadow: inset 0 0 0 2px var(--tmw-blue);
+        color: var(--tmw-blue);
+    }
+    .mobile-app #platform .training-calendar--navigation button:not(.secondary):not(.danger) {
+        border-color: var(--platform-border);
+        background: #fff;
+        color: var(--tmw-navy);
+    }
+    .mobile-app #legacy-slot .device-card { color: var(--tmw-navy); }
+    .mobile-app .skip-link { left: 14px; }
+
+    body.mobile-app[data-route="player"] {
+        background: #050c14;
+    }
+    body.mobile-app[data-route="player"] .platform-header::after { display: none; }
+    body.mobile-app[data-route="player"] .mobile-brand-mark {
+        background-image: url("../images/logo/too-many-watts-mark-white.png");
+    }
+    .mobile-app[data-route="player"] .ride-actions {
+        background: rgba(8, 19, 31, .94);
+        backdrop-filter: blur(12px);
+    }
 }
 
 @media (forced-colors: active) {
-    body.platform-app, .platform-app .hero, .platform-app .sidebar { background-image: none; }
-    body.platform-app::before { display: none; }
-    .platform-app .platform-header::after { display: none; }
-    #platform .brand { text-shadow: none; }
-    .platform-app .panel, .platform-app .workout-card, .platform-app .hero { box-shadow: none; }
-    #platform .sidebar nav a[aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
+    body.platform-app { background: Canvas; }
+    body.platform-app::before,
+    .platform-header::after,
+    .panel::after,
+    .workout-card::after { display: none; }
+    .sidebar { border-right: 1px solid CanvasText; }
+    #platform .brand { background: none; color: LinkText; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #platform *, #legacy-slot * {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
 }
