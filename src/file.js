@@ -82,11 +82,11 @@ class FileHandler {
         }
         let ext = file.name.split('.').pop();
         switch(ext) {
-            case 'zwo': return self.readTextFile(file); break;
-            case 'erg': return self.readTextFile(file); break;
-            case 'mrc': return self.readTextFile(file); break;
-            case 'fit': return self.readBinaryFile(file); break;
-            default:           self.unsupportedFormat(); break;
+            case 'zwo': return self.readTextFile(file);
+            case 'erg': return self.readTextFile(file);
+            case 'mrc': return self.readTextFile(file);
+            case 'fit': return self.readBinaryFile(file);
+            default: return self.unsupportedFormat();
         }
     }
     /** Wrap contents with a media-type label so the browser can treat them as a downloadable file. */

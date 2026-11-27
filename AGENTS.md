@@ -10,6 +10,9 @@ Too Many Watts / Athlima is a browser-only indoor training application. It is Pa
 
 - For project conventions: `.github/instructions/athlima-standards.instructions.md`
 - For security-sensitive work: `.github/instructions/athlima-security.instructions.md`
+- For testing: `.github/instructions/athlima-testing.instructions.md`
+- For Docker, CI/CD, and releases: `.github/instructions/athlima-devops.instructions.md`
+- For product/domain and brand behavior: `.github/instructions/athlima-product.instructions.md`
 - For the task's architecture or domain: `README.md`, `doc/code-guide.md`, `doc/coaching.md`, `doc/backend.md`, or `doc/intervals-guide.md`
 - For the selected role: `.github/agents/<agent>.agent.md`
 

@@ -1,11 +1,14 @@
 # Copilot Instructions
 
-Read [AGENTS.md](../../AGENTS.md) before changing the repository.
+Read [AGENTS.md](../AGENTS.md) before changing the repository.
 
 Load these shared files as needed:
 
 - [Athlima Standards](./instructions/athlima-standards.instructions.md)
 - [Athlima Security](./instructions/athlima-security.instructions.md)
+- [Athlima Testing](./instructions/athlima-testing.instructions.md)
+- [Athlima DevOps](./instructions/athlima-devops.instructions.md)
+- [Athlima Product](./instructions/athlima-product.instructions.md)
 
 Load the repository role matching the task:
 

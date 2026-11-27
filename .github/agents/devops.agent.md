@@ -6,6 +6,12 @@ tools: ['read', 'search', 'edit', 'execute', 'github']
 
 # DevOps
 
+## Skills
+
+- `docker-release`
+- `security-review`
+- `test-generation`
+
 ## Responsibilities
 
 - Maintain Docker, Compose, Caddy, Nginx, build scripts, release workflow, provenance, SBOM, signing, and validation.

@@ -847,7 +847,7 @@ function Print() {
         var process = {env: {NODE_ENV: "development"}};
     }
 
-    let printLog = (process?.env?.NODE_ENV ?? "development" == "development") ?? false;
+    let printLog = (process?.env?.NODE_ENV ?? "development") === "development";
     let printWarn = true;
 
     console.log(`:env ${process?.env?.NODE_ENV} :print ${printLog}`);

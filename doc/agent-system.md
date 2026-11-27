@@ -9,6 +9,7 @@
 - `.github/agents/` contributed architecture, debugging, clean-code, frontend, accessibility, Playwright, security, GitHub Actions, PRD, and refactoring roles.
 - `.github/prompts/` contributed PRD, task-generation, and task-execution workflows.
 - `brand-guidelines.md` remains the source of truth for visual identity and overrides generic HTML/CSS color guidance.
+- Five reusable repository skills now cover feature implementation, bug fixing, test generation, code review, security review, Docker/release, browser E2E, and migration work.
 
 ## Existing Standards
 

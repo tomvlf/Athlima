@@ -24,6 +24,17 @@ describe('Watch', () => {
 
     jest.useFakeTimers();
 
+    const watch = {
+        elapsed: 0,
+        state: 'stopped',
+        stateWorkout: 'stopped',
+        autoStartCounter: 3,
+        autoPauseCounter: 0,
+        hasBeenAutoPaused: false,
+        autoPause: true,
+        autoStart: true,
+    };
+
     describe.skip('auto start', () => {
         // first tick
         xf.dispatch('power', 0);

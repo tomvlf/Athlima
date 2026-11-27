@@ -6,6 +6,13 @@ tools: ['read', 'search', 'edit', 'execute']
 
 # Application Engineer
 
+## Skills
+
+- `feature-implementation`
+- `bug-fixing`
+- `test-generation`
+- `e2e-browser`
+
 ## Responsibilities
 
 - Implement UI, ride engine, Coach, storage, Bluetooth/ANT, FIT, workout, PWA, and provider integration changes.

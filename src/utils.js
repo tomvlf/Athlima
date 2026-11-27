@@ -200,7 +200,7 @@ async function backoff(args = {}) {
         } catch(e) {
             if(max <= 0) return fail(e);
             if(exists(msg)) console.log(`:retry :${msg} :in ${rate(wait)} :left ${max}`);
-            await delay(wait);
+            await new Promise(resolve => setTimeout(resolve, wait));
             return recur(max-1, rate(wait), fn, success, fail, msg);
         }
     }

@@ -16,7 +16,7 @@ Implemented on the `security/hardening` branch:
 |---|---|
 | 0 — baseline (`npm ci`, build) | Done |
 | 1.1 — SHA-pinned actions, Dependabot | Done |
-| 1.2 — provenance/SBOM, keyless cosign signing | Done (verify on first publish) |
+| 1.2 — provenance/SBOM, keyless cosign signing | Done; workflow verifies the promoted digest |
 | 1.3 — `npm ci --ignore-scripts` | Done and build-verified locally |
 | 1.4 — `:latest` kept, digest verification documented | Done |
 | 2 — COOP/CORP, HSTS `includeSubDomains`, Caddy error headers | Done |
@@ -26,9 +26,9 @@ Implemented on the `security/hardening` branch:
 | 5.2 — persistence request and Settings storage summary | Done |
 | 5.3 — delete all local data | Done |
 | 6 — `noopener`, debug log cleanup | Done |
-| 7 — full release verification | Pending on a real browser/container |
+| 7 — full release verification | Docker and browser smoke checks implemented; real BLE/ANT+ and Caddy checks remain hardware/infrastructure evidence |
 
-Verification performed here: `npm test` (891 passing), `npm run build` after a
+Verification performed here: `npm test` (979 passing), `npm run build` after a
 `--ignore-scripts` install, and the
 generated header file inspected for the new directives. Remaining checks need a
 real browser and container: Trusted Types runtime behaviour across every screen,

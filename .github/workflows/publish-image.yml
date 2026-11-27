@@ -75,10 +75,69 @@ jobs:
         with:
           category: "/language:javascript-typescript"
 
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Lint source and test files
+        run: npm run lint
+      - name: Run Jest coverage gate
+        run: npm run test:coverage
+      - name: Build Parcel assets
+        run: npm run build
+      - name: Check internal documentation links
+        run: npm run check:links
+
+  e2e:
+    name: browser-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright journeys
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+  scheduled-audit:
+    if: github.event_name == 'schedule'
+    name: scheduled-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit direct and transitive dependencies
+        run: npm audit --package-lock-only --audit-level=high
+      - name: Check internal documentation links
+        run: npm run check:links
+
   validate:
     name: container-security
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: [quality, e2e]
     permissions:
       contents: read
     steps:
@@ -190,8 +249,8 @@ jobs:
           retention-days: 7
 
   publish:
-    if: github.event_name != 'pull_request'
-    needs: [validate, actionlint, secret-scan, codeql]
+    if: github.event_name == 'push'
+    needs: [validate, actionlint, secret-scan, codeql, quality, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production

@@ -6,6 +6,12 @@ tools: ['read', 'search', 'execute']
 
 # Reviewer
 
+## Skills
+
+- `code-review`
+- `test-generation`
+- `security-review`
+
 ## Responsibilities
 
 - Review changes against shared standards and nearest tests.

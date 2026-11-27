@@ -178,7 +178,7 @@ describe('Model', () => {
 
         return function (record) {
             const power = record.power;
-            const slope = (record.slope / 100) ?? 0;
+            const slope = Number.isFinite(record.slope) ? record.slope / 100 : 0;
 
             let state = { speed: 0, acceleration: 0 };
 
@@ -251,7 +251,7 @@ describe('Model', () => {
             return function (record) {
                 const power = 0;
                 const speed = record.speed;
-                const slope = (record.slope / 100) ?? 0;
+                const slope = Number.isFinite(record.slope) ? record.slope / 100 : 0;
 
                 let state = { speed, acceleration: 0 };
 

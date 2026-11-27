@@ -7,8 +7,16 @@
 
 export default {
     testEnvironment: 'jsdom',
-    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/server/'],
+    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/server/', '<rootDir>/test/e2e/'],
     setupFiles: ['<rootDir>/test/jest-setup.js'],
+    coverageThreshold: {
+        global: {
+            statements: 68,
+            branches: 68,
+            functions: 65,
+            lines: 69,
+        },
+    },
     transform: {
         '^.+\\.js$': 'babel-jest',
     },

@@ -14,3 +14,6 @@ env.js
 .env.*
 .parcel-cache/
 /data/
+/coverage/
+/test-results/
+/playwright-report/

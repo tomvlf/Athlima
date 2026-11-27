@@ -561,7 +561,6 @@ class FTP extends Model {
         } else {
             return zones[6];
         }
-        return zones[0];
     }
 }
 
@@ -1558,7 +1557,6 @@ class PropAccumulator extends MetaProp {
             prop: '',
 
             event: '',
-            prev: 0,
             count: 0,
         };
     }

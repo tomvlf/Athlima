@@ -6,6 +6,12 @@ tools: ['read', 'search', 'edit', 'execute']
 
 # Architect
 
+## Skills
+
+- `migration-work`
+- `feature-implementation`
+- `code-review`
+
 ## Responsibilities
 
 - Interpret requirements against the browser-only architecture and existing domain rules.

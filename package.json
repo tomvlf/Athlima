@@ -12,6 +12,11 @@
     ],
     "scripts": {
         "test": "jest",
+        "test:coverage": "jest --coverage",
+        "test:e2e": "playwright test",
+        "lint": "eslint src test scripts jest.config.js eslint.config.js playwright.config.js",
+        "check:links": "node scripts/check-internal-links.mjs",
+        "check": "npm run lint && npm run test:coverage && npm run build && npm run check:links",
         "start": "parcel",
         "starttls": "parcel --cert ./dev_cert/cert.pem --key ./dev_cert/key.pem",
         "build": "parcel build && node scripts/rename-build-output.mjs"
@@ -20,10 +25,14 @@
         "@babel/core": "^7.29.7",
         "@babel/plugin-transform-dynamic-import": "^7.29.7",
         "@babel/plugin-transform-modules-commonjs": "^7.29.7",
+        "@eslint/js": "^10.0.1",
         "@parcel/packager-raw-url": "^2.16.4",
         "@parcel/transformer-webmanifest": "^2.16.4",
+        "@playwright/test": "^1.65.1",
         "babel-jest": "^30.5.2",
+        "eslint": "^10.16.0",
         "fake-indexeddb": "^6.2.6",
+        "globals": "^17.14.0",
         "jest": "^30.5.2",
         "jest-environment-jsdom": "^30.5.2",
         "parcel": "^2.16.4",
@@ -36,5 +45,9 @@
         "lmdb": false,
         "msgpackr-extract": false,
         "unrs-resolver": false
+    },
+    "overrides": {
+        "glob": "14.0.6",
+        "minimatch": "11.0.9"
     }
 }

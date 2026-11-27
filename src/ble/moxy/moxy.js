@@ -113,15 +113,15 @@ function DeviceControl(args = {}) {
             'doNotChange': 0,
             '2sDataSmoothing': 1, // Default
             '2sNoDataSmoothing': 2,
-            '2sDataSmoothing': 3,
+            '1sNoDataSmoothing': 3,
             '0.5sNoDataSmoothing': 4,
             '1sDataSmoothing': 5,
         },
         antProfile: {
             doNotChange: 0,
             matchExisting: 1,
-            matchExisting: 2,
-            matchExisting: 3,
+            profile2: 2,
+            profile3: 3,
         },
         antBleSelector: {
             doNotChange: 0,

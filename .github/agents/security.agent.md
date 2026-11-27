@@ -6,6 +6,12 @@ tools: ['read', 'search', 'edit', 'execute', 'github']
 
 # Security
 
+## Skills
+
+- `security-review`
+- `migration-work`
+- `code-review`
+
 ## Responsibilities
 
 - Trace untrusted data through HTML sinks, XML/FIT/ZWO/backup parsers, providers, storage, and CI.

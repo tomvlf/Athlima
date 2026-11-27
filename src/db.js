@@ -509,7 +509,6 @@ xf.reg(`ant:search:found`, (x, db) => {
     if(!x || x.deviceNumber === undefined) return;
     if(includesDevice(db.antSearchList, x)) return;
     db.antSearchList.push(x);
-    db.antSearchList = db.antSearchList;
 });
 xf.reg(`ant:search:stopped`, (x, db) => {
     db.antSearchList = [];
