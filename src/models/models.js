@@ -817,7 +817,7 @@ class Activity extends Model {
      * status and announce the result to activity controls.
      */
     async upload(service, id) {
-        let record = await idb.get('activity', id);
+        let record = await idb.getChecked('activity', id);
         if(!record) throw new Error('Activity not found.');
         if(service === 'intervals') {
             const res = await this.api[service].uploadWorkout(record);
@@ -834,7 +834,7 @@ class Activity extends Model {
      */
     async download(id) {
         const self = this;
-        const record = await idb.get('activity', id);
+        const record = await idb.getChecked('activity', id);
         fileHandler.download()(
             record.blob,
             self.fileName(record.summary.timestamp),
@@ -866,7 +866,7 @@ class Activity extends Model {
      * summary fields from saved ride payloads when present.
      */
     async restore() {
-        const records = await idb.getAll('activity') ?? [];
+        const records = await idb.getAllChecked('activity');
 
         // migrate summary.status String to {strava: String, intervals: String}
         records.forEach((record) => {
@@ -1028,7 +1028,7 @@ class Workouts extends Model {
     /** Combine stored workouts with built-ins, preferring a stored copy when their IDs match. */
     async restore(db) {
         const self = this;
-        const workouts = await idb.getAll(`${self.name}`) ?? [];
+        const workouts = await idb.getAllChecked(`${self.name}`);
 
         if(empty(workouts)) {
             return self.default;
@@ -1217,7 +1217,7 @@ function Session(args = {}) {
      * clear empty recovery data.
      */
     async function restore(db) {
-        const sessions = await idb.getAll(`${name}`);
+        const sessions = await idb.getAllChecked(`${name}`);
         xf.dispatch(`${name}:restore`, sessions);
         console.log(`:idb :restore '${name}' :length ${sessions.length}`);
 

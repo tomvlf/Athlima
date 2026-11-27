@@ -8,13 +8,18 @@
 import { syncRecordedRides } from '../../src/storage/ride-sync.js';
 import { idb } from '../../src/storage/idb.js';
 
-jest.mock('../../src/storage/idb.js', () => ({idb: {getAll: jest.fn(), putChecked: jest.fn()}}));
+jest.mock('../../src/storage/idb.js', () => ({idb: {getAllChecked: jest.fn(), putChecked: jest.fn()}}));
 
 beforeEach(() => jest.clearAllMocks());
 
+test('outbox read failures are surfaced instead of reported as empty', async () => {
+    idb.getAllChecked.mockRejectedValue(new Error('Storage unavailable'));
+    await expect(syncRecordedRides({recordRide: jest.fn()})).rejects.toThrow('Storage unavailable');
+});
+
 test('retries persisted pending recordings by stable identity and clears outbox only after a successful server write', async () => {
     const pending = {id: 'ride', pendingSync: true, ride: {id: 'ride', duration: 123}, coachingWorkoutId: 'session'};
-    idb.getAll.mockResolvedValue([pending, {id: 'old', pendingSync: false}]);
+    idb.getAllChecked.mockResolvedValue([pending, {id: 'old', pendingSync: false}]);
     const service = {recordRide: jest.fn().mockResolvedValue(null)};
     expect(await syncRecordedRides(service)).toEqual({synced: 1, planReviewRequired: true});
     expect(service.recordRide).toHaveBeenCalledWith(pending.ride, 'session');
@@ -26,14 +31,14 @@ test('Train Now hand-off is saved without requesting plan review', async () => {
         id: 'train-now', pendingSync: true,
         ride: {id: 'train-now', duration: 1800, trainNow: true}, summary: {},
     };
-    idb.getAll.mockResolvedValue([pending]);
+    idb.getAllChecked.mockResolvedValue([pending]);
     const service = {recordRide: jest.fn().mockResolvedValue(null)};
     expect(await syncRecordedRides(service)).toEqual({synced: 1, planReviewRequired: false});
     expect(service.recordRide).toHaveBeenCalledWith(pending.ride, undefined);
 });
 
 test('mixed pending hand-offs still request plan review for a normal ride', async () => {
-    idb.getAll.mockResolvedValue([
+    idb.getAllChecked.mockResolvedValue([
         {id: 'train-now', pendingSync: true, ride: {trainNow: true}, summary: {}},
         {id: 'normal', pendingSync: true, ride: {trainNow: false}, summary: {}},
     ]);
@@ -42,20 +47,20 @@ test('mixed pending hand-offs still request plan review for a normal ride', asyn
 });
 
 test('failed remote write leaves local outbox pending and surfaces the error', async () => {
-    idb.getAll.mockResolvedValue([{pendingSync: true, ride: {id: 'ride'}}]);
+    idb.getAllChecked.mockResolvedValue([{pendingSync: true, ride: {id: 'ride'}}]);
     await expect(syncRecordedRides({recordRide: jest.fn().mockRejectedValue(new Error('Offline'))}))
         .rejects.toThrow('Offline');
     expect(idb.putChecked).not.toHaveBeenCalled();
 });
 
 test('failed local acknowledgement surfaces the failure so a later idempotent retry is possible', async () => {
-    idb.getAll.mockResolvedValue([{pendingSync: true, ride: {id: 'ride'}}]);
+    idb.getAllChecked.mockResolvedValue([{pendingSync: true, ride: {id: 'ride'}}]);
     idb.putChecked.mockRejectedValueOnce(new Error('Quota exceeded'));
     await expect(syncRecordedRides({recordRide: jest.fn().mockResolvedValue(null)})).rejects.toThrow('Quota exceeded');
 });
 
 test('outbox report counts only records that remain pending after partial success', async () => {
-    idb.getAll.mockResolvedValue([
+    idb.getAllChecked.mockResolvedValue([
         {id: 'one', pendingSync: true, ride: {id: 'one'}},
         {id: 'two', pendingSync: true, ride: {id: 'two'}},
         {id: 'three', pendingSync: false, ride: null},

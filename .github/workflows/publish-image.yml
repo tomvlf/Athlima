@@ -324,7 +324,7 @@ jobs:
           set -euo pipefail
           cosign sign --yes "$IMAGE"
           cosign verify \
-            --certificate-identity-regexp='https://github.com/tomvlf/Athlima/.+' \
+            --certificate-identity-regexp='^https://github\.com/tomvlf/too-many-watts/\.github/workflows/publish-image\.yml@refs/(heads/master|tags/v.+)$' \
             --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
             "$IMAGE"
 

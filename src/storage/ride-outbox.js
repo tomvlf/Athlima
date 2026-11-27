@@ -5,7 +5,7 @@
 import { idb } from './idb.js';
 
 export async function getRideOutboxStatus() {
-    const records = await idb.getAll('activity');
+    const records = await idb.getAllChecked('activity');
     const pending = records.filter(record => record.pendingSync === true && record.ride);
     return {
         pending: pending.length,
@@ -15,7 +15,7 @@ export async function getRideOutboxStatus() {
 
 /** Drain all pending records, continue through ordinary failures, and return a per-ride report. */
 export async function drainRideOutbox(service) {
-    const records = await idb.getAll('activity');
+    const records = await idb.getAllChecked('activity');
     const results = [];
     const successfulIds = new Set();
     let planReviewRequired = false;

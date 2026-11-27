@@ -987,7 +987,7 @@ export async function launchPlatform(root) {
             void run(async () => {
                 const {models} = await import('../models/models.js');
                 const {idb} = await import('../storage/idb.js');
-                const record = await idb.get('activity', upload);
+                const record = await idb.getChecked('activity', upload);
                 const result = await models.api.intervals.uploadWorkout(record);
                 if(result !== ':success') throw new Error('Intervals.icu upload failed. Check the connection and retry.');
                 report('Recording sent to Intervals.icu. Run Sync to refresh provider metadata.');

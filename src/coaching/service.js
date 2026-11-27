@@ -49,10 +49,13 @@ export function validateCoachingState(state) {
         throw new Error('Invalid coaching history; export or repair it before continuing.');
     }
     if(state.profile) validateProfile(state.profile);
-    if(state.plan) {
-        if(!Array.isArray(state.plan.workouts)) {
-            throw new Error('Invalid coaching plan; export or repair it before continuing.');
-        }
+    const validPlan = plan => typeof plan.id === 'string' && plan.id.length > 0 &&
+        Array.isArray(plan.workouts) && Array.isArray(plan.weeks);
+    if(state.plan && !validPlan(state.plan)) {
+        throw new Error('Invalid coaching plan; export or repair it before continuing.');
+    }
+    if(!state.revisions.every(validPlan)) {
+        throw new Error('Invalid coaching plan history; export or repair it before continuing.');
     }
     return state;
 }

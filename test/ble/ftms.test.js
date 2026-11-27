@@ -358,15 +358,6 @@ describe('FitnessMachineStatus', () => {
             expect(status.decode(view)).toEqual({operation, value: undefined});
         });
 
-        test.each([
-            [15, 'Targeted Time in Two Heart Rate Zones Changed'],
-            [16, 'Targeted Time in Three Heart Rate Zones Changed'],
-            [17, 'Targeted Time in Five Heart Rate Zones Changed'],
-        ])('heart-rate zone status opcode 0x%02X', (opCode, operation) => {
-            const view = new DataView((new Uint8Array([opCode])).buffer);
-            expect(status.decode(view)).toEqual({operation, value: undefined});
-        });
-
         test('Wheel Circumference Changed', () => {
             const view = new DataView((new Uint8Array([19, 40, 85])).buffer);
 

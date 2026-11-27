@@ -139,8 +139,7 @@ function DeviceControl(args = {}) {
         antBleSelector: values.antBleSelector.doNotChange,
     };
 
-    // Build the command buffer. The retained legacy radio-setting write currently
-    // overwrites updateType's byte, so this does not preserve a requested update rate.
+    // Build the command buffer, retaining the legacy radio settings in their own byte.
     function encode(args = {}) {
         const dataControl = args.dataControl ?? defaults.dataControl;
         const updateType  = args.updateType ?? defaults.updateType;

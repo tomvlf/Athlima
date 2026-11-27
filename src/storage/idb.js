@@ -134,7 +134,8 @@ function IDB(args = {}) {
     /**
      * Run one named database operation. A missing collection returns undefined; a request failure
      * is logged and returns an empty array. Use the Checked write/delete methods when callers must
-     * distinguish failure from success.
+     * distinguish failure from success. Use the Checked read methods when unavailable storage
+     * must not be mistaken for empty data.
      */
     function transaction(storeName, method, param = undefined, type = 'readonly') {
         if(!db.objectStoreNames.contains(storeName)) return undefined;
@@ -156,6 +157,46 @@ function IDB(args = {}) {
             console.error(`:idb :error :${method} :store '${storeName}'`, err);
             return [];
         });
+    }
+
+    /**
+     * Read one or more records and reject if the request or its transaction cannot complete.
+     * Critical restoration flows use this instead of the legacy empty-array fallback.
+     */
+    function readChecked(storeName, method, param = undefined) {
+        return new Promise((resolve, reject) => {
+            if(!db?.objectStoreNames.contains(storeName)) {
+                reject(new Error(`IndexedDB store is unavailable: ${storeName}`));
+                return;
+            }
+            let result;
+            let request;
+            let transaction;
+            try {
+                transaction = db.transaction(storeName, 'readonly');
+                const store = transaction.objectStore(storeName);
+                request = param === undefined ? store[method]() : store[method](param);
+                request.onsuccess = () => { result = request.result; };
+                request.onerror = () => reject(request.error ||
+                    new Error(`Unable to read IndexedDB store: ${storeName}`));
+                transaction.oncomplete = () => resolve(result);
+                transaction.onabort = () => reject(transaction.error ||
+                    new Error(`Unable to read IndexedDB store: ${storeName}`));
+                transaction.onerror = () => reject(transaction.error || request.error ||
+                    new Error(`Unable to read IndexedDB store: ${storeName}`));
+            } catch(error) {
+                transaction?.abort();
+                reject(error);
+            }
+        });
+    }
+
+    function getChecked(storeName, key) {
+        return readChecked(storeName, 'get', key);
+    }
+
+    function getAllChecked(storeName) {
+        return readChecked(storeName, 'getAll');
     }
 
     /**
@@ -257,7 +298,9 @@ function IDB(args = {}) {
         putManyChecked,
         putChecked,
         get,
+        getChecked,
         getAll,
+        getAllChecked,
         remove,
         removeChecked,
         clear,
