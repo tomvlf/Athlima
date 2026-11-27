@@ -212,10 +212,10 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
     expect(root.textContent).toContain('<script>not executable</script>');
     expect(root.querySelector('script')).toBeNull();
     expect(root.textContent).toContain('200 W');
-    expect(root.querySelector('.interval-list').textContent).toContain('Cadence: Self-selected');
+    expect(root.querySelector('.workout-detail--blocks').textContent).toContain('Self-selected');
     db.workouts[0].intervals[0].steps[0].cadence = 95;
     await go('workout/ride');
-    expect(root.querySelector('.interval-list').textContent).toContain('Cadence: 95 rpm');
+    expect(root.querySelector('.workout-detail--blocks').textContent).toContain('95 rpm');
     delete db.workouts[0].intervals[0].steps[0].cadence;
     const dispatch = xf.dispatch;
     const startWorkout = root.querySelector('[data-action="start-workout"]');

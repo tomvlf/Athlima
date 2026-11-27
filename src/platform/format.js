@@ -103,10 +103,19 @@ export function profileGraph(workout) {
                 <polygon points="0,48 ${coordinates} 100,48"></polygon><polyline points="${coordinates}"></polyline>
             </svg></div>`;
     }
+    const color = power => {
+        if(power < .54) return '#636468';
+        if(power < .75) return '#328AFF';
+        if(power < .87) return '#44A5AB';
+        if(power < .94) return '#57C057';
+        if(power < 1.05) return '#F8C73A';
+        if(power < 1.20) return '#FF663A';
+        return '#FE340B';
+    };
     const bars = steps.map(step => html`<span style="flex-grow:${Number(step.duration) || 1};
             height:${Math.max(8, Math.min(100, (Number(step.power) || 0) < 9
                 ? (Number(step.power) || 0) * 62 : Number(step.power) / 5))}%;
-            --bar:${Number(step.power) > 1 ? '#f5ad65' : Number(step.power) > 0.75 ? '#9a99ff' : '#52d9b2'}"></span>`);
+            --bar:${color(Number(step.power) || 0)}"></span>`);
     return html`<div class="profile-graph" role="img" aria-label="Workout target power profile">
         ${bars}</div>`;
 }

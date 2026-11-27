@@ -2649,6 +2649,30 @@ coaching-panel textarea {
     line-height: 1.35;
 }
 
+.training-calendar--period-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 7px;
+}
+
+.training-calendar--period-summary span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    padding: 4px 8px;
+    border: 1px solid var(--platform-border);
+    border-radius: 999px;
+    color: var(--platform-muted);
+    font-size: 11px;
+}
+
+.training-calendar--period-summary strong {
+    color: var(--foreground-color);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
 .training-calendar--navigation,
 .training-calendar--entry-actions {
     display: flex;
@@ -2828,6 +2852,11 @@ coaching-panel textarea {
 .calendar-event.is-activity {
     border-color: rgba(101, 228, 190, 0.24);
     background: #1c3032;
+}
+
+.calendar-event.is-coaching {
+    border-color: rgba(245, 173, 101, .28);
+    background: #302b25;
 }
 
 #platform .training-calendar .calendar-event--select {

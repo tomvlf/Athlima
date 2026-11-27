@@ -376,6 +376,16 @@ class TrainingCalendar extends HTMLElement {
         );
     }
 
+    periodSummary(dates) {
+        const entries = dates.flatMap(date => this.entriesForDate(date));
+        const completed = entries.filter(entry => entry.source === 'activity').length;
+        return {
+            total: entries.length,
+            completed,
+            planned: entries.length - completed,
+        };
+    }
+
     // Return the month heading/grid in standard chronological order on every viewport.
     renderMonth() {
         const dates = this.monthDates();
@@ -387,9 +397,15 @@ class TrainingCalendar extends HTMLElement {
             month: 'long',
             year: 'numeric',
         });
+        const summary = this.periodSummary(dates);
         return `
             <header class="training-calendar--header">
-                <h2 class="list--sub-heading">${heading}</h2>
+                <div><h2 class="list--sub-heading">${heading}</h2>
+                    <div class="training-calendar--period-summary" aria-label="${summary.total} calendar sessions">
+                        <span><strong>${summary.total}</strong> sessions</span>
+                        <span><strong>${summary.planned}</strong> planned</span>
+                        <span><strong>${summary.completed}</strong> completed</span>
+                    </div></div>
                 <div class="training-calendar--navigation">
                     <button type="button" data-action="previous" aria-label="Previous month">
                         ${navigationIcon('previous')}
@@ -699,9 +715,15 @@ class TrainingCalendar extends HTMLElement {
         const heading = sameMonth
             ? `${startDate.toLocaleDateString(undefined, {month: 'long'})} ${startDate.getDate()}–${endDate.getDate()}, ${endDate.getFullYear()}`
             : `${startDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} – ${endDate.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}`;
+        const summary = this.periodSummary(dates);
         return `
             <header class="training-calendar--header">
-                <h2 class="list--sub-heading">${escapeHTML(heading)}</h2>
+                <div><h2 class="list--sub-heading">${escapeHTML(heading)}</h2>
+                    <div class="training-calendar--period-summary" aria-label="${summary.total} calendar sessions">
+                        <span><strong>${summary.total}</strong> sessions</span>
+                        <span><strong>${summary.planned}</strong> planned</span>
+                        <span><strong>${summary.completed}</strong> completed</span>
+                    </div></div>
                 <div class="training-calendar--navigation">
                     <button type="button" data-action="week-previous" aria-label="Previous week">
                         ${navigationIcon('previous')}

@@ -62,6 +62,31 @@ function workoutBlocks(workout) {
     const steps = (workout?.intervals || []).flatMap(interval => interval.steps || []);
     const blocks = [];
     for(let index = 0; index < steps.length;) {
+        const first = steps[index];
+        let end = index + 1;
+        let direction = 0;
+        while(end < steps.length) {
+            const previous = steps[end - 1];
+            const current = steps[end];
+            const sameMode = previous.duration === current.duration &&
+                previous.cadence === current.cadence &&
+                previous.slope === current.slope &&
+                Number.isFinite(previous.power) && Number.isFinite(current.power);
+            const delta = current.power - previous.power;
+            if(!sameMode || direction * delta < 0) break;
+            const nextDirection = Math.sign(delta);
+            if(direction && nextDirection && direction !== nextDirection) break;
+            direction = nextDirection || direction;
+            end += 1;
+        }
+        if(end - index >= 3 && direction) {
+            const rampSteps = steps.slice(index, end);
+            blocks.push({steps: [first, steps[end - 1]], repeats: 1,
+                totalDuration: rampSteps.reduce((total, step) => total + step.duration, 0),
+                ramp: direction > 0 ? 'Build' : 'Ease'});
+            index = end;
+            continue;
+        }
         let best = null;
         for(const patternSize of [2, 1]) {
             if(index + patternSize > steps.length) continue;
@@ -601,7 +626,7 @@ export async function launchPlatform(root) {
                             <span class="workout-detail--block-dot" style="--block-zone:${zone?.color || '#8b9aaa'}"></span>
                             <div><strong>${block.repeats > 1
                                 ? `${block.repeats} × ${block.steps.map(step => time(step.duration)).join(' / ')}`
-                                : time(primary.duration)}</strong>
+                                : block.ramp ? `${block.ramp} ${time(block.totalDuration)}` : time(primary.duration)}</strong>
                                 <span>${target(primary)}${secondary ? ` / ${target(secondary)}` : ''}</span></div>
                             <span class="workout-detail--block-time">${time(block.totalDuration)}</span>
                             <span class="workout-detail--block-cadence">${run ? 'Effort' : cadenceSummary(block.steps)}</span>

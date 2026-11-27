@@ -1337,6 +1337,16 @@ body[data-route="coach"] #legacy-slot coaching-panel {
     background: #edfafe;
 }
 
+#platform .calendar-event.is-coaching {
+    border-color: #eac58d;
+    background: #fff8eb;
+}
+
+#platform .calendar-event.is-planned {
+    border-color: #c9b9ee;
+    background: #f5f0ff;
+}
+
 #platform .training-calendar .calendar-event--select {
     color: var(--tmw-navy);
 }
@@ -1372,6 +1382,10 @@ body[data-route="coach"] #legacy-slot coaching-panel {
 }
 
 .training-calendar--entry.is-activity { border-color: #a8dfea; }
+.training-calendar--entry.is-activity {
+    border-color: #a8dfea;
+    background: linear-gradient(145deg, #fff 0%, #f5fcfd 100%);
+}
 .training-calendar--eyebrow { color: var(--tmw-blue); }
 .training-calendar--meta span {
     border-color: #c7d8e7;

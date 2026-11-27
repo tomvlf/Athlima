@@ -131,6 +131,11 @@ body.platform-app, body:has(.auth-screen) { margin: 0; background: var(--platfor
 .workout-detail--blocks li > div span { color: var(--platform-muted); font-size: 11px; }
 .workout-detail--block-time { color: var(--tmw-navy); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .workout-detail--block-cadence { color: var(--platform-muted); font-size: 11px; text-align: right; }
+@media (max-width: 1200px) {
+    .workout-detail--hero { grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.3fr); }
+    .workout-detail--actions { grid-column: 1 / -1; grid-template-columns: minmax(160px, 240px) minmax(160px, 200px); }
+    .workout-detail--grid { grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); }
+}
 .library-empty { grid-column: 1 / -1; padding: 30px; border: 1px solid var(--platform-border); border-radius: 16px; background: var(--platform-panel); color: var(--platform-muted); }
 .profile-graph { display: flex; align-items: end; height: 110px; gap: 2px; margin: 24px 0; overflow: hidden; border-bottom: 1px solid #465766; }
 .profile-graph > span { min-width: 1px; background: var(--bar); border-radius: 3px 3px 0 0; }
@@ -753,6 +758,9 @@ html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-i
 .mobile-app #legacy-slot .training-calendar { padding: 0; }
 .mobile-app #legacy-slot .training-calendar--header { gap: 8px; margin-bottom: 8px; }
 .mobile-app #platform .training-calendar--header h2 { margin: 0; font-size: 20px; text-transform: none; }
+.mobile-app #platform .training-calendar--period-summary { gap: 5px; margin-top: 6px; }
+.mobile-app #platform .training-calendar--period-summary span { padding: 3px 6px; font-size: 9px; }
+.mobile-app #platform .training-calendar--period-summary strong { font-size: 11px; }
 .mobile-app #platform .training-calendar--navigation { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px minmax(0, 1fr); gap: 6px; width: 100%; }
 .mobile-app #platform .training-calendar--navigation button { min-height: 44px; padding: 6px 10px; font-size: 14px; }
 .mobile-app #platform .training-calendar--navigation button[aria-label] { font-size: 24px; line-height: 1; }

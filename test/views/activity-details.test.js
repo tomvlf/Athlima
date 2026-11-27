@@ -19,3 +19,17 @@ test('escapes untrusted Train Now reasoning', () => {
     expect(element.querySelector('img')).toBeNull();
     expect(element.textContent).toContain('<img src=x onerror=alert(1)>');
 });
+
+test('prioritizes useful activity metrics before the full list', () => {
+    const element = document.createElement('div');
+    element.innerHTML = renderActivityDetails({
+        duration: 3600, distance: 32000, averagePower: 214, averageHeartRate: 151,
+        details: {trainingLoad: 87},
+    });
+
+    expect(element.querySelector('.activity-insight--metrics').textContent)
+        .toContain('214 W');
+    expect(element.querySelector('.activity-insight--metrics').textContent)
+        .toContain('151 bpm');
+    expect(element.querySelector('details.activity-details')).not.toBeNull();
+});

@@ -97,6 +97,8 @@ describe('training calendar', () => {
         expect(day.querySelector('.power-profile--target')).not.toBeNull();
         expect(calendar.querySelector('button figure, button button')).toBeNull();
         expect(calendar.querySelector('[data-action="week"]')).not.toBeNull();
+        expect(calendar.querySelector('.training-calendar--period-summary').textContent)
+            .toMatch(/1\s*sessions\s*1\s*planned\s*0\s*completed/);
         const plannedWeek = day.closest('tr').querySelector('.training-calendar--week-summary');
         expect(plannedWeek.textContent).toMatch(/Planned\s*1/);
         expect(calendar.querySelector('[data-week-start="2026-10-26"] .training-calendar--week-summary')
