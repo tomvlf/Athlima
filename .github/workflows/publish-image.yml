@@ -6,18 +6,83 @@ on:
   push:
     branches: [master]
     tags: ["v*"]
+  schedule:
+    - cron: "17 4 * * 1"
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_NAME: ghcr.io/tomvlf/too-many-watts
+
 jobs:
-  validate:
-    name: container-security
+  actionlint:
+    name: workflow-lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    name: dependency-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: codeql
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+      - uses: github/codeql-action/init@74c1aea9df7c0f02e9b7bfe4a8935abf2e5e3aa6 # v3.39.5
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@74c1aea9df7c0f02e9b7bfe4a8935abf2e5e3aa6 # v3.39.5
+        with:
+          category: "/language:javascript-typescript"
+
+  validate:
+    name: container-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
 
       - name: Build runtime image for validation
         run: |
@@ -39,86 +104,189 @@ jobs:
           test -n "$healthcheck"
           test "$healthcheck" != "null"
 
-      - name: Generate image vulnerability report
+      - name: Save image for scanning and promotion
+        run: |
+          docker save --output "$PWD/too-many-watts.tar" too-many-watts:scan
+          cd "$PWD"
+          sha256sum too-many-watts.tar > too-many-watts.tar.sha256
+
+      - name: Generate image vulnerability report and SBOM
         shell: bash
         run: |
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD:/workspace" \
-            aquasec/trivy:0.67.2 image \
+            aquasec/trivy@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08 \
+            image \
+            --input /workspace/too-many-watts.tar \
             --skip-version-check \
             --scanners vuln \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --exit-code 0 \
             --format json \
-            --output /workspace/trivy-image.json \
-            too-many-watts:scan
+            --output /workspace/trivy-image.json
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            aquasec/trivy@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08 \
+            image \
+            --input /workspace/too-many-watts.tar \
+            --skip-version-check \
+            --scanners vuln \
+            --format cyclonedx \
+            --output /workspace/sbom.cdx.json
 
       - name: Enforce image vulnerability policy
         shell: bash
         run: |
           docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.67.2 image \
+            -v "$PWD:/workspace" \
+            aquasec/trivy@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08 \
+            image \
+            --input /workspace/too-many-watts.tar \
             --skip-version-check \
             --scanners vuln \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
-            --format table \
-            too-many-watts:scan
+            --format table
+
+      - name: Smoke test the validated image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -d --name too-many-watts-validation -p 18080:8080 too-many-watts:scan
+          trap 'docker rm -f too-many-watts-validation >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18080/ >/dev/null; then break; fi
+            sleep 1
+          done
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/)" = "200"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/mobile)" = "200"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18080/)" = "405"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/.git/config)" = "404"
+          headers="$(curl -sSI http://127.0.0.1:18080/ | tr -d '\r')"
+          grep -qi '^Content-Security-Policy:' <<<"$headers"
+          grep -qi '^X-Content-Type-Options: nosniff' <<<"$headers"
+          grep -qi '^X-Frame-Options: DENY' <<<"$headers"
 
       - name: Upload image scan report
         if: ${{ always() && hashFiles('trivy-image.json') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: trivy-too-many-watts-image
           path: trivy-image.json
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload the validated image and SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: validated-image
+          path: |
+            too-many-watts.tar
+            too-many-watts.tar.sha256
+            sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
     if: github.event_name != 'pull_request'
-    needs: validate
+    needs: [validate, actionlint, secret-scan, codeql]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
     permissions:
       contents: read
       packages: write
+      attestations: write
       id-token: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
 
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: validated-image
+          path: validated-image
+
+      - name: Verify and load the validated image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/validated-image"
+          sha256sum -c too-many-watts.tar.sha256
+          docker load --input too-many-watts.tar
+
+      - uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         id: meta
         with:
-          images: ghcr.io/tomvlf/too-many-watts
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
 
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        id: build
+      - name: Promote the exact validated image
+        id: push
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t tags <<<"${{ steps.meta.outputs.tags }}"
+          test "${#tags[@]}" -gt 0
+          first_tag=""
+          for tag in "${tags[@]}"; do
+            test -n "$tag"
+            docker tag too-many-watts:scan "$tag"
+            docker push "$tag" | tee /tmp/docker-push.log
+            if test -z "$first_tag"; then first_tag="$tag"; fi
+          done
+          digest="$(grep -oE 'sha256:[0-9a-f]{64}' /tmp/docker-push.log | tail -n 1)"
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=${{ env.IMAGE_NAME }}@$digest" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
         with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          provenance: mode=max
-          sbom: true
-          build-args: |
-            TOO_MANY_WATTS_BUILD_VERSION=build-${{ github.run_number }}.${{ github.run_attempt }}
-            TOO_MANY_WATTS_BUILD_REVISION=${{ github.sha }}
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
-      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
 
-      - name: Sign published image
+      - name: Sign and verify the promoted image
         env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "ghcr.io/tomvlf/too-many-watts@${DIGEST}"
+          IMAGE: ${{ steps.push.outputs.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cosign sign --yes "$IMAGE"
+          cosign verify \
+            --certificate-identity-regexp='https://github.com/tomvlf/Athlima/.+' \
+            --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
+            "$IMAGE"
+
+      - name: Smoke test the published image
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE"
+          docker run --rm -d --name too-many-watts-published -p 18081:8080 "$IMAGE"
+          trap 'docker rm -f too-many-watts-published >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18081/ >/dev/null; then break; fi
+            sleep 1
+          done
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/)" = "200"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/mobile)" = "200"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18081/)" = "405"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/.git/config)" = "404"
+          headers="$(curl -sSI http://127.0.0.1:18081/ | tr -d '\r')"
+          grep -qi '^Content-Security-Policy:' <<<"$headers"
+          grep -qi '^X-Content-Type-Options: nosniff' <<<"$headers"
+          grep -qi '^X-Frame-Options: DENY' <<<"$headers"

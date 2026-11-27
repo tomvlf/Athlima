@@ -6,13 +6,30 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      docker-base-images:
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+      day: monday
     # Build tooling only; the shipped app has no runtime package imports.
     open-pull-requests-limit: 5
+    groups:
+      npm-development-dependencies:
+        patterns:
+          - "*"

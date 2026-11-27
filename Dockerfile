@@ -1,6 +1,6 @@
 # Stage 1 uses Node to turn editable source into browser-ready files.
 # The digest fixes the exact base image; it must be updated deliberately for patches.
-FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS build
+FROM docker.io/library/node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS build
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN npm test -- --runInBand \
 # Stage 2 serves only the built files. Use the maintained NGINX unprivileged registry; the former
 # nginxinc registry is archived. Pin the patched stable release and let the vulnerability gate verify
 # its complete runtime package set before publication.
-FROM nginx/nginx-unprivileged:1.30.8-alpine
+FROM docker.io/nginx/nginx-unprivileged:1.30.8-alpine@sha256:637c35e46af7bc0dd3d3bcf7162e004e13ab3b370fde7cd416e2ac410b5a985a
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/security-headers.conf /etc/nginx/security-headers.conf
@@ -34,6 +34,6 @@ USER 101:101
 EXPOSE 8080
 # Check that the local web page responds, not that a trainer or provider is connected.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["wget", "-q", "--spider", "http://<scrubbed-url-domain>"]
+    CMD ["wget", "-q", "--spider", "http://127.0.0.1:8080/"]
 ENTRYPOINT ["nginx"]
 CMD ["-g", "daemon off;"]
