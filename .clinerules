@@ -1,0 +1,4 @@
+Read AGENTS.md first.
+Follow `.github/instructions/athlima-standards.instructions.md`.
+Use `.github/instructions/athlima-security.instructions.md` for security-sensitive work.
+Load only the relevant `.github/agents/*.agent.md` definition.
