@@ -156,15 +156,15 @@ describe('IDB', () => {
         await expect(idb.getAllChecked('missing')).rejects.toThrow('IndexedDB store is unavailable');
     });
 
-    test('checked writes commit recording and cleared checkpoint atomically', async () => {
+    test('checked writes and reads complete on committed transactions', async () => {
         await idb.open('recording-atomic', 1, ['activity', 'session']);
         await idb.putChecked('session', {id: 0, elapsed: 60});
         await idb.putManyChecked([
             ['activity', {id: 'ride', pendingSync: true}],
             ['session', {id: 0, elapsed: 0}],
         ]);
-        expect(await idb.get('activity', 'ride')).toEqual({id: 'ride', pendingSync: true});
-        expect(await idb.get('session', 0)).toEqual({id: 0, elapsed: 0});
+        expect(await idb.getChecked('activity', 'ride')).toEqual({id: 'ride', pendingSync: true});
+        expect(await idb.getAllChecked('session')).toEqual([{id: 0, elapsed: 0}]);
     });
 
     test('a failed checkpoint write rolls back the recording instead of leaving duplicate recovery state', async () => {
