@@ -118,7 +118,7 @@ function chooseMinutes(profile, state, rules, day) {
 
 /** Turn the chosen signals into a compact, readable explanation without medical claims. */
 function explain({family, minutes, level, state, sessions, lastHard,
-    missedRecent, phaseType, goal, rules}) {
+    missedRecent, phaseType, goal, rules, restDay}) {
     const label = FAMILY_LABELS[family] || family;
     const labelStart = label[0].toUpperCase() + label.slice(1);
     const reasons = [];
@@ -155,6 +155,9 @@ function explain({family, minutes, level, state, sessions, lastHard,
     if(phaseType === 'recovery' || phaseType === 'taper') {
         reasons.push(`the current Coach phase is ${phaseType}, which keeps intensity low`);
     }
+    if(restDay) {
+        reasons.push('today is marked for recovery and rest in Coach, so an optional ride stays easy');
+    }
     if(isHardFamily(family)) {
         const lastTwo = sessions.slice(-2).map(session => FAMILY_LABELS[session.family] || session.family);
         if(lastTwo.length) reasons.push(`your last completed ${lastTwo.length === 1 ? 'session was' : 'sessions were'} ${lastTwo.join(' and ')}`);
@@ -172,10 +175,10 @@ function explain({family, minutes, level, state, sessions, lastHard,
 /**
  * Generate the most suitable ad-hoc cycling session for the current moment.
  *
- * @param {{data: object, asOf: string}} args - Coach data and the rider's local day (YYYY-MM-DD).
+ * @param {{data: object, asOf: string, restDay?: boolean}} args - Coach data and the rider's local day (YYYY-MM-DD).
  * @returns {{workout: object, reasoning: string, signals: object}} The session and its explanation.
  */
-export function trainNowWorkout({data, asOf} = {}) {
+export function trainNowWorkout({data, asOf, restDay = false} = {}) {
     if(!data?.profile) throw new Error('Set up your Coach profile before using Train Now.');
     const profile = data.profile;
     if(sportOf(profile) !== 'cycling') {
@@ -224,7 +227,7 @@ export function trainNowWorkout({data, asOf} = {}) {
         !risingEffort && !lowCompletion && !['recovery', 'taper'].includes(phaseType) && missedRecent < 2 &&
         minutes >= rules.minimumHardSessionMinutes && hardThisWeek < maxHard &&
         (lastHard == null || lastHard >= rules.minimumHardSeparationDays);
-    const recovery = state.readiness?.status === 'caution' || highLoad;
+    const recovery = restDay || state.readiness?.status === 'caution' || highLoad;
     const family = recovery ? 'recovery' : hardAllowed ? chooseHardFamily(goal, sessions) : 'endurance';
     const successful = state.successfulSessionsByFamily?.[family] ?? 0;
     const level = family === 'recovery' ? 1 : Math.min(rules.progressionMaximumLevel,
@@ -237,7 +240,7 @@ export function trainNowWorkout({data, asOf} = {}) {
     const history = (data.plan?.workouts || []).filter(workout => workout.date <= asOf);
     const workout = prescribeWorkout(slot, {history, rules, allowTechnique: family === 'endurance'});
     const reasoning = explain({family: workout.family, minutes: workout.duration / 60, level,
-        state, sessions, lastHard, missedRecent, phaseType, goal, rules});
+        state, sessions, lastHard, missedRecent, phaseType, goal, rules, restDay});
     const signals = {
         family: workout.family, requestedFamily: family, minutes: workout.duration / 60, level,
         readiness: state.readiness?.status ?? 'unknown', sufficiency: state.sufficiency,
@@ -246,7 +249,7 @@ export function trainNowWorkout({data, asOf} = {}) {
         recentRpeTrend: state.recentRpeTrend?.value ?? null,
         completionRate: state.completionRate?.value ?? null,
         recentFamilies: sessions.slice(-3).map(session => session.family),
-        goal: goal?.type ?? null, ignoredPlannedWorkout: true,
+        goal: goal?.type ?? null, restDay: Boolean(restDay), ignoredPlannedWorkout: true,
     };
     workout.title = `Train Now · ${workout.title}`;
     workout.trainNow = {reasoning, signals, generatedAt: new Date().toISOString()};

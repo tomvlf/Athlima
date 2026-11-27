@@ -398,7 +398,10 @@ export async function launchPlatform(root) {
         }
         if(daily.status === 'rest') {
             return todayCard('Recovery today', escape(title), escape(reason),
-                html`${link('library', 'Choose an easy session', 'button')}${link('coach', 'Open full Coach', 'button secondary')}`, snapshot);
+                daily.canTrainNow
+                    ? html`<button type="button" data-action="train-now" data-rest-day="true">Feeling like riding today?</button>
+                        ${link('coach', 'Open full Coach', 'button secondary')}`
+                    : html`${link('library', 'Choose an easy session', 'button')}${link('coach', 'Open full Coach', 'button secondary')}`, snapshot);
         }
         if(!data?.goal && !data?.plan) return todayCard('Ready when you are', 'Make today count.',
             'Start a focused ride in one click, or give Coach a goal and let it build the path ahead.', unconfiguredActions);
@@ -1221,6 +1224,7 @@ export async function launchPlatform(root) {
                 if(db.watchStatus !== 'stopped' || db.elapsed > 0) {
                     throw new Error('Finish and save your current ride before starting another workout.');
                 }
+                const restDay = event.target.closest('[data-action="train-now"]')?.dataset.restDay === 'true';
                 if(intervals.status().connected) {
                     report('Syncing the latest Intervals.icu profile and activity history before Train Now...');
                     try {
@@ -1236,7 +1240,7 @@ export async function launchPlatform(root) {
                 }
                 const data = coachingData();
                 const {trainNowWorkout} = await import('../coaching/train-now.js');
-                const result = trainNowWorkout({data, asOf: today(data)});
+                const result = trainNowWorkout({data, asOf: today(data), restDay});
                 if(data.profile.ftp !== db.ftp) {
                     throw new Error('Update device FTP to match your Coach profile before using Train Now.');
                 }

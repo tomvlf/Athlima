@@ -134,4 +134,28 @@ test('Train Now refuses an unfinished ride, then generates and starts an ad-hoc 
     expect(trainNowWorkout).toHaveBeenCalledWith(expect.objectContaining({data: syncedData}));
     expect(root.querySelector('#platform-message').textContent).toMatch(/last known Coach data/i);
     confirm.mockRestore();
+
+    const restData = {
+        profile,
+        goal: {name: 'Keep moving', type: 'general_fitness'},
+        plan: {status: 'active', trainingPaused: false, workouts: [], adaptations: [], weeks: []},
+        activities: [],
+        snapshots: [],
+        safetyStatus: null,
+    };
+    coachingData.mockReturnValue(restData);
+    window.location.hash = '/';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    xf.dispatch('coaching:changed');
+    await settle();
+    const restPrompt = root.querySelector('[data-action="train-now"][data-rest-day="true"]');
+    expect(restPrompt).not.toBeNull();
+    expect(restPrompt.textContent).toMatch(/feeling like riding today/i);
+    trainNowWorkout.mockClear();
+    restPrompt.click();
+    await settle();
+    expect(trainNowWorkout).toHaveBeenCalledWith(expect.objectContaining({
+        data: restData,
+        restDay: true,
+    }));
 });

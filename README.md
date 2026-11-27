@@ -118,7 +118,10 @@ when history and recovery support it, and the Coach avoids repeating the same
 hard focus too often. The ride screen shows **Why this workout?** with the
 reasons, and the explanation is kept with the recorded activity. Train Now is
 available without an active plan, but requires a configured cycling profile and
-FTP. Running profiles receive guidance to use the calendar instead.
+FTP. On a Coach recovery/rest day, the dashboard and Coach ask **Feeling like
+riding today?**; opting in keeps the ad-hoc workout in the recovery family while
+leaving the planned rest day unchanged. Running profiles receive guidance to use
+the calendar instead.
 
 ## Current repo status
 

@@ -36,7 +36,10 @@ export function todayRecommendationView(recommendation) {
         ${session ? `<p><strong>${escape(session.family)}</strong> · ${minutes(session.duration)} · Effort ${escape(session.expectedRpe ?? '—')}/10</p>` : ''}
         <p>${escape(visibleText(recommendation.reason))}</p>
         ${recommendation.snapshotDate ? `<p class="muted">Evidence snapshot: ${escape(formatMicrocycleDate(recommendation.snapshotDate))}</p>` : ''}
-        ${recommendation.status === 'review' ? `<button type="button" class="secondary" data-coach="microcycle-review">${microcycleMessage('reviewBeforeTraining')}</button>` : ''}</section>`;
+        ${recommendation.status === 'review' ? `<button type="button" class="secondary" data-coach="microcycle-review">${microcycleMessage('reviewBeforeTraining')}</button>` : ''}
+        ${recommendation.status === 'rest' && recommendation.canTrainNow
+            ? '<div class="button-row"><button type="button" data-action="train-now" data-rest-day="true">Feeling like riding today?</button></div>'
+            : ''}</section>`;
 }
 
 /**

@@ -60,6 +60,13 @@ test('chooses recovery when subjective readiness reaches caution', () => {
     expect(result.workout.trainNow.reasoning).toMatch(/caution threshold|recent load/);
 });
 
+test('chooses recovery when the rider opts in from a planned rest day', () => {
+    const result = trainNowWorkout({data: data(), asOf: start, restDay: true});
+    expect(result.workout.family).toBe('recovery');
+    expect(result.signals.restDay).toBe(true);
+    expect(result.workout.trainNow.reasoning).toMatch(/recovery and rest/i);
+});
+
 test('chooses recovery when recent load is well above the longer baseline', () => {
     const hard = [1, 2, 3].map(i => normalizeActivity({
         id: `hard-${i}`, start: `${addDays(start, -i)}T09:00:00Z`, duration: 7200,

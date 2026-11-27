@@ -96,6 +96,15 @@ describe('Adaptive Microcycle Engine review UI', () => {
             reason: '<img src=x>',
             session: {family: 'threshold', duration: 2700, expectedRpe: 7},
         })).not.toContain('<b>');
+        const rest = todayRecommendationView({
+            status: 'rest',
+            title: 'Recovery and rest today',
+            reason: 'Keep today easy.',
+            canTrainNow: true,
+        });
+        expect(rest).toContain('Feeling like riding today?');
+        expect(rest).toContain('data-action="train-now"');
+        expect(rest).toContain('data-rest-day="true"');
 
         const forecast = microcycleForecastView({
             current: {sessions: [{

@@ -239,6 +239,11 @@ and penalised when that family was used recently. Duration uses the configured
 limit for today when available, otherwise a typical session length, capped by
 the recent longest session and the configured spike limit.
 
+When today's Coach guidance is recovery and rest, the dashboard and Coach expose
+the optional **Feeling like riding today?** action. That action uses the same
+selector but forces a recovery-family session; the calendar remains a rest day,
+and the generated ride is still recorded as an unplanned Train Now session.
+
 The **Why this workout?** panel on the ride screen shows the reasoning (readiness,
 load, recent sessions, missed sessions, phase and progression level). The same
 text is stored with the recorded activity and shown under its metrics. This is

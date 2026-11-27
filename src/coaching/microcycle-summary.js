@@ -4,7 +4,7 @@
  * workout, modify a plan or persist data.
  */
 
-import { localDay } from './domain.js';
+import { localDay, sportOf } from './domain.js';
 import { microcycleReadiness } from './microcycle-context.js';
 
 export const visibleCoachText = value => {
@@ -53,7 +53,7 @@ export function todayRecommendation({data, state = data?.snapshots?.at(-1), now 
             : 'Recent training evidence is limited';
         return {day, status: 'rest', session: null, title: 'Recovery and rest today',
             reason: visibleCoachText(`${recentLoad}. This rest is chosen from your recent training, current recovery signals and active goal; no missed work or catch-up is added.`),
-            snapshotDate: state.date};
+            snapshotDate: state.date, canTrainNow: sportOf(data.profile) === 'cycling'};
     }
     if(state.sufficiency !== 'supported' || readiness.status === 'monitor') {
         return {day, status: 'review', session, title: 'Review today’s session first',

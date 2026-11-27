@@ -29,7 +29,7 @@ test('pauses or asks for review when safety/readiness evidence requires it', () 
 
 test('returns a conservative rest message when nothing is planned today', () => {
     expect(todayRecommendation({data: data({plan: {...data().plan, workouts: []}}), now: `${start}T10:00:00Z`}))
-        .toMatchObject({status: 'rest', session: null, title: 'Recovery and rest today'});
+        .toMatchObject({status: 'rest', session: null, title: 'Recovery and rest today', canTrainNow: true});
 });
 
 test('requires setup or a dated snapshot and does not invent missing evidence', () => {
