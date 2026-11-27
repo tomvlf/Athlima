@@ -62,6 +62,9 @@ test('Train Now refuses an unfinished ride, then generates and starts an ad-hoc 
 
     const button = root.querySelector('[data-action="train-now"]');
     expect(button).not.toBeNull();
+    expect(root.querySelector('.overview-today')).not.toBeNull();
+    expect(root.querySelector('#daily-goal-form')).toBeNull();
+    expect(root.querySelector('[data-today-goal-card]').textContent).toMatch(/set a goal/i);
 
     db.elapsed = 300;
     trainNowWorkout.mockClear();

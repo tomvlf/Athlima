@@ -271,6 +271,222 @@ body.platform-app::before {
 
 .dashboard-grid { gap: 20px; }
 
+.overview-page {
+    display: grid;
+    gap: 22px;
+    max-width: 1280px;
+}
+
+.overview-editor {
+    max-width: 920px;
+}
+
+.overview-lead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.72fr) minmax(300px, .9fr);
+    gap: 22px;
+    align-items: stretch;
+}
+
+.overview-lead-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.overview-side {
+    display: grid;
+    min-width: 0;
+}
+
+#platform .overview-today {
+    display: flex;
+    min-height: 455px;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(34px, 5vw, 70px);
+    margin: 0;
+    isolation: isolate;
+    background:
+        linear-gradient(112deg, rgba(255, 255, 255, .98) 0%, rgba(244, 249, 255, .96) 58%, rgba(222, 244, 255, .84) 100%);
+}
+
+#platform .overview-today::before {
+    width: 52%;
+    height: auto;
+    aspect-ratio: 830 / 255;
+    top: 42px;
+    right: -9%;
+    bottom: auto;
+    border: 0;
+    background: url("../images/logo/too-many-watts-mark.png") center / contain no-repeat;
+    opacity: .075;
+    transform: rotate(-5deg);
+}
+
+#platform .overview-today::after {
+    position: absolute;
+    inset: auto auto 44px -84px;
+    width: 280px;
+    height: 14px;
+    border: 0;
+    background: linear-gradient(90deg, var(--tmw-blue), var(--tmw-cyan));
+    transform: skewX(-28deg);
+    opacity: .12;
+}
+
+#platform .overview-today > .eyebrow {
+    margin-bottom: 16px;
+    font-size: 12px;
+}
+
+#platform .overview-today .hero-title {
+    max-width: 720px;
+    margin: 0 0 18px;
+    font-size: clamp(44px, 5.1vw, 76px);
+    font-weight: 860;
+    letter-spacing: -.065em;
+    line-height: .96;
+}
+
+#platform .overview-today-copy {
+    max-width: 570px;
+    margin: 0;
+    color: var(--tmw-slate);
+    font-size: 17px;
+    line-height: 1.65;
+}
+
+.overview-today-actions {
+    margin: 28px 0 0;
+    gap: 10px;
+}
+
+#platform .overview-today-actions .button,
+#platform .overview-today-actions button {
+    min-height: 50px;
+    padding: 13px 21px;
+}
+
+#platform .overview-goal-card {
+    display: grid;
+    min-height: 455px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 14px;
+    align-items: center;
+    align-content: center;
+    padding: 24px;
+    margin: 0;
+    border: 1px solid #bcd0e2 !important;
+    border-radius: var(--tmw-radius);
+    background: linear-gradient(135deg, #fff, #f2f7ff) !important;
+    color: var(--tmw-navy) !important;
+    text-align: left;
+    box-shadow: var(--tmw-shadow) !important;
+}
+
+.overview-goal-card .daily-choice-icon {
+    grid-row: 1 / span 2;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: #e8f1ff;
+}
+
+.overview-goal-copy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+#platform .overview-goal-card strong {
+    color: var(--tmw-navy);
+    font-size: 20px;
+    line-height: 1.18;
+}
+
+#platform .overview-goal-card small {
+    color: var(--platform-muted);
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1.45;
+}
+
+.overview-goal-action {
+    grid-column: 2;
+    color: var(--tmw-blue);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.overview-week {
+    display: grid;
+    grid-template-columns: minmax(180px, .55fr) minmax(340px, 1fr) minmax(280px, .85fr);
+    gap: 10px 32px;
+    align-items: end;
+    margin: 0;
+}
+
+.overview-week-heading {
+    grid-row: 1 / span 2;
+    align-self: center;
+}
+
+.overview-week-heading h2 { font-size: 25px; }
+.overview-week .stats { gap: 28px; margin: 8px 0 0; }
+.overview-week .stat { min-width: 0; }
+.overview-week .stat strong { font-size: 38px; }
+.overview-week > .muted {
+    grid-column: 2;
+    max-width: 520px;
+    margin: 0;
+    font-size: 12px;
+}
+
+.overview-week .week-chart {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    height: 128px;
+    margin: 0;
+    padding: 10px 0 0;
+}
+
+.overview-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+    gap: 22px;
+}
+
+#platform .overview-next,
+#platform .overview-coach {
+    min-width: 0;
+    margin: 0;
+}
+
+.overview-next .overview-empty-title {
+    margin: 6px 0 8px;
+    color: var(--tmw-navy);
+    font-size: 19px;
+    font-weight: 720;
+}
+
+.overview-coach .coach-note {
+    font-size: 16px;
+    line-height: 1.55;
+}
+
+.overview-text-link {
+    display: inline-flex;
+    margin-top: 10px;
+    align-items: center;
+    color: var(--tmw-blue) !important;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.overview-goal-preview,
+.overview-recovery {
+    margin: 0;
+}
+
 .panel,
 .platform-app .workout-card,
 .coach-intro,
@@ -811,6 +1027,9 @@ body.platform-app[data-route="player"] #platform textarea {
 @media (max-width: 1100px) {
     #main-content { padding: 34px 30px 70px; }
     .dashboard-grid { grid-template-columns: 1fr; }
+    .overview-lead { grid-template-columns: minmax(0, 1.35fr) minmax(280px, .8fr); }
+    .overview-week { grid-template-columns: minmax(170px, .6fr) minmax(300px, 1fr); }
+    .overview-week .week-chart { grid-column: 1 / -1; grid-row: 3; height: 105px; }
 }
 
 @media (max-width: 700px) {
@@ -877,7 +1096,58 @@ body.platform-app[data-route="player"] #platform textarea {
         border-radius: 16px;
         box-shadow: 0 8px 24px rgba(7, 24, 39, .05);
     }
+    .overview-page { gap: 14px; }
+    .overview-lead,
+    .overview-bottom { grid-template-columns: minmax(0, 1fr); }
+    #platform .overview-today {
+        min-height: 420px;
+        justify-content: flex-end;
+        padding: 30px 24px;
+    }
+    .overview-today::before {
+        top: 42px;
+        right: -16%;
+        width: 78%;
+    }
+    #platform .overview-today .hero-title {
+        max-width: 10ch;
+        margin-bottom: 14px;
+        font-size: clamp(42px, 13vw, 58px);
+        line-height: .98;
+    }
+    #platform .overview-today-copy {
+        font-size: 15px;
+        line-height: 1.55;
+    }
+    .overview-today-actions { display: grid; grid-template-columns: 1fr; }
+    #platform .overview-today-actions .button,
+    #platform .overview-today-actions button { width: 100%; }
+    #platform .overview-goal-card {
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+        min-height: 0;
+        padding: 20px;
+    }
+    #platform .overview-goal-card strong { font-size: 18px; }
+    .overview-week { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .overview-week-heading { grid-row: auto; }
+    .overview-week .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+    .overview-week .stat strong { font-size: 28px; }
+    .overview-week > .muted,
+    .overview-week .week-chart {
+        grid-column: 1;
+        grid-row: auto;
+    }
+    .overview-week .week-chart { height: 92px; }
     .mobile-app #platform .hero-title { font-size: 28px; }
+    .mobile-app #platform .overview-today .hero-title {
+        max-width: 10ch;
+        font-size: clamp(42px, 13vw, 58px);
+    }
     .mobile-app .stat strong { font-size: 27px; }
     .mobile-app .week-chart { border-bottom: 0; }
     .mobile-app #platform .daily-choice { min-height: 84px; }
