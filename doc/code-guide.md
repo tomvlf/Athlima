@@ -195,7 +195,7 @@ works.
 | `@jest-environment node` | A functional instruction in a comment: run that file in Node rather than the default simulated browser. Preserve it when editing documentation. |
 
 After installing the development dependencies as shown in the
-[README](../README.md#local-development), run commands in the project folder:
+[README](../README.md#run-your-own-copy), run commands in the project folder:
 
 ```sh
 # Check one focused area.

@@ -1,399 +1,240 @@
-
 # Too Many Watts
 
-Too Many Watts turns a compatible web browser into an indoor cycling dashboard. It can guide a workout, ask a smart trainer to change resistance, record a ride, and help plan cycling or running training.
+**Turn a browser tab into an indoor cycling cockpit.** Too Many Watts runs structured
+workouts, drives a smart trainer, records every ride and plans the weeks ahead — with no
+account, no cloud and no server sitting between you and your trainer.
 
-The app's calculations run in your browser, and training data is saved in that browser. There is no Too Many Watts login or cloud account. An optional Intervals.icu connection can import activities and upload recorded rides directly to that service.
+![The ride screen during a Chili Pepper session: 127 W against a 126 W target, cadence target 80 rpm, heart rate 163 bpm, and the live position marker on the workout profile](doc/images/screenshots/ride.webp)
 
-## New here? Start with this
+<p>
+  <img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
+  <img alt="No account required" src="https://img.shields.io/badge/account-not%20required-2ea44f">
+  <img alt="Training data stays on this device" src="https://img.shields.io/badge/data-on%20this%20device-123653">
+</p>
 
-You do not need programming knowledge to use Too Many Watts. If someone already hosts it for you, open their web address in a [supported browser](#browser-and-device-support); skip the installation and Docker sections below.
+## First ride in three steps
 
-1. **Check Settings.** Review your units, body mass and cycling FTP. FTP is the power reference used to scale cycling workouts; see the short glossary below.
-2. **Connect equipment.** Open **Devices** and use the connection controls. Your browser asks you to choose a trainer or sensor; a website cannot simply connect without permission.
-3. **Choose a workout.** The **Library** describes what each session contains. A workout is a recipe for a ride, not a ride you have already completed.
-4. **Ride.** **Start workout** opens the ride screen. **Target** values describe the requested effort; the other readings describe what connected sensors report. `--` means unavailable, not zero.
-5. **Finish and save.** Finish the current ride before starting another. For rides under one minute, the app offers save or discard. If saving fails, use the displayed retry/download options before closing the page.
-6. **Keep a backup.** Use **Settings > Local backup** to download a copy. Saving in the browser alone does not protect against clearing site data, losing the device or browser storage being removed.
+1. **Set your reference.** In *Settings*, enter body mass and cycling FTP — the watts that
+   scale every workout target.
+2. **Connect your gear.** Open *Devices* and pick your trainer or sensor. The browser asks
+   for permission; no website can connect to your sensors silently.
+3. **Pick a session and ride.** Choose something in the *Workout library* and press
+   **Start workout**. Finish and save before starting another ride, then download a backup
+   from *Settings → Local backup*.
 
-The **Coach** is optional. It builds a proposed schedule from your goal, availability and recorded history; it is not medical advice. Running plans provide running guidance and exports, not treadmill or cycling-trainer execution. See [Using the Coach](doc/coaching.md#using-the-coach).
+A few words you will see on screen:
 
-### A few useful words
-
-| Word | Plain-English meaning |
+| Word | Meaning |
 |---|---|
-| Smart trainer | Indoor cycling equipment that can report readings and accept resistance commands. |
-| Power / W | How hard you are working mechanically, measured in watts. |
-| FTP | Functional Threshold Power: the cycling reference, in watts, used to scale targets. A target of 80% with FTP 250 W is 200 W. |
-| Cadence / rpm | How many complete pedal turns you make each minute. |
-| Heart rate / bpm | Heartbeats per minute. RR intervals are the times between successive beats. |
-| ERG | Trainer mode that tries to hold a requested power by adjusting resistance. |
-| Interval / step | A section of a workout; a section can contain smaller steps with different targets. |
-| RPE | Your own rating of perceived exertion, on a 0-10 effort scale. |
-| ZWO file | A text-based workout recipe that Too Many Watts can read. |
-| FIT file | A compact recording of activity data, suitable for downloading or uploading to compatible services. |
-| Backup / sync | A backup is a separate saved copy. Intervals.icu sync refreshes local history; it is not a backup of your complete Too Many Watts setup. |
+| FTP | Functional threshold power: the reference, in watts, that workout targets are a fraction of. |
+| Target | The effort the workout asks for. `--` in an actual reading means unavailable, not zero. |
+| ERG | Trainer mode that holds a requested power by adjusting resistance. |
+| ZWO / FIT | A text workout file / a compact activity recording you can download or upload. |
+| RPE | Your own effort rating on a 0–10 scale, used as session feedback. |
 
-For a guided tour of the files and code, start with the [beginner's code guide](doc/code-guide.md).
+## Why riders use it
 
-## What Too Many Watts does
+**The effort is the whole interface.** Target power, actual power and the gap between them
+are the biggest things on screen, next to the interval countdown and the cadence the workout
+asks for. A marker walks along the session profile so you always know what is left and what
+is next.
 
-- runs `.zwo` workouts and built-in structured sessions
-- shows a live workout power timeline with a current-position marker, interval countdown, and separate target/actual power and cadence; cadence targets appear only when prescribed
-- searches and filters the workout library by category, type, and duration, with power profiles and cadence previews
-- controls smart trainers in ERG, resistance, and grade-simulation modes
-- records `.fit` files with power, cadence, heart rate, and RR intervals
-- supports session planning and direct launch from a multi-week calendar, with weekly ride totals and power profiles when data is available
-- reviews activities across sports with weekly and monthly totals, available training-load indicators, and recorded power previews when samples exist
-- imports and syncs activity history (all sports, with type icons) from Intervals.icu
-- fetches full-resolution power, heart-rate and cadence streams plus route previews on demand, with CSV export
-- uploads new FIT recordings back to Intervals.icu
-- includes a local, rule-based coaching engine for cycling/running planning and activity review
-- offers **Train Now**, an ad-hoc session chosen from readiness, recent load and history without changing the plan
-- automatically switches between mobile and desktop layouts as the window width changes
-- saves coaching, plans, workouts, recordings and calendar on this device
-- downloads and restores local backup files without including integration credentials
+**Structured sessions, not just a stopwatch.** 46 built-in workouts cover recovery, tempo,
+sweet spot, threshold, VO2 max, sprints and race prep, each with power and cadence targets.
+Import `.zwo` files, load `.FIT` courses, or build your own session in the workout editor.
 
-## Ride screen
+**A Coach that works around your week.** Give it a goal, a date and the days you can train.
+It lays out the phases, picks the sessions and explains why — then adapts when life, illness
+or a missed ride gets in the way. It is deterministic, rule-based guidance: not a chatbot,
+and not medical advice.
 
-The application's default cyberpunk theme uses a locally bundled city backdrop,
-angular dark panels, signal-yellow controls and cyan/magenta accents. Industrial
-headings and a road leading toward a distant night skyline evoke a dystopian city interface,
-without animation, flashing, external assets or changes to training-zone colors.
-The ride screen retains its calmer mint controls and removes
-decorative imagery and header accents to keep metrics and controls
-distraction-free. The theme is included in production builds and Docker images,
-with no external image or font requests. Styling lives in [cyberpunk.css](src/css/cyberpunk.css).
-The locally bundled backdrop uses a 1920-pixel WebP for smaller displays and a
-3840-pixel version for large or high-density desktop displays.
+**Every ride is kept.** Finished sessions become FIT files on your device, alongside weekly
+and monthly totals, fitness/fatigue/form and observed power profiles. Upload to
+Intervals.icu when you want a second opinion.
 
-Backdrop photograph: [Krzysztof Kotkowicz, city skyline at night with a freeway in the foreground](https://unsplash.com/photos/a-city-skyline-at-night-with-a-freeway-in-the-foreground-VPnxo1uloJE),
-used under the [Unsplash License](https://unsplash.com/license), brightness- and
-color-adjusted. Both the road and buildings are photographic, not illustrated.
-A stronger overlay over the skyline keeps the city secondary to the road and
-the interface. All image assets are served locally.
+**Built to be used mid-effort.** Phone and desktop layouts switch automatically, controls
+stay reachable, an interrupted ride is recovered, and the app installs to your home screen
+and reopens from its cache when you are offline.
 
-Both `/` and `/mobile` automatically use the mobile layout at widths of 700px
-or less and the desktop layout above that. Resizing or rotating switches layouts
-without reloading, changing the current page, clearing forms, or interrupting a ride.
-Mobile screens use compact cards and expandable secondary information: library
-filters, workout notes and intervals, monthly activity totals, local backup
-settings, additional sensors, the month calendar overview, and the plan timeline. Open sections retain their
-state while navigating during the session; desktop shows this information expanded.
-The mobile library shows six workouts per page with Previous/Next controls.
-Ride metrics and controls stay visible, and the five-item bottom navigation is unchanged.
-Long activity histories and setup forms still scroll so no information is clipped.
+## A look inside
 
-The ride screen keeps target power, interval time remaining and target cadence
-above an always-visible workout power profile. A labelled position marker
-follows the workout timeline, including skipped intervals; completed work is
-dimmed and the current interval is outlined. Actual power and cadence remain
-separate from their targets, and disconnected sensors show unavailable readings.
-Cadence targets come from the workout and are hidden when none is prescribed;
-actual cadence remains visible. Device connections and trainer settings are available
-under "Devices & trainer settings" without hiding the profile.
-Use "Choose a workout" beneath the ride controls to browse the library.
-In workout details, "Start workout" opens the ride screen and starts the session.
-Finish and save an existing ride before starting another workout.
+### Overview — what to do today
 
-The library includes gentle cadence-practice sessions and shows target cadence
-ranges on workout cards and individual targets in workout details. The Coach
-may include approved drills in suitable endurance slots; cadence is optional,
-not a diagnosis or a universal target. Ride comfortably and stop or return to
-your natural cadence if a drill causes discomfort or bouncing.
+![Overview page showing today's Coach proposal, the current cycling goal with 84 days remaining, and this week's momentum](doc/images/screenshots/overview.webp)
 
-## Train Now
+### Workout library — pick the shape of the effort
 
-**Train Now** on the dashboard generates one cycling session for the current
-moment and opens it in the ride screen. It ignores today's planned workout and
-the calendar: no planned session is replaced, moved or marked, and the generated
-session is not added to the library. It chooses from your Coach profile, goal,
-recent completed sessions, load, readiness signals and the Coach's configured
-rules. When Intervals.icu is linked, Train Now first refreshes the provider
-profile and activity history. If refresh fails, you can cancel or explicitly
-continue using the last known local Coach data.
-Recovery is preferred when subjective readiness reaches the caution
-threshold or recent load is well above baseline; quality work is considered only
-when history and recovery support it, and the Coach avoids repeating the same
-hard focus too often. The ride screen shows **Why this workout?** with the
-reasons, and the explanation is kept with the recorded activity. Train Now is
-available without an active plan, but requires a configured cycling profile and
-FTP. On a Coach recovery/rest day, the dashboard and Coach ask **Feeling like
-riding today?**; opting in keeps the ad-hoc workout in the recovery family while
-leaving the planned rest day unchanged. Running profiles receive guidance to use
-the calendar instead.
+![Workout library with 46 sessions, category and duration filters, and a power profile on every card](doc/images/screenshots/library.webp)
 
-## Current repo status
+Each card carries the category, duration, interval count, cadence prescription and a power
+profile drawn from the session's own targets.
 
-This repository is a standalone browser app. The main flow is:
+### Training plan — the whole block at a glance
 
-- open the app and train without signing in
-- run the complete Coach locally using IndexedDB
-- connect Intervals.icu directly from Settings using a browser-stored API key
-- export a backup before clearing browser data or switching devices
+![Training plan page with the goal, week count, days to go, today's session and a phase timeline from Baseline to Taper](doc/images/screenshots/plan.webp)
 
+### Calendar — the next session is always visible
 
-## Quick start
+![Training calendar for January with planned Coach sessions on each training day](doc/images/screenshots/calendar.webp)
 
-This section is for people running their own copy or editing the app. A
-**terminal** is a window for typing commands. Open one in the downloaded project
-folder; in VS Code, use **Terminal > New Terminal**.
+### Activities — the work you actually did
 
-### Local development
+![Activities page with weekly and monthly totals, fitness/fatigue/form, and recorded rides with power profiles](doc/images/screenshots/activities.webp)
 
-Requirements:
-- Node.js 22.18.0 or later, with npm. Node runs development tools; npm installs
-  the packages those tools need. Riders opening an already-hosted app do not need them.
+### Coach — goals, feedback and adjustments
 
-```bash
+![Coach page with today's session review, the training goal card and the coming sessions](doc/images/screenshots/coach.webp)
+
+### Settings — profile, integrations and backups
+
+![Settings page with the rider profile, Intervals.icu connection, local backup and storage status](doc/images/screenshots/settings.webp)
+
+## Ride from your phone
+
+The same app switches to a touch layout below 700 px: a five-item bottom bar, compact cards
+and ride metrics that stay on screen. Open the HTTPS address in Chrome on Android and choose
+**Install app** (or **Add to Home screen**) to run it like a native app.
+
+<table>
+  <tr>
+    <td width="50%"><img src="doc/images/screenshots/m-overview.webp" alt="Mobile overview with today's session and goal" width="320"></td>
+    <td width="50%"><img src="doc/images/screenshots/m-library.webp" alt="Mobile workout library with session cards" width="320"></td>
+  </tr>
+</table>
+
+## Coach, without the black box
+
+The Coach is a local rules engine, so you can always ask what it is thinking:
+
+- **Plan from your real week.** Availability in minutes per day, a long-ride day, typical
+  and maximum weekly hours, experience, and a dated goal.
+- **Phases to race day.** Baseline, base, build, event-specific and taper, with recovery
+  weeks built in. The plan page shows where you are and what comes next.
+- **Sessions chosen for the moment.** Recovery is preferred when readiness signals or recent
+  load call for it; quality work only when history supports it. **Train Now** picks an
+  ad-hoc session without changing the plan.
+- **Explanations you can check.** "Why this workout?" is shown on the ride screen and stored
+  with the activity, together with the plan's current phase and objectives.
+- **Honest adaptation.** Missed sessions are reviewed rather than silently stacked onto
+  later days, and upcoming training can be made easier without being made up elsewhere.
+- **Stated limits.** It needs your FTP and, ideally, some history. With little evidence it
+  stays conservative and says so. Running plans provide guidance and exports; structured
+  execution needs a trainer that accepts commands.
+
+## Your data stays in your browser
+
+There is no Too Many Watts login, no account server and no analytics pipeline. Workouts,
+recordings, plans and settings live in this browser's storage on this device.
+
+- **Backups are yours to keep.** *Settings → Local backup* downloads one JSON file with your
+  coaching history, plans, workouts, recent FIT recordings, settings and calendar. It does
+  not include integration API keys.
+- **Clearing site data deletes training data.** Browser eviction can do the same. Download a
+  backup before switching devices or clearing storage.
+- **Intervals.icu is optional.** Your personal API key is stored in this browser and sent
+  only to `https://intervals.icu`; anyone with access to this browser profile can use it.
+  Disconnecting keeps imported history. See the [Intervals.icu guide](doc/intervals-guide.md).
+- **Nothing is silently invented.** Missing sensor or provider readings show as `--`, never
+  as zero, and incomplete totals are labelled as known values.
+
+## Connect your equipment
+
+Too Many Watts speaks the protocols indoor bikes and sensors already use:
+
+- **FTMS** over Bluetooth — trainers, indoor bikes and controllable resistance
+- **FE-C** over Bluetooth — FE-C trainers
+- **Wahoo WCPS** — vendor-specific control for Wahoo trainers
+- **ANT+ FE-C** over a compatible USB ANT+ adapter
+- Heart-rate, speed/cadence and Moxy muscle-oxygen sensors
+
+You choose every device from the browser's own pairing prompt; a website cannot connect to
+your sensors without permission. Trainer modes are ERG, resistance and slope simulation.
+
+**Supported browsers:** Chrome, Edge, Opera, Brave and Samsung Internet over HTTPS (or
+localhost during development). Firefox and Safari do not provide the Web Bluetooth path a
+trainer needs, and the web version is not supported on iOS. On Linux you may need to enable
+`chrome://flags/#enable-experimental-web-platform-features` (or the Edge/Opera equivalent).
+
+## Run your own copy
+
+Host it once and riders only need the address: there is no backend, database or
+authentication to operate. Node.js 22.18.0 or newer with npm is enough to develop locally.
+
+```sh
 npm install
-npm start
+npm start        # development server with live reload
+npm run build    # browser-ready files in dist/
+npm test         # automated checks
 ```
 
-`npm install` installs dependencies into the project; it does not install a
-training server or create an account. `npm start` runs Parcel, the tool that
-prepares the app and serves it while you edit. Open the local URL it prints.
-Keep the terminal open while using that development server; **Ctrl+C** stops it.
+Serve `dist/` over HTTPS (or localhost) — Web Bluetooth requires a secure context. For an
+encrypted development server, `npm run starttls` expects local certificates at
+`dev_cert/cert.pem` and `dev_cert/key.pem`. Storage, hosting and migration details are in
+[browser-only deployment](doc/backend.md); focused test commands are in the
+[code guide](doc/code-guide.md#reading-and-running-tests).
 
-Useful commands:
-
-```bash
-npm test
-npm run build
-```
-
-`npm test` runs automated examples that check expected behavior. `npm run build`
-creates browser-ready files in `dist/`; it does not publish them or start a
-server. See [testing explained](doc/code-guide.md#reading-and-running-tests) for
-smaller test commands and the limits of what they prove.
-
-The regular test suite includes enforcing Trusted Types regressions for ZWO
-parsing, timer-worker startup, service-worker registration and policy reuse across
-separately loaded modules. Source guards also reject unwrapped XML and worker
-sinks. These simulate enforcement; they do not replace an Android browser check.
-Docker builds run the suite before packaging, so failing tests block publication.
-
-For HTTPS development, use:
-
-```bash
-npm run starttls
-```
-
-This expects local certificate files at `dev_cert/cert.pem` and
-`dev_cert/key.pem`. A certificate enables an encrypted HTTPS connection; the
-private key must stay private. This command does not create or automatically
-trust those files. Plain localhost development usually does not need them.
+The desktop app shows the frontend build label at the bottom of the sidebar; published
+images display the GitHub Actions build number and attempt, with the full revision on hover.
 
 ### Docker Compose
 
-Docker runs a packaged copy of the web server in a **container**. Compose reads
-a configuration file describing how to start it. This is an alternative to
-local development, not an extra step every rider must perform.
-
-The default Compose setup serves only static frontend files. No backend or database service is needed.
-The frontend runs as UID/GID 101 on container port 8080, with a read-only
-filesystem, no Linux capabilities, no privilege escalation and a bounded
-temporary filesystem. The container includes a health check.
-
-```bash
-docker compose up -d
-```
-
-Then open:
-
-- http://localhost:8080
-
-For the existing Dockhand `bike_trainer` stack, use [compose.dockhand.yaml](compose.dockhand.yaml).
-It preserves host port 1111 for the existing HTTPS proxy, forwarding to container
-port 8080. TLS remains handled by your existing proxy; no Caddy or backend is
-needed in this stack. Replace the stack's Compose content with this file and
-redeploy after publishing the new frontend image.
-The frontend service is named `too-many-watts`. If the previous deployment used a
-different service name, remove the obsolete frontend container without deleting
-volumes before redeploying, so it cannot retain host port 1111.
-The old backend is no longer needed. Stop/remove its container separately if
-Dockhand leaves it as an orphan; preserve its data volume until any old data
-has been exported. Do not use volume deletion during this upgrade.
-
-To stop it:
-
-```bash
+```sh
+docker compose up -d            # published frontend on http://localhost:8080
 docker compose down
 ```
 
-To build from a local checkout instead of using published images:
+Build from your checkout instead of the published image:
 
-```bash
+```sh
 docker compose -f compose.yaml -f compose.server.yaml up --build -d
 ```
 
-For public HTTPS hosting, replace `app.example.com` in [Caddyfile](Caddyfile) with your
-hostname and run:
+Public HTTPS hosting with automatic certificates — replace `app.example.com` in the
+[Caddyfile](Caddyfile) with a hostname you control:
 
-```bash
+```sh
 docker compose -f compose.https.yaml up -d
 ```
 
-To build the HTTPS frontend locally instead:
+The frontend container runs unprivileged on port 8080 with a read-only filesystem, no Linux
+capabilities and a health check; Caddy handles TLS and HSTS. For the existing Dockhand
+`bike_trainer` stack, use [compose.dockhand.yaml](compose.dockhand.yaml), which keeps host
+port 1111 for your existing proxy. Images are published to
+`ghcr.io/tomvlf/too-many-watts` with build provenance and a software bill of materials.
 
-```bash
-docker compose -f compose.https.yaml -f compose.server.yaml up --build -d
-```
+To deploy exactly one reviewed build, pin its digest:
 
-Caddy manages TLS certificates, sets HSTS and keeps certificate/configuration
-state in its named volumes. Its root process retains only the capability needed
-to bind ports 80/443; the frontend is non-root and has no capabilities.
-
-The build and server base images are pinned by digest, and `npm ci` uses the
-committed lockfile. Refresh these pins and the lockfile regularly for security
-updates; pinning does not automatically apply upstream patches.
-Rebuild/publish before using these Compose files with a published image:
-older frontend images listen on port 80 rather than 8080.
-
-### Deployed versions
-
-The desktop app shows the frontend version at the bottom of the left-hand menu;
-the mobile layout omits it. Published images display the GitHub Actions build
-number and attempt. Hover over the version for the full Git revision.
-
-Local development and local image builds show `development` unless build metadata
-is supplied. The frontend label identifies the code currently loaded in the
-browser, so reload the app after deploying a new frontend.
-
-### Verifying a published image
-
-Published images carry build provenance and a software bill of materials, and
-are signed with the release workflow's short-lived GitHub identity. The example
-Compose files use the moving `latest` tag for convenience. To deploy exactly
-one reviewed build, resolve the digest and pin it:
-
-```bash
+```sh
 docker buildx imagetools inspect ghcr.io/tomvlf/too-many-watts:latest
-# then in compose.yaml:
-#   image: ghcr.io/tomvlf/too-many-watts@sha256:<digest>
+# image: ghcr.io/tomvlf/too-many-watts@sha256:<digest>
 ```
 
-With [cosign](https://docs.sigstore.dev/cosign/overview/) installed, check the
-signature before pulling:
+With [cosign](https://docs.sigstore.dev/cosign/overview/) installed, verify the signature
+before pulling:
 
-```bash
+```sh
 cosign verify ghcr.io/tomvlf/too-many-watts:latest \
   --certificate-identity-regexp 'https://github.com/tomvlf/Too Many Watts/.github/workflows/publish-image.yml@refs/(heads/master|tags/v.*)' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-A digest-pinned deployment only changes when you update the digest; the
-`pull_policy: always` setting then confirms the pinned image is present.
-
-## Local data and integrations
-
-The Coach, activity history, calendar, workout library and ride recovery use browser storage. Data is not synchronized between browsers or devices. Clearing site data or browser eviction can remove it; use Settings > Local backup regularly.
-
-The dashboard's recent-duration summary is cycling-only. The Activities page's
-week/month totals include dated activities across sports. Coach load estimates
-remain specific to the selected sport; different load scales are not added
-together. A total labelled **Known** is incomplete because some measurements
-are missing.
-
-Intervals.icu is optional and requires internet access. In Settings, enter your
-personal API key and import start date. By default the key is saved in this
-browser's local storage so the connection survives a tab close; clear **Keep
-this connection on this device** to keep it only for the current tab. It is
-sent only to `https://intervals.icu` and is not encrypted against someone with
-access to your browser profile. Disconnect removes the key but keeps imported
-history. **Settings > Delete local data** also erases it, along with all other
-Too Many Watts data on this device. There is no Too Many Watts server or intermediary.
-Strava and TrainingPeaks server-based OAuth connections have been removed;
-use FIT file downloads for manual upload to other providers.
-
-For the practical details, see [where data lives and how backups work](doc/backend.md),
-[connecting Intervals.icu](doc/intervals-guide.md) and [using the Coach](doc/coaching.md).
-
-Older account-scoped browser data and server volumes are not deleted or silently
-merged. Export data from the previous version before upgrading; see the migration
-notes in the backend guide.
-
-## Browser and device support
-
-Too Many Watts relies on browser features such as Web Bluetooth (talking to nearby
-sensors), Web Serial (communicating with supported adapters) and Web Components
-(reusable interface elements). For a supported experience, use a compatible
-browser and a **secure context**: HTTPS, or localhost on your own computer.
-
-Supported browsers:
-- Chrome
-- Edge
-- Opera
-- Brave
-- Samsung Internet
-
-Important notes:
-- Bluetooth requires HTTPS or localhost
-- Android generally works best by opening the URL directly in Chrome
-- Firefox and Safari are not supported for the trainer/Web Bluetooth path
-
-On Android, open the HTTPS app in Chrome and use the browser menu's **Install
-app** or **Add to Home screen** option. The installed app uses the Too Many Watts
-icon, including a maskable variant for Android launchers. Chrome may take time
-to refresh the icon of an existing installation after an update; close old app
-windows so the updated offline worker can activate.
-
-### Linux
-
-On Linux, enable the experimental web platform flag if needed:
-
-- Chrome: `chrome://flags/#enable-experimental-web-platform-features`
-- Edge: `edge://flags/#enable-experimental-web-platform-features`
-- Opera: `opera://flags/#enable-experimental-web-platform-features`
-
-### iOS
-
-The web version is not currently supported on iOS.
-
-## Supported trainer protocols
-
-Too Many Watts supports the industry-standard trainer and sensor protocols used by indoor bikes:
-
-- FTMS over Bluetooth
-- FE-C over BLE
-- Wahoo CPS
-- ANT+ FE-C via a compatible USB ANT+ adapter
-
-## Static hosting
-
-Serve the built `dist/` directory over HTTPS, or use localhost for development.
-The Compose HTTPS variant adds Caddy in front of the static frontend only.
-No authentication cookie, server encryption key or server-origin configuration
-is required. Training and coaching can work offline once the needed app files
-are cached, meaning the browser has kept copies. Offline loading is best-effort,
-not a backup: not every image/resource is cached, and browser cache removal can
-prevent a later offline launch. Check offline reopening before relying on it.
-Intervals.icu requests require a connection and permission from that service
-for cross-site browser requests (CORS).
-
-The Docker build generates a Content Security Policy from the exact built HTML,
-including hashes for Parcel's inline import map. Scripts cannot use arbitrary
-inline code or `eval`; connections are limited to this origin and Intervals.icu.
-Trusted Types (`require-trusted-types-for 'script'`) requires every HTML update,
-XML parser input and worker script URL to pass through the app's single
-`too-many-watts` policy, so a plain string cannot be assigned to an enforced sink. XML
-remains parsed as inert XML rather than HTML, and worker scripts are restricted
-to same-origin URLs. Inline styles remain allowed for the existing dynamic
-UI. Anti-framing, cross-origin isolation, MIME-sniffing, referrer and
-device-permission headers also apply to error pages. Other static hosts must
-configure equivalent headers themselves. Do not reuse the generated CSP after
-replacing assets without rebuilding its import-map hashes.
+The build derives a Content Security Policy from the exact HTML it ships, so scripts are
+limited to hashed inline blocks and this origin plus Intervals.icu. Rebuild the policy with
+the app; do not loosen it to silence a browser warning. Other static hosts must configure
+equivalent headers themselves, and offline loading is best-effort rather than a backup.
 
 ## Documentation
 
 | I want to... | Read |
 |---|---|
-| Use the app and understand its terms | This README |
 | Understand the code without a programming background | [Beginner's code guide](doc/code-guide.md) |
-| Know where data lives, back it up, or host the app | [Storage, hosting and migration](doc/backend.md) |
-| Connect another training service | [Intervals.icu guide](doc/intervals-guide.md) |
-| Understand planning, feedback and scientific limitations | [Coach guide](doc/coaching.md) |
+| Know where data lives, back it up, or host it | [Deployment, storage and migration](doc/backend.md) |
+| Connect Intervals.icu | [Intervals.icu guide](doc/intervals-guide.md) |
+| Understand planning, feedback and its limits | [Coach guide](doc/coaching.md) |
 
-## License
+## Credits and license
 
-This project is licensed under the terms in [LICENSE.txt](LICENSE.txt).
+Too Many Watts grew out of [Auuki](https://github.com/dvmarinoff/Auuki) by Dimitar Marinov,
+and continues here with a rebuilt interface and an adaptive Coach.
+
+Licensed under the [GNU AGPL v3](LICENSE.txt).

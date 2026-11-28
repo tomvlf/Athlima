@@ -1,0 +1,230 @@
+<!doctype html><html><head><meta charset='utf-8'><style>
+body{font:16px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2328;max-width:900px;margin:0 auto;padding:32px 24px;background:#fff}
+img{max-width:100%;border-radius:6px}
+h1,h2{border-bottom:1px solid #d8dee4;padding-bottom:.3em}
+h3{margin-top:2em}
+table{border-collapse:collapse}th,td{border:1px solid #d0d7de;padding:6px 13px}
+code{background:#f6f8fa;padding:.2em .4em;border-radius:4px;font-size:85%}
+pre{background:#f6f8fa;padding:16px;border-radius:6px;overflow:auto}
+</style></head><body><h1>Too Many Watts</h1>
+<p><strong>Turn a browser tab into an indoor cycling cockpit.</strong> Too Many Watts runs structured
+workouts, drives a smart trainer, records every ride and plans the weeks ahead — with no
+account, no cloud and no server sitting between you and your trainer.</p>
+<p><img alt="The ride screen during a Chili Pepper session: 127 W against a 126 W target, cadence target 80 rpm, heart rate 163 bpm, and the live position marker on the workout profile" src="doc/images/screenshots/ride.webp" /></p>
+<p>
+  <img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
+  <img alt="No account required" src="https://img.shields.io/badge/account-not%20required-2ea44f">
+  <img alt="Training data stays on this device" src="https://img.shields.io/badge/data-on%20this%20device-123653">
+</p>
+
+<h2>First ride in three steps</h2>
+<ol>
+<li><strong>Set your reference.</strong> In <em>Settings</em>, enter body mass and cycling FTP — the watts that
+   scale every workout target.</li>
+<li><strong>Connect your gear.</strong> Open <em>Devices</em> and pick your trainer or sensor. The browser asks
+   for permission; no website can connect to your sensors silently.</li>
+<li><strong>Pick a session and ride.</strong> Choose something in the <em>Workout library</em> and press
+   <strong>Start workout</strong>. Finish and save before starting another ride, then download a backup
+   from <em>Settings → Local backup</em>.</li>
+</ol>
+<p>A few words you will see on screen:</p>
+<table>
+<thead>
+<tr>
+<th>Word</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FTP</td>
+<td>Functional threshold power: the reference, in watts, that workout targets are a fraction of.</td>
+</tr>
+<tr>
+<td>Target</td>
+<td>The effort the workout asks for. <code>--</code> in an actual reading means unavailable, not zero.</td>
+</tr>
+<tr>
+<td>ERG</td>
+<td>Trainer mode that holds a requested power by adjusting resistance.</td>
+</tr>
+<tr>
+<td>ZWO / FIT</td>
+<td>A text workout file / a compact activity recording you can download or upload.</td>
+</tr>
+<tr>
+<td>RPE</td>
+<td>Your own effort rating on a 0–10 scale, used as session feedback.</td>
+</tr>
+</tbody>
+</table>
+<h2>Why riders use it</h2>
+<p><strong>The effort is the whole interface.</strong> Target power, actual power and the gap between them
+are the biggest things on screen, next to the interval countdown and the cadence the workout
+asks for. A marker walks along the session profile so you always know what is left and what
+is next.</p>
+<p><strong>Structured sessions, not just a stopwatch.</strong> 46 built-in workouts cover recovery, tempo,
+sweet spot, threshold, VO2 max, sprints and race prep, each with power and cadence targets.
+Import <code>.zwo</code> files, load <code>.FIT</code> courses, or build your own session in the workout editor.</p>
+<p><strong>A Coach that works around your week.</strong> Give it a goal, a date and the days you can train.
+It lays out the phases, picks the sessions and explains why — then adapts when life, illness
+or a missed ride gets in the way. It is deterministic, rule-based guidance: not a chatbot,
+and not medical advice.</p>
+<p><strong>Every ride is kept.</strong> Finished sessions become FIT files on your device, alongside weekly
+and monthly totals, fitness/fatigue/form and observed power profiles. Upload to
+Intervals.icu when you want a second opinion.</p>
+<p><strong>Built to be used mid-effort.</strong> Phone and desktop layouts switch automatically, controls
+stay reachable, an interrupted ride is recovered, and the app installs to your home screen
+and reopens from its cache when you are offline.</p>
+<h2>A look inside</h2>
+<h3>Overview — what to do today</h3>
+<p><img alt="Overview page showing today's Coach proposal, the current cycling goal with 84 days remaining, and this week's momentum" src="doc/images/screenshots/overview.webp" /></p>
+<h3>Workout library — pick the shape of the effort</h3>
+<p><img alt="Workout library with 46 sessions, category and duration filters, and a power profile on every card" src="doc/images/screenshots/library.webp" /></p>
+<p>Each card carries the category, duration, interval count, cadence prescription and a power
+profile drawn from the session's own targets.</p>
+<h3>Training plan — the whole block at a glance</h3>
+<p><img alt="Training plan page with the goal, week count, days to go, today's session and a phase timeline from Baseline to Taper" src="doc/images/screenshots/plan.webp" /></p>
+<h3>Calendar — the next session is always visible</h3>
+<p><img alt="Training calendar for January with planned Coach sessions on each training day" src="doc/images/screenshots/calendar.webp" /></p>
+<h3>Activities — the work you actually did</h3>
+<p><img alt="Activities page with weekly and monthly totals, fitness/fatigue/form, and recorded rides with power profiles" src="doc/images/screenshots/activities.webp" /></p>
+<h3>Coach — goals, feedback and adjustments</h3>
+<p><img alt="Coach page with today's session review, the training goal card and the coming sessions" src="doc/images/screenshots/coach.webp" /></p>
+<h3>Settings — profile, integrations and backups</h3>
+<p><img alt="Settings page with the rider profile, Intervals.icu connection, local backup and storage status" src="doc/images/screenshots/settings.webp" /></p>
+<h2>Ride from your phone</h2>
+<p>The same app switches to a touch layout below 700 px: a five-item bottom bar, compact cards
+and ride metrics that stay on screen. Open the HTTPS address in Chrome on Android and choose
+<strong>Install app</strong> (or <strong>Add to Home screen</strong>) to run it like a native app.</p>
+<table>
+  <tr>
+    <td width="50%"><img src="doc/images/screenshots/m-overview.webp" alt="Mobile overview with today's session and goal" width="320"></td>
+    <td width="50%"><img src="doc/images/screenshots/m-library.webp" alt="Mobile workout library with session cards" width="320"></td>
+  </tr>
+</table>
+
+<h2>Coach, without the black box</h2>
+<p>The Coach is a local rules engine, so you can always ask what it is thinking:</p>
+<ul>
+<li><strong>Plan from your real week.</strong> Availability in minutes per day, a long-ride day, typical
+  and maximum weekly hours, experience, and a dated goal.</li>
+<li><strong>Phases to race day.</strong> Baseline, base, build, event-specific and taper, with recovery
+  weeks built in. The plan page shows where you are and what comes next.</li>
+<li><strong>Sessions chosen for the moment.</strong> Recovery is preferred when readiness signals or recent
+  load call for it; quality work only when history supports it. <strong>Train Now</strong> picks an
+  ad-hoc session without changing the plan.</li>
+<li><strong>Explanations you can check.</strong> "Why this workout?" is shown on the ride screen and stored
+  with the activity, together with the plan's current phase and objectives.</li>
+<li><strong>Honest adaptation.</strong> Missed sessions are reviewed rather than silently stacked onto
+  later days, and upcoming training can be made easier without being made up elsewhere.</li>
+<li><strong>Stated limits.</strong> It needs your FTP and, ideally, some history. With little evidence it
+  stays conservative and says so. Running plans provide guidance and exports; structured
+  execution needs a trainer that accepts commands.</li>
+</ul>
+<h2>Your data stays in your browser</h2>
+<p>There is no Too Many Watts login, no account server and no analytics pipeline. Workouts,
+recordings, plans and settings live in this browser's storage on this device.</p>
+<ul>
+<li><strong>Backups are yours to keep.</strong> <em>Settings → Local backup</em> downloads one JSON file with your
+  coaching history, plans, workouts, recent FIT recordings, settings and calendar. It does
+  not include integration API keys.</li>
+<li><strong>Clearing site data deletes training data.</strong> Browser eviction can do the same. Download a
+  backup before switching devices or clearing storage.</li>
+<li><strong>Intervals.icu is optional.</strong> Your personal API key is stored in this browser and sent
+  only to <code>https://intervals.icu</code>; anyone with access to this browser profile can use it.
+  Disconnecting keeps imported history. See the <a href="doc/intervals-guide.md">Intervals.icu guide</a>.</li>
+<li><strong>Nothing is silently invented.</strong> Missing sensor or provider readings show as <code>--</code>, never
+  as zero, and incomplete totals are labelled as known values.</li>
+</ul>
+<h2>Connect your equipment</h2>
+<p>Too Many Watts speaks the protocols indoor bikes and sensors already use:</p>
+<ul>
+<li><strong>FTMS</strong> over Bluetooth — trainers, indoor bikes and controllable resistance</li>
+<li><strong>FE-C</strong> over Bluetooth — FE-C trainers</li>
+<li><strong>Wahoo WCPS</strong> — vendor-specific control for Wahoo trainers</li>
+<li><strong>ANT+ FE-C</strong> over a compatible USB ANT+ adapter</li>
+<li>Heart-rate, speed/cadence and Moxy muscle-oxygen sensors</li>
+</ul>
+<p>You choose every device from the browser's own pairing prompt; a website cannot connect to
+your sensors without permission. Trainer modes are ERG, resistance and slope simulation.</p>
+<p><strong>Supported browsers:</strong> Chrome, Edge, Opera, Brave and Samsung Internet over HTTPS (or
+localhost during development). Firefox and Safari do not provide the Web Bluetooth path a
+trainer needs, and the web version is not supported on iOS. On Linux you may need to enable
+<code>chrome://flags/#enable-experimental-web-platform-features</code> (or the Edge/Opera equivalent).</p>
+<h2>Run your own copy</h2>
+<p>Host it once and riders only need the address: there is no backend, database or
+authentication to operate. Node.js 22.18.0 or newer with npm is enough to develop locally.</p>
+<pre><code class="language-sh">npm install
+npm start        # development server with live reload
+npm run build    # browser-ready files in dist/
+npm test         # automated checks
+</code></pre>
+<p>Serve <code>dist/</code> over HTTPS (or localhost) — Web Bluetooth requires a secure context. For an
+encrypted development server, <code>npm run starttls</code> expects local certificates at
+<code>dev_cert/cert.pem</code> and <code>dev_cert/key.pem</code>. Storage, hosting and migration details are in
+<a href="doc/backend.md">browser-only deployment</a>; focused test commands are in the
+<a href="doc/code-guide.md#reading-and-running-tests">code guide</a>.</p>
+<p>The desktop app shows the frontend build label at the bottom of the sidebar; published
+images display the GitHub Actions build number and attempt, with the full revision on hover.</p>
+<h3>Docker Compose</h3>
+<pre><code class="language-sh">docker compose up -d            # published frontend on http://localhost:8080
+docker compose down
+</code></pre>
+<p>Build from your checkout instead of the published image:</p>
+<pre><code class="language-sh">docker compose -f compose.yaml -f compose.server.yaml up --build -d
+</code></pre>
+<p>Public HTTPS hosting with automatic certificates — replace <code>app.example.com</code> in the
+<a href="Caddyfile">Caddyfile</a> with a hostname you control:</p>
+<pre><code class="language-sh">docker compose -f compose.https.yaml up -d
+</code></pre>
+<p>The frontend container runs unprivileged on port 8080 with a read-only filesystem, no Linux
+capabilities and a health check; Caddy handles TLS and HSTS. For the existing Dockhand
+<code>bike_trainer</code> stack, use <a href="compose.dockhand.yaml">compose.dockhand.yaml</a>, which keeps host
+port 1111 for your existing proxy. Images are published to
+<code>ghcr.io/tomvlf/too-many-watts</code> with build provenance and a software bill of materials.</p>
+<p>To deploy exactly one reviewed build, pin its digest:</p>
+<pre><code class="language-sh">docker buildx imagetools inspect ghcr.io/tomvlf/too-many-watts:latest
+# image: ghcr.io/tomvlf/too-many-watts@sha256:&lt;digest&gt;
+</code></pre>
+<p>With <a href="https://docs.sigstore.dev/cosign/overview/">cosign</a> installed, verify the signature
+before pulling:</p>
+<pre><code class="language-sh">cosign verify ghcr.io/tomvlf/too-many-watts:latest \
+  --certificate-identity-regexp 'https://github.com/tomvlf/Too Many Watts/.github/workflows/publish-image.yml@refs/(heads/master|tags/v.*)' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+</code></pre>
+<p>The build derives a Content Security Policy from the exact HTML it ships, so scripts are
+limited to hashed inline blocks and this origin plus Intervals.icu. Rebuild the policy with
+the app; do not loosen it to silence a browser warning. Other static hosts must configure
+equivalent headers themselves, and offline loading is best-effort rather than a backup.</p>
+<h2>Documentation</h2>
+<table>
+<thead>
+<tr>
+<th>I want to...</th>
+<th>Read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Understand the code without a programming background</td>
+<td><a href="doc/code-guide.md">Beginner's code guide</a></td>
+</tr>
+<tr>
+<td>Know where data lives, back it up, or host it</td>
+<td><a href="doc/backend.md">Deployment, storage and migration</a></td>
+</tr>
+<tr>
+<td>Connect Intervals.icu</td>
+<td><a href="doc/intervals-guide.md">Intervals.icu guide</a></td>
+</tr>
+<tr>
+<td>Understand planning, feedback and its limits</td>
+<td><a href="doc/coaching.md">Coach guide</a></td>
+</tr>
+</tbody>
+</table>
+<h2>Credits and license</h2>
+<p>Too Many Watts grew out of <a href="https://github.com/dvmarinoff/Auuki">Auuki</a> by Dimitar Marinov,
+and continues here with a rebuilt interface and an adaptive Coach.</p>
+<p>Licensed under the <a href="LICENSE.txt">GNU AGPL v3</a>.</p></body></html>

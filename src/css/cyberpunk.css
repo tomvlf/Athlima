@@ -1089,6 +1089,25 @@ body[data-route="coach"] #legacy-slot coaching-panel {
     letter-spacing: 0;
 }
 
+/*
+ * The plan summary reuses the stat block on a light card, not the dark Coach hero, so its numbers
+ * and labels follow the page ink instead of the white hero treatment.
+ */
+#platform .plan-stats strong {
+    color: var(--platform-text);
+    font-size: 28px;
+}
+
+#platform .plan-stats span {
+    color: var(--platform-muted);
+    font-size: 11px;
+}
+
+#platform .plan-stats small {
+    color: var(--platform-muted);
+    font-size: 15px;
+}
+
 #legacy-slot .coach-hero .coach-progress {
     height: 5px;
     border-radius: 99px;
