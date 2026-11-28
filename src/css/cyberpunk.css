@@ -1453,7 +1453,7 @@ body[data-route="coach"] #legacy-slot coaching-panel {
     color: #fff !important;
 }
 
-/* Keep the rider screen focused without abandoning the light Athlima workspace. */
+/* The workspace stays light; the active ride becomes a deep-navy cockpit whose accent follows the target zone. */
 body.platform-app[data-route="player"] {
     --platform-bg: #f4f7fa;
     --platform-panel: #ffffff;
@@ -1481,91 +1481,354 @@ body.platform-app[data-route="player"] #platform .eyebrow { color: var(--tmw-blu
 body.platform-app[data-route="player"] #platform p { color: var(--tmw-slate); }
 body.platform-app[data-route="player"] #platform .muted { color: var(--tmw-slate); }
 body.platform-app[data-route="player"] .ride-panel {
-    border-color: var(--platform-border);
-    border-radius: 20px;
-    background: #fff;
-    box-shadow: 0 22px 58px rgba(7, 24, 39, .08);
+    --ride-bg: #071827;
+    --ride-surface: #0b2033;
+    --ride-surface-2: #081a2a;
+    --ride-border: rgba(151, 181, 208, .18);
+    --ride-border-strong: rgba(151, 181, 208, .3);
+    --ride-text: #eef4fa;
+    --ride-muted: #93a8bd;
+    --ride-zone: #00c8f8;
+    position: relative;
+    padding: 26px;
+    border: 1px solid var(--ride-border-strong);
+    border-radius: 24px;
+    background: #071827;
+    background:
+        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--ride-zone) 16%, transparent), transparent 62%),
+        linear-gradient(180deg, #0a2033 0%, var(--ride-bg) 55%, #06131f 100%);
+    box-shadow: 0 30px 80px rgba(7, 24, 39, .32), inset 0 1px 0 rgba(255, 255, 255, .06);
+    color: var(--ride-text);
 }
-body.platform-app[data-route="player"] .ride-metric {
-    border: 1px solid var(--platform-border);
-    background: #f7fafc;
+body.platform-app[data-route="player"] .ride-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0 24px auto;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: linear-gradient(90deg, transparent, var(--ride-zone), transparent);
+    opacity: .85;
+    pointer-events: none;
 }
-body.platform-app[data-route="player"] .ride-metric.primary {
-    border-color: #9ec5f8;
-    background: linear-gradient(155deg, #eef6ff 0%, #f8fbff 100%);
+body.platform-app[data-route="player"] #platform .ride-panel h2,
+body.platform-app[data-route="player"] #platform .ride-panel h3 {
+    color: var(--ride-text);
+    text-transform: none;
+}
+body.platform-app[data-route="player"] #platform .ride-panel p,
+body.platform-app[data-route="player"] #platform .ride-panel .muted,
+body.platform-app[data-route="player"] #platform .ride-panel small {
+    color: var(--ride-muted);
+}
+body.platform-app[data-route="player"] #platform .ride-panel .eyebrow { color: var(--ride-zone); }
+body.platform-app[data-route="player"] #platform .ride-panel a { color: var(--ride-zone); }
+body.platform-app[data-route="player"] #platform .ride-panel label { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-heading {
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+body.platform-app[data-route="player"] .ride-heading h2 {
+    font-size: clamp(24px, 2.6vw, 34px);
+    letter-spacing: -.045em;
+    line-height: 1.1;
+}
+body.platform-app[data-route="player"] .ride-panel .plan-chip {
+    border: 1px solid color-mix(in srgb, var(--ride-zone) 40%, transparent);
+    background: color-mix(in srgb, var(--ride-zone) 16%, transparent);
+    color: color-mix(in srgb, var(--ride-zone) 55%, #ffffff);
 }
 body.platform-app[data-route="player"] #ride-status {
-    border: 1px solid #bcd8fa;
-    background: #edf5ff;
-    color: var(--tmw-blue);
+    border: 1px solid var(--ride-border-strong);
+    background: rgba(255, 255, 255, .04);
+    color: var(--ride-text);
 }
-body.platform-app[data-route="player"] .ride-summary { background: #f7fafc; }
-body.platform-app[data-route="player"] .ride-metric strong { color: var(--tmw-navy); }
-body.platform-app[data-route="player"] .ride-metric.primary strong { color: var(--tmw-blue); }
+body.platform-app[data-route="player"] #ride-status::before {
+    background: var(--ride-zone);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ride-zone) 18%, transparent);
+}
+body.platform-app[data-route="player"] .ride-metrics {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 12px;
+}
+body.platform-app[data-route="player"] .ride-metric {
+    min-height: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--ride-border);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015));
+    color: var(--ride-text);
+}
+body.platform-app[data-route="player"] .ride-metric.primary {
+    grid-row: 1 / -1;
+    justify-content: space-between;
+    border-color: color-mix(in srgb, var(--ride-zone) 42%, var(--ride-border));
+    background:
+        radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--ride-zone) 18%, transparent), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .015));
+}
+body.platform-app[data-route="player"] .ride-metric.countdown { grid-column: 2; grid-row: 1; }
+body.platform-app[data-route="player"] .ride-metric:not(.primary):not(.countdown) { grid-column: 2; grid-row: 2; }
+body.platform-app[data-route="player"] .ride-metric > span,
+body.platform-app[data-route="player"] .ride-metric-label {
+    color: var(--ride-muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+body.platform-app[data-route="player"] .ride-metric strong {
+    color: var(--ride-text);
+    font-variant-numeric: tabular-nums;
+}
+body.platform-app[data-route="player"] .ride-live-value { margin: 4px 0; }
+body.platform-app[data-route="player"] .ride-live-value strong {
+    font-size: clamp(64px, 8.5vw, 118px);
+    line-height: .9;
+    letter-spacing: -.07em;
+    color: var(--ride-text);
+}
+@supports (color: color-mix(in srgb, red, blue)) and ((-webkit-background-clip: text) or (background-clip: text)) {
+    body.platform-app[data-route="player"] .ride-live-value strong {
+        background: linear-gradient(180deg, #ffffff 12%, color-mix(in srgb, var(--ride-zone) 58%, #ffffff) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+}
+body.platform-app[data-route="player"] .ride-live-value small {
+    color: var(--ride-muted);
+    font-size: 16px;
+}
+body.platform-app[data-route="player"] .ride-target-row {
+    color: var(--ride-muted);
+    font-size: 12px;
+}
+body.platform-app[data-route="player"] .ride-target-row b {
+    color: var(--ride-text);
+    font-size: 22px;
+}
 body.platform-app[data-route="player"] .ride-power-state {
-    border-color: #c7d8e7;
-    color: var(--tmw-slate) !important;
+    border: 1px solid var(--ride-border-strong);
+    background: rgba(255, 255, 255, .04);
+    color: var(--ride-muted) !important;
 }
 body.platform-app[data-route="player"] .ride-metric.primary[data-target-state="on-target"] .ride-power-state {
-    border-color: #87c8aa;
-    background: #e9f8f0;
-    color: #176c43 !important;
+    border-color: rgba(87, 192, 87, .55);
+    background: rgba(87, 192, 87, .14);
+    color: #a8e6bd !important;
 }
 body.platform-app[data-route="player"] .ride-metric.primary[data-target-state="low"] .ride-power-state {
-    border-color: #a9ccef;
-    background: #edf5ff;
-    color: #245d98 !important;
+    border-color: rgba(50, 138, 255, .55);
+    background: rgba(50, 138, 255, .14);
+    color: #a9d0ff !important;
 }
 body.platform-app[data-route="player"] .ride-metric.primary[data-target-state="high"] .ride-power-state {
-    border-color: #eab99f;
-    background: #fff2ea;
-    color: #a34a20 !important;
+    border-color: rgba(255, 102, 58, .55);
+    background: rgba(255, 102, 58, .14);
+    color: #ffc0a6 !important;
+}
+body.platform-app[data-route="player"] .ride-metric.countdown strong {
+    font-size: clamp(40px, 4.8vw, 66px);
+    line-height: 1;
+    letter-spacing: -.05em;
+}
+body.platform-app[data-route="player"] #ride-interval {
+    color: var(--ride-muted);
+    font-size: 12px;
+}
+body.platform-app[data-route="player"] #ride-cadence-prescription strong {
+    font-size: clamp(28px, 3vw, 40px);
+    letter-spacing: -.04em;
+}
+body.platform-app[data-route="player"] .ride-reading {
+    color: var(--ride-muted);
+    font-size: 12px;
+}
+body.platform-app[data-route="player"] .ride-reading b {
+    color: var(--ride-text);
+    font-size: 24px;
+}
+body.platform-app[data-route="player"] .ride-summary {
+    margin: 14px 0 18px;
+    padding: 12px 0;
+    border: 1px solid var(--ride-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .03);
+    color: var(--ride-muted);
+}
+body.platform-app[data-route="player"] .ride-summary > span { border-right-color: var(--ride-border); }
+body.platform-app[data-route="player"] .ride-summary small {
+    color: var(--ride-muted);
+    font-size: 10px;
+    letter-spacing: .02em;
+    text-transform: none;
+}
+body.platform-app[data-route="player"] .ride-summary strong {
+    color: var(--ride-text);
+    font-size: 18px;
+}
+body.platform-app[data-route="player"] .ride-summary b { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-zone-stat strong {
+    color: color-mix(in srgb, var(--ride-zone) 55%, #ffffff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+body.platform-app[data-route="player"] .ride-zone-stat strong::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--ride-zone);
+    box-shadow: 0 0 10px var(--ride-zone);
+    vertical-align: middle;
 }
 body.platform-app[data-route="player"] .ride-workout-profile {
-    border-color: var(--platform-border);
-    background: #fff;
+    padding: 16px 20px 18px;
+    border: 1px solid var(--ride-border);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, .02);
 }
-body.platform-app[data-route="player"] .ride-profile-plot { border-color: #b8c7d3; }
-body.platform-app[data-route="player"] .ride-profile-grid { stroke: #c9d4dc; }
+body.platform-app[data-route="player"] .ride-profile-heading h3 { font-size: 14px; }
+body.platform-app[data-route="player"] .ride-profile-zone-summary,
+body.platform-app[data-route="player"] #ride-position-label { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-profile-axis { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-profile-plot { border-bottom-color: rgba(255, 255, 255, .18); }
+body.platform-app[data-route="player"] .ride-profile-grid { stroke: rgba(255, 255, 255, .12); }
 body.platform-app[data-route="player"] .ride-profile-active {
-    fill: var(--tmw-blue);
-    fill-opacity: .08;
-    stroke: var(--tmw-blue);
-    stroke-opacity: .45;
+    fill: var(--ride-zone);
+    fill-opacity: .1;
+    stroke: var(--ride-zone);
+    stroke-opacity: .55;
 }
 body.platform-app[data-route="player"] .ride-profile-completed {
-    fill: #fff;
-    fill-opacity: .68;
+    fill: #071827;
+    fill-opacity: .55;
 }
-body.platform-app[data-route="player"] .ride-profile-cursor { background: var(--tmw-navy); }
+body.platform-app[data-route="player"] .ride-profile-cursor {
+    background: var(--ride-zone);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--ride-zone) 70%, transparent);
+}
 body.platform-app[data-route="player"] .ride-profile-cursor span {
-    background: var(--tmw-navy);
-    color: #fff;
+    background: var(--ride-zone);
+    color: #06131f;
+}
+body.platform-app[data-route="player"] .ride-profile-times { color: var(--ride-muted); }
+body.platform-app[data-route="player"] #ride-progress { accent-color: var(--ride-zone); }
+body.platform-app[data-route="player"] .interval-context { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-zone-legend { color: var(--ride-muted); }
+body.platform-app[data-route="player"] #ride-next {
+    padding: 4px 10px;
+    border: 1px solid var(--ride-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .03);
+    color: var(--ride-text);
+    font-size: 11px;
 }
 body.platform-app[data-route="player"] .ride-instruction {
-    border-color: #a8dfea;
-    background: #edfafe;
+    border: 1px solid color-mix(in srgb, var(--ride-zone) 45%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ride-zone) 10%, transparent);
+    color: var(--ride-text);
 }
-body.platform-app[data-route="player"] .ride-train-now {
-    border-color: #bed4ed;
-    background: #f3f8fe;
+body.platform-app[data-route="player"] .ride-actions {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--ride-zone) 38%, var(--ride-border));
+    border-radius: 16px;
+    background: rgba(7, 24, 39, .82);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .04), 0 18px 40px rgba(0, 0, 0, .32), 0 0 30px color-mix(in srgb, var(--ride-zone) 16%, transparent);
 }
-body.platform-app[data-route="player"] #platform button:not(.secondary):not(.danger) {
-    border-color: var(--tmw-blue);
-    background: var(--tmw-blue);
+body.platform-app[data-route="player"] .ride-actions button {
+    min-height: 52px;
+    border-radius: 12px;
+}
+body.platform-app[data-route="player"] #platform .ride-actions button:not(.secondary):not(.danger) {
+    border-color: transparent;
+    background: linear-gradient(135deg, #1265ff, #0b4fd6);
     color: #fff;
+    box-shadow: 0 10px 24px rgba(18, 101, 255, .32);
 }
-body.platform-app[data-route="player"] #platform button.secondary {
-    border-color: #c5d1dc;
-    background: #fff;
-    color: var(--tmw-navy);
+body.platform-app[data-route="player"] #platform .ride-panel button.secondary {
+    border-color: var(--ride-border-strong);
+    background: rgba(255, 255, 255, .06);
+    color: var(--ride-text);
 }
-body.platform-app[data-route="player"] #platform input,
-body.platform-app[data-route="player"] #platform select,
-body.platform-app[data-route="player"] #platform textarea {
-    border-color: #c5d1dc;
-    background: #fff;
-    color: var(--tmw-navy);
+body.platform-app[data-route="player"] .ride-settings { border-top-color: var(--ride-border); }
+body.platform-app[data-route="player"] .ride-settings summary { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-train-now {
+    border-color: color-mix(in srgb, var(--ride-zone) 40%, transparent);
+    background: color-mix(in srgb, var(--ride-zone) 8%, transparent);
+}
+body.platform-app[data-route="player"] .ride-train-now summary { color: var(--ride-text); }
+body.platform-app[data-route="player"] .ride-train-now p { color: var(--ride-muted); }
+body.platform-app[data-route="player"] .ride-panel .device-connect {
+    border-color: var(--ride-border-strong);
+    background: rgba(255, 255, 255, .04);
+    color: var(--ride-text);
+}
+body.platform-app[data-route="player"] .ride-panel .device-connect--name { color: var(--ride-text); }
+body.platform-app[data-route="player"] .ride-panel .device-connect > [data-sensor] { color: var(--ride-muted); }
+body.platform-app[data-route="player"] #platform .ride-panel select,
+body.platform-app[data-route="player"] #platform .ride-panel input {
+    border-color: var(--ride-border-strong);
+    background: var(--ride-surface-2);
+    color: var(--ride-text);
+}
+body.platform-app[data-route="player"] #ride-adjust-value { color: var(--ride-text); }
+body.platform-app[data-route="player"] #ride-recovery { color: var(--ride-muted); }
+body.platform-app[data-route="player"] #ride-unsaved {
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 102, 58, .45);
+    border-radius: 12px;
+    background: rgba(255, 102, 58, .1);
+}
+body.platform-app[data-route="player"] #ride-unsaved h3 { color: #ffc0a6; }
+
+@media (max-width: 700px) {
+    body.mobile-app[data-route="player"] .ride-panel {
+        padding: 14px;
+        border-radius: 20px;
+    }
+    body.mobile-app[data-route="player"] .ride-metrics {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: auto;
+    }
+    body.mobile-app[data-route="player"] .ride-metric.primary,
+    body.mobile-app[data-route="player"] .ride-metric.countdown,
+    body.mobile-app[data-route="player"] .ride-metric:not(.primary):not(.countdown) {
+        grid-column: auto;
+        grid-row: auto;
+    }
+    body.mobile-app[data-route="player"] .ride-metric {
+        min-height: 142px;
+        padding: 12px 6px;
+    }
+    body.mobile-app[data-route="player"] .ride-live-value strong { font-size: clamp(34px, 9vw, 52px); }
+    body.mobile-app[data-route="player"] .ride-metric.countdown strong { font-size: clamp(30px, 7vw, 44px); }
+    body.mobile-app[data-route="player"] #ride-cadence-prescription strong { font-size: clamp(26px, 6vw, 36px); }
+    body.mobile-app[data-route="player"] .ride-actions {
+        bottom: calc(var(--tab-bar-height) + 6px);
+        background: rgba(7, 24, 39, .9);
+    }
+    body.mobile-app[data-route="player"] .ride-summary > span { min-width: 0; }
+    body.mobile-app[data-route="player"] .ride-zone-stat strong { font-size: 12px; }
+    body.mobile-app[data-route="player"] .ride-zone-stat strong::before { display: none; }
+}
+
+@media (forced-colors: active) {
+    body.platform-app[data-route="player"] .ride-live-value strong {
+        background: none;
+        color: CanvasText;
+    }
 }
 
 @keyframes tmw-enter {
@@ -1827,7 +2090,7 @@ body.platform-app[data-route="player"] #platform textarea {
         background-image: url("../images/logo/too-many-watts-mark.png");
     }
     .mobile-app[data-route="player"] .ride-actions {
-        background: rgba(255, 255, 255, .94);
+        background: rgba(7, 24, 39, .92);
         backdrop-filter: blur(12px);
     }
 }

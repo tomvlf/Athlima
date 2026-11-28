@@ -695,13 +695,13 @@ export async function launchPlatform(root) {
                     <span id="ride-power-state" class="ride-power-state">Waiting for power</span></div>
                 <div class="ride-metric countdown"><span class="ride-metric-label">Interval left</span>
                     <strong id="ride-countdown">--</strong><span id="ride-interval"></span></div>
-                <div class="ride-metric"><span id="ride-cadence-label">Cadence</span><div id="ride-cadence-prescription" hidden><strong id="ride-cadence-target"></strong><small id="ride-cadence-unit">rpm</small></div>
+                <div class="ride-metric"><span id="ride-cadence-label" class="ride-metric-label">Cadence</span><div id="ride-cadence-prescription" hidden><strong id="ride-cadence-target"></strong><small id="ride-cadence-unit">rpm</small></div>
                     <span class="ride-reading">Actual <b id="ride-cadence">--</b> rpm</span></div>
             </div>
             <div class="ride-summary"><span><small>Heart rate</small><strong id="ride-hr">--</strong><b>bpm</b></span>
                 <span><small>Elapsed</small><strong id="ride-elapsed">--</strong></span>
                 <span><small>Workout left</small><strong id="ride-remaining">--</strong></span>
-                <span><small>Intensity</small><strong id="ride-target-zone">--</strong></span></div>
+                <span class="ride-zone-stat"><small>Intensity</small><strong id="ride-target-zone">--</strong></span></div>
             <section class="ride-workout-profile" aria-labelledby="ride-profile-heading">
                 <div class="ride-profile-heading"><div><h3 id="ride-profile-heading">Workout power profile</h3>
                     <span class="ride-profile-zone-summary">FTP-relative intensity zones</span></div><span id="ride-position-label"></span></div>
@@ -1065,6 +1065,11 @@ export async function launchPlatform(root) {
         const powerMetric = root.querySelector('.ride-metric.primary');
         powerMetric.dataset.targetState = delta == null ? 'waiting' : Math.abs(delta) <= tolerance
             ? 'on-target' : delta < 0 ? 'low' : 'high';
+        const cockpit = powerMetric.closest('.ride-panel');
+        if(cockpit) {
+            cockpit.style.setProperty('--ride-zone', targetZone?.color || '#00c8f8');
+            cockpit.dataset.zone = targetZone?.name || '';
+        }
         const progress = root.querySelector('#ride-progress');
         if(progress) progress.value = duration ? position / duration : 0;
         root.querySelector('#ride-cadence-prescription').hidden = cadenceTarget == null;
