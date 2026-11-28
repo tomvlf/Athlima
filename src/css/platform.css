@@ -643,8 +643,8 @@ html:has(> body.mobile-app) { scroll-padding-bottom: calc(66px + env(safe-area-i
 .mobile-app #platform button, .mobile-app #platform .button { padding: 8px 12px; }
 .mobile-app #platform label { margin: 10px 0; }
 .mobile-app #platform input, .mobile-app #platform select, .mobile-app #platform textarea { padding: 9px; font-size: 16px; }
-.mobile-app #profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
-.mobile-app #profile-form button { grid-column: 1 / -1; justify-self: start; }
+/* Settings rows stack on their own; the form itself is a plain block. */
+.mobile-app #profile-form { display: block; }
 .mobile-app .mobile-details > summary { display: list-item; min-height: 44px; padding: 10px 0; cursor: pointer; font-size: 14px; font-weight: 650; color: var(--platform-text); }
 .mobile-app .mobile-details[open] > summary { margin-bottom: 6px; }
 .mobile-app #platform .desktop-section-title { display: none; }

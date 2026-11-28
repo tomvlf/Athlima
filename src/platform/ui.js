@@ -729,51 +729,171 @@ export async function launchPlatform(root) {
         </section>`;
     }
     /**
+     * Settings is one column of grouped rows: a sticky section bar jumps to each group, the label
+     * and explanation sit on the left and the control on the right. Only presentation changes here;
+     * forms, ids and events stay the ones the engine already listens to.
+     */
+    const settingsIcons = {
+        rider: '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c.9-4 3.7-6.5 7-6.5s6.1 2.5 7 6.5"/>',
+        integration: '<path d="M10.6 13.4a4.6 4.6 0 0 0 6.5 0l2.1-2.1a4.6 4.6 0 0 0-6.5-6.5l-1.1 1.1"/><path d="M13.4 10.6a4.6 4.6 0 0 0-6.5 0l-2.1 2.1a4.6 4.6 0 0 0 6.5 6.5l1.1-1.1"/>',
+        backup: '<path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4.5 16.5v2.2a1.8 1.8 0 0 0 1.8 1.8h11.4a1.8 1.8 0 0 0 1.8-1.8v-2.2"/>',
+        storage: '<rect x="3.6" y="4.5" width="16.8" height="6.5" rx="2"/><rect x="3.6" y="14" width="16.8" height="5.5" rx="2"/><path d="M7 7.8h.01M7 16.8h.01"/>',
+        danger: '<path d="M4.5 7h15"/><path d="M9.5 7V5.6a1.6 1.6 0 0 1 1.6-1.6h1.8a1.6 1.6 0 0 1 1.6 1.6V7"/><path d="M6.6 7l.7 11.9a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.4 7"/>',
+    };
+    const settingsSections = [
+        ['settings-rider', 'Rider', 'rider'],
+        ['settings-intervals', 'Intervals.icu', 'integration'],
+        ['settings-backup', 'Backup', 'backup'],
+        ['settings-storage', 'Storage', 'storage'],
+        ['settings-danger', 'Delete', 'danger'],
+    ];
+    /** One labelled setting: explanation on the left, control on the right, hairline above. */
+    const settingsRow = (label, help, control, {for: target = '', helpId = '', className = ''} = {}) => html`
+        <div class="settings-row${className ? ` ${className}` : ''}">
+            <div class="settings-row--text">
+                ${target ? html`<label class="settings-row--label" for="${target}">${label}</label>`
+                    : html`<span class="settings-row--label">${label}</span>`}
+                ${help ? html`<p class="settings-row--help" id="${helpId}">${help}</p>` : ''}
+            </div>
+            ${control ? html`<div class="settings-row--control">${control}</div>` : ''}
+        </div>`;
+    /**
+     * A number its rider nudges in steps. The input keeps type=number, so typing any valid value
+     * stays possible; the buttons only adjust by the step printed in their labels.
+     */
+    const settingsStepper = ({field, spoken, value, min, max, step, unit, unitName, helpId, disabled = false}) => html`
+        <div class="settings-stepper">
+            <button type="button" class="settings-stepper--btn" data-settings-field="${field}" data-settings-step="${-step}"
+                aria-label="Decrease ${spoken} by ${step} ${unitName}" ${disabled ? 'disabled' : ''}>−</button>
+            <span class="settings-stepper--value">
+                <input id="settings-${field}" class="settings-stepper--input" name="${field}" type="number"
+                    inputmode="decimal" step="any" min="${min}" max="${max}" value="${value}"
+                    aria-describedby="${helpId}" required ${disabled ? 'disabled' : ''}>
+                <span class="settings-stepper--unit" aria-hidden="true">${unit}</span>
+            </span>
+            <button type="button" class="settings-stepper--btn" data-settings-field="${field}" data-settings-step="${step}"
+                aria-label="Increase ${spoken} by ${step} ${unitName}" ${disabled ? 'disabled' : ''}>+</button>
+        </div>`;
+    /**
+     * A titled group. On mobile it collapses through the shared mobile-details behaviour; the
+     * section id is the jump target for its chip.
+     */
+    const settingsGroup = (id, title, iconName, body, {danger = false} = {}) => html`
+        <section id="${id}" class="panel settings-group${danger ? ' settings-group--danger' : ''}">
+            <details class="mobile-details" data-mobile-details="${title}">
+                <summary>${title}</summary>
+                <div class="mobile-details-body">
+                    <h2 class="desktop-section-title settings-group--head" tabindex="-1"><span class="settings-group--icon"
+                        aria-hidden="true">${icon(settingsIcons[iconName])}</span>${title}</h2>
+                    ${body}
+                </div>
+            </details>
+        </section>`;
+    /**
      * Build local profile, integration and backup controls. Provider-managed FTP/body mass are
      * read-only while connected.
      */
     function settings() {
         const locked = integration?.connected;
-        return html`<div class="dashboard-grid">${card('Rider profile', html`<p>Settings, workouts, recordings, calendar and coaching are stored only on this device.</p>
-            <form id="profile-form"><label>FTP (W)<input name="ftp" type="number" min="1" max="1500" value="${db.ftp}" required ${locked ? 'disabled' : ''}></label>
-                <label>Body mass (kg)<input name="weight" type="number" min="1" max="500" step="0.1" value="${db.weight}" required ${locked ? 'disabled' : ''}></label>
-                <button ${locked ? 'disabled' : ''}>Save profile</button></form>${locked ? html`<p class="muted">FTP and body mass are managed by Intervals.icu and refreshed each time this app opens. Change them in Intervals.icu, or disconnect to edit locally.</p><button class="secondary" data-action="import-profile">Refresh Intervals.icu profile</button>` : ''}
-                <p class="muted">After changing FTP, archive and regenerate an active plan before riding it.</p>`)}
-            ${card('Intervals.icu', integrationView(), '', true)}
-            ${card('Local backup', html`<p>Download your coaching history, plans, workout files, recent FIT recordings, settings and calendar. Keep a backup before clearing browser data or changing devices.</p>
-                <div class="button-row"><button class="secondary" data-action="backup">Download backup</button>
-                <label>Restore backup<input id="restore-backup" type="file" accept=".json,application/json"></label></div>
-                <p class="muted">Restore merges workout/recording files and replaces local coaching, settings and calendar. Integration API keys are not included.</p>
-                <button class="secondary" data-action="export">Export local training history</button>`, '', true)}
-            ${card('This device', html`<p id="storage-status">Checking local storage...</p>
-                <p class="muted">The browser may remove local data to free space. Download a backup before clearing site data or changing devices.</p>`)}
-            ${card('Delete local data', html`<p>Erase workouts, rides, coaching history, settings, calendar, offline files and any saved Intervals.icu key from this browser. This cannot be undone.</p>
-                <button class="secondary" data-action="delete-all">Delete all local data</button>`)}</div>`;
+        return html`<div class="settings-page">
+            <nav class="settings-chips" aria-label="Settings sections">${settingsSections.map(([id, label, iconName]) =>
+                html`<button type="button" class="settings-chip" data-settings-jump="${id}">
+                    <span class="settings-chip--icon" aria-hidden="true">${icon(settingsIcons[iconName])}</span>${label}</button>`)}</nav>
+            ${settingsGroup('settings-rider', 'Rider', 'rider', html`
+                <p class="settings-lede">Settings, workouts, recordings, calendar and coaching are stored only on this device.</p>
+                <form id="profile-form">
+                    ${settingsRow(html`FTP <span class="settings-row--unit">watts</span>`,
+                        'Every workout target is a percentage of this number, so set it from a test rather than a guess.',
+                        settingsStepper({field: 'ftp', spoken: 'FTP', value: db.ftp, min: 1, max: 1500, step: 5,
+                            unit: 'W', unitName: 'watts', helpId: 'settings-ftp-help', disabled: locked}),
+                        {for: 'settings-ftp', helpId: 'settings-ftp-help'})}
+                    ${settingsRow(html`Body mass <span class="settings-row--unit">kilograms</span>`,
+                        'Used for speed, distance and climbing estimates. Power targets do not change with it.',
+                        settingsStepper({field: 'weight', spoken: 'body mass', value: db.weight, min: 1, max: 500, step: 0.5,
+                            unit: 'kg', unitName: 'kilograms', helpId: 'settings-weight-help', disabled: locked}),
+                        {for: 'settings-weight', helpId: 'settings-weight-help'})}
+                    <div class="settings-foot">
+                        <button class="settings-save" ${locked ? 'disabled' : ''}>Save profile</button>
+                        <p class="settings-foot--note">After changing FTP, archive and regenerate an active plan before riding it.</p>
+                    </div>
+                    ${locked ? html`<div class="settings-row">
+                        <div class="settings-row--text">
+                            <span class="settings-row--label">Managed by Intervals.icu</span>
+                            <p class="settings-row--help">FTP and body mass are managed by Intervals.icu and refreshed each time this app opens. Change them in Intervals.icu, or disconnect to edit locally.</p>
+                        </div>
+                        <div class="settings-row--control"><button type="button" class="secondary" data-action="import-profile">Refresh Intervals.icu profile</button></div>
+                    </div>` : ''}
+                </form>`)}
+            ${settingsGroup('settings-intervals', 'Intervals.icu', 'integration', integrationView())}
+            ${settingsGroup('settings-backup', 'Local backup', 'backup', html`
+                <p class="settings-lede">Your coaching history, plans, workout files, recent FIT recordings, settings and calendar in one file. Keep one before clearing browser data or changing devices.</p>
+                ${settingsRow('Download backup', 'Creates the file on this device. Anyone who opens it can read your training data.',
+                    html`<button type="button" class="secondary" data-action="backup">Download backup</button>`)}
+                ${settingsRow('Restore backup', 'Merges workout and recording files, then replaces local coaching, settings and calendar. Integration API keys are not included.',
+                    html`<input id="restore-backup" class="settings-file" type="file" accept=".json,application/json">`,
+                    {for: 'restore-backup'})}
+                ${settingsRow('Export training history', 'Coaching history, plans and recordings as JSON, without credentials.',
+                    html`<button type="button" class="secondary" data-action="export">Export history</button>`)}
+            `)}
+            ${settingsGroup('settings-storage', 'This device', 'storage', html`
+                <div class="settings-row settings-row--stack">
+                    <div class="settings-row--text">
+                        <span class="settings-row--label">Local storage</span>
+                        <p class="settings-row--help settings-row--status" id="storage-status">Checking local storage...</p>
+                    </div>
+                </div>
+            `)}
+            ${settingsGroup('settings-danger', 'Delete local data', 'danger', html`
+                <p class="settings-lede">Erase workouts, rides, coaching history, settings, calendar, offline files and any saved Intervals.icu key from this browser. This cannot be undone.</p>
+                <div class="settings-foot">
+                    <button type="button" class="danger" data-action="delete-all">Delete all local data</button>
+                    <p class="settings-foot--note">Only do this once a backup is saved somewhere else.</p>
+                </div>
+            `, {danger: true})}
+        </div>`;
     }
     /**
      * Present connection setup or import progress without displaying the saved API key. Imported
      * history is separate from the connection credentials.
      */
     function integrationView() {
-        if(!integration) return html`<p role="status">Loading integration status...</p>`;
-        if(!integration.connected) return html`<p>Import history directly from Intervals.icu into your local Activities, analytics and Coach. Your personal API key is stored in this browser and sent only to Intervals.icu. Anyone with access to this browser profile can use it.</p>
-            <form id="intervals-connect"><label>Personal API key<input name="apiKey" type="password" required autocomplete="off" maxlength="1024"></label>
-                <label>Import from<input name="oldest" type="date" value="${addDays(today(), -365)}" max="${today()}" required></label>
-                <label class="check"><input type="checkbox" name="remember" checked> Keep this connection on this device</label>
-                <button>Test & connect</button></form><p class="muted">Personal/self-hosted connections only. Strava-origin data is not available through the Intervals.icu API.</p>`;
-        const athleteIdText = integration.athleteId && integration.athleteId !== '0'
-            ? `Athlete ID: ${integration.athleteId}`
-            : 'Athlete ID: auto-resolved from your Intervals.icu account';
-        return html`<p class="eyebrow">${integration.status}</p><p>Last successful sync: ${integration.lastSuccess ? new Date(integration.lastSuccess).toLocaleString() : 'Not yet synced'}</p>
-            ${integration.nextDate ? html`<p>Importing ${integration.nextDate} through ${integration.through} in 31-day batches.</p>` : ''}
-            ${integration.error ? html`<p role="alert">${integration.error}</p>` : ''}
-            ${integration.skipped?.length ? html`<details class="muted"><summary>${integration.skipped.length} activit${integration.skipped.length === 1 ? 'y' : 'ies'} skipped (missing ID, start time or duration)</summary><ul>${integration.skipped.map(label => html`<li>${label}</li>`)}</ul></details>` : ''}
-            ${integration.retryAt && integration.status === 'queued' ? html`<p>Retry after ${new Date(integration.retryAt).toLocaleString()}</p>` : ''}
-            <p class="muted">${athleteIdText}</p>
-            <div class="button-row"><button data-action="sync" ${['running', 'queued'].includes(integration.status) ? 'disabled' : ''}>${integration.lastSuccess ? 'Sync now' : 'Import history'}</button>
-                <button class="secondary" data-action="test-connection">Test connection</button>
-                <button class="secondary" data-action="disconnect">Disconnect</button></div>
-            <p class="muted">Your API key is stored in this browser, not on an Too Many Watts server. Disconnect removes it; imported history is retained. Sync runs while this app is open and rechecks the last seven days for updates.${integration.remembered === false ? ' This connection is kept only until you close this tab.' : ''}</p>`;
+        if(!integration) return html`<p class="settings-lede" role="status">Loading integration status...</p>`;
+        if(!integration.connected) return html`
+            <p class="settings-lede">Import history directly from Intervals.icu into your local Activities, analytics and Coach. The key stays in this browser.</p>
+            <form id="intervals-connect">
+                ${settingsRow('Personal API key', 'Anyone with access to this browser profile can use this key.',
+                    html`<input id="intervals-api-key" name="apiKey" type="password" required autocomplete="off" maxlength="1024"
+                        aria-describedby="intervals-key-help">`, {for: 'intervals-api-key', helpId: 'intervals-key-help'})}
+                ${settingsRow('Import from', 'History is imported in 31-day batches from this date.',
+                    html`<input id="intervals-oldest" name="oldest" type="date" value="${addDays(today(), -365)}" max="${today()}"
+                        required aria-describedby="intervals-oldest-help">`, {for: 'intervals-oldest', helpId: 'intervals-oldest-help'})}
+                ${settingsRow(html`<label class="settings-check"><input type="checkbox" name="remember" checked>Keep this connection on this device</label>`,
+                    'Clear it and the key is forgotten when this tab closes.', '')}
+                <div class="settings-foot">
+                    <button class="settings-save">Test &amp; connect</button>
+                    <p class="settings-foot--note">Personal/self-hosted connections only. Strava-origin data is not available through the Intervals.icu API.</p>
+                </div>
+            </form>`;
+        const athleteText = integration.athleteId && integration.athleteId !== '0'
+            ? integration.athleteId
+            : 'Resolved from your Intervals.icu account';
+        return html`
+            <p class="settings-lede">Connected. Imported history stays on this device, and sync rechecks the last seven days while the app is open.</p>
+            <div class="settings-facts">
+                <div><span>Status</span><strong>${integration.status}</strong></div>
+                <div><span>Last sync</span><strong>${integration.lastSuccess ? new Date(integration.lastSuccess).toLocaleString() : 'Not yet synced'}</strong></div>
+                <div><span>Athlete</span><strong>${athleteText}</strong></div>
+            </div>
+            ${integration.nextDate ? html`<p class="settings-note">Importing ${integration.nextDate} through ${integration.through} in 31-day batches.</p>` : ''}
+            ${integration.retryAt && integration.status === 'queued' ? html`<p class="settings-note">Retry after ${new Date(integration.retryAt).toLocaleString()}</p>` : ''}
+            ${integration.error ? html`<p class="settings-callout" role="alert">${integration.error}</p>` : ''}
+            ${integration.skipped?.length ? html`<details class="settings-skipped"><summary>${integration.skipped.length} activit${integration.skipped.length === 1 ? 'y' : 'ies'} skipped (missing ID, start time or duration)</summary><ul>${integration.skipped.map(label => html`<li>${label}</li>`)}</ul></details>` : ''}
+            <div class="settings-foot settings-foot--actions">
+                <button data-action="sync" ${['running', 'queued'].includes(integration.status) ? 'disabled' : ''}>${integration.lastSuccess ? 'Sync now' : 'Import history'}</button>
+                <button type="button" class="secondary" data-action="test-connection">Test connection</button>
+                <button type="button" class="secondary" data-action="disconnect">Disconnect</button>
+            </div>
+            <p class="settings-note">Your API key is stored in this browser, not on a Too Many Watts server. Disconnect removes it; imported history is retained.${integration.remembered === false ? ' This connection is kept only until you close this tab.' : ''}</p>`;
     }
     /**
      * Refresh connection status without overlapping another status load or overwriting a focused
@@ -1253,6 +1373,35 @@ export async function launchPlatform(root) {
             render();
             if(isDate) root.querySelector('[name=dailyDate]')?.focus();
             else root.querySelector(`[data-daily-timeline="${dailyTimeline}"]`)?.focus();
+            return;
+        }
+        const settingsJump = event.target.closest('[data-settings-jump]');
+        if(settingsJump) {
+            const section = root.querySelector(`#${settingsJump.dataset.settingsJump}`);
+            if(section) {
+                const details = section.querySelector('details');
+                if(details) details.open = true;
+                section.scrollIntoView?.({behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                    ? 'auto' : 'smooth', block: 'start'});
+                (mobile ? section.querySelector('summary') : section.querySelector('.settings-group--head'))
+                    ?.focus({preventScroll: true});
+            }
+            root.querySelectorAll('[data-settings-jump]').forEach(chip =>
+                chip.setAttribute('aria-current', String(chip === settingsJump)));
+            return;
+        }
+        const stepper = event.target.closest('[data-settings-step]');
+        if(stepper) {
+            const input = stepper.closest('form')?.elements?.[stepper.dataset.settingsField];
+            if(!input || input.disabled) return;
+            const min = Number(input.min);
+            const max = Number(input.max);
+            const decimals = (stepper.dataset.settingsStep.split('.')[1] || '').length;
+            let value = Number(input.value);
+            if(input.value === '' || !Number.isFinite(value)) value = Number(input.defaultValue) || min;
+            const bounded = Math.min(Number.isFinite(max) ? max : Infinity,
+                Math.max(Number.isFinite(min) ? min : 0, value + Number(stepper.dataset.settingsStep)));
+            input.value = bounded.toFixed(decimals);
             return;
         }
         const action = event.target.closest('[data-action]')?.dataset.action;

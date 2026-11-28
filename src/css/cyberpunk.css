@@ -1849,3 +1849,372 @@ body.platform-app[data-route="player"] #platform textarea {
         scroll-behavior: auto !important;
     }
 }
+
+/*
+ * Settings page. One centred column: a sticky section bar jumps between groups, and each group is
+ * a single surface whose rows carry a hairline, a label with its explanation, and the control on
+ * the right. The values themselves are the loudest element on the page.
+ */
+body[data-route="settings"] .platform-header,
+body[data-route="settings"] .settings-page {
+    width: 100%;
+    max-width: 780px;
+    margin-inline: auto;
+}
+
+body[data-route="settings"] .platform-header {
+    min-height: 0;
+    margin-bottom: 8px;
+}
+
+body[data-route="settings"] .platform-header::after { display: none; }
+
+body[data-route="settings"] #platform .settings-chips {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 12px 0;
+    overflow-x: auto;
+    background: var(--tmw-paper);
+    scrollbar-width: none;
+}
+
+body[data-route="settings"] #platform .settings-chips::-webkit-scrollbar { display: none; }
+
+body[data-route="settings"] #platform .settings-chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    min-height: 42px;
+    margin: 0;
+    padding: 0 15px;
+    border: 1px solid var(--platform-border);
+    border-radius: 999px;
+    background: var(--tmw-white);
+    color: var(--platform-muted);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: 0;
+    cursor: pointer;
+    transition: color .15s ease, background-color .15s ease, border-color .15s ease;
+}
+
+body[data-route="settings"] #platform .settings-chip:hover {
+    border-color: #b8c6d5;
+    color: var(--tmw-navy);
+}
+
+body[data-route="settings"] #platform .settings-chip[aria-current="true"] {
+    border-color: var(--tmw-navy);
+    background: var(--tmw-navy);
+    color: var(--tmw-white);
+}
+
+body[data-route="settings"] #platform .settings-chip--icon { display: grid; place-items: center; }
+body[data-route="settings"] #platform .settings-chip--icon svg { width: 16px; height: 16px; stroke-width: 2; }
+
+body[data-route="settings"] #platform .settings-group {
+    padding: 0;
+    margin: 0 0 14px;
+}
+
+body[data-route="settings"] #platform .settings-group--head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 18px clamp(18px, 2.4vw, 26px) 12px;
+    color: var(--tmw-navy);
+    font-size: 19px;
+    font-weight: 780;
+    letter-spacing: -.03em;
+}
+
+body[data-route="settings"] #platform .settings-group--head:focus { outline: none; }
+
+body[data-route="settings"] #platform .settings-group--icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--platform-surface);
+    color: var(--tmw-blue);
+}
+
+body[data-route="settings"] #platform .settings-group--icon svg { width: 17px; height: 17px; }
+body[data-route="settings"] #platform .settings-group--danger .settings-group--icon { background: #fdeceb; color: #b42318; }
+
+body[data-route="settings"] #platform .settings-lede {
+    margin: 0;
+    padding: 0 clamp(18px, 2.4vw, 26px) 12px;
+    max-width: 66ch;
+    color: var(--platform-muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+}
+
+body[data-route="settings"] #platform .settings-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+    min-height: 72px;
+    padding: 14px clamp(18px, 2.4vw, 26px);
+    border-top: 1px solid var(--platform-border);
+}
+
+body[data-route="settings"] #platform .settings-row--stack { align-items: flex-start; }
+body[data-route="settings"] #platform .settings-row--text { flex: 1 1 14rem; min-width: 0; }
+
+body[data-route="settings"] #platform .settings-row--label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--tmw-navy);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+body[data-route="settings"] #platform .settings-row--unit {
+    color: var(--platform-muted);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+body[data-route="settings"] #platform .settings-row--help {
+    margin: 3px 0 0;
+    max-width: 46ch;
+    color: var(--platform-muted);
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+body[data-route="settings"] #platform .settings-row--status { color: var(--tmw-navy); font-size: 14px; }
+
+body[data-route="settings"] #platform .settings-row--control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+body[data-route="settings"] #platform .settings-stepper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--platform-border);
+    border-radius: 14px;
+    background: var(--platform-surface);
+}
+
+body[data-route="settings"] #platform .settings-stepper--btn {
+    min-width: 40px;
+    min-height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: var(--tmw-white);
+    color: var(--tmw-navy);
+    box-shadow: 0 1px 2px rgba(7, 24, 39, .1);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+body[data-route="settings"] #platform .settings-stepper--btn:hover:not(:disabled) { background: #e9f1fa; }
+body[data-route="settings"] #platform .settings-stepper--btn:disabled { opacity: .45; cursor: not-allowed; }
+
+body[data-route="settings"] #platform .settings-stepper--value {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 6.2rem;
+    padding: 0 6px;
+}
+
+body[data-route="settings"] #platform .settings-stepper--input {
+    width: 4.8rem;
+    height: 40px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    box-shadow: none;
+    color: var(--tmw-navy);
+    font: inherit;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -.045em;
+    line-height: 40px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+body[data-route="settings"] #platform .settings-stepper--unit {
+    color: var(--platform-muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+body[data-route="settings"] #platform .settings-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+    padding: 15px clamp(18px, 2.4vw, 26px) 17px;
+    border-top: 1px solid var(--platform-border);
+}
+
+body[data-route="settings"] #platform .settings-foot--actions { gap: 10px; }
+
+body[data-route="settings"] #platform .settings-foot--note,
+body[data-route="settings"] #platform .settings-note {
+    margin: 0;
+    color: var(--platform-muted);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+body[data-route="settings"] #platform .settings-foot--note { flex: 1 1 16rem; max-width: 48ch; }
+
+body[data-route="settings"] #platform .settings-note {
+    padding: 0 clamp(18px, 2.4vw, 26px) 16px;
+    max-width: 66ch;
+}
+
+body[data-route="settings"] #platform .settings-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px 20px;
+    padding: 14px clamp(18px, 2.4vw, 26px) 16px;
+    border-top: 1px solid var(--platform-border);
+}
+
+body[data-route="settings"] #platform .settings-facts > div { display: grid; gap: 2px; min-width: 0; }
+
+body[data-route="settings"] #platform .settings-facts span {
+    color: var(--platform-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+body[data-route="settings"] #platform .settings-facts strong {
+    color: var(--tmw-navy);
+    font-size: 14.5px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+body[data-route="settings"] #platform .settings-callout {
+    margin: 0;
+    padding: 12px clamp(18px, 2.4vw, 26px);
+    border-top: 1px solid #fecaca;
+    background: #fff3f2;
+    color: #7a271a;
+    font-size: 13.5px;
+}
+
+body[data-route="settings"] #platform .settings-skipped {
+    padding: 12px clamp(18px, 2.4vw, 26px);
+    border-top: 1px solid var(--platform-border);
+    color: var(--platform-muted);
+    font-size: 13.5px;
+}
+
+body[data-route="settings"] #platform .settings-skipped summary {
+    color: var(--tmw-navy);
+    font-weight: 650;
+    cursor: pointer;
+}
+
+body[data-route="settings"] #platform .settings-skipped ul { margin: 8px 0 0; padding-left: 20px; }
+
+body[data-route="settings"] #platform .settings-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--tmw-navy);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+body[data-route="settings"] #platform .settings-check input {
+    width: 22px;
+    height: 22px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--tmw-blue);
+}
+
+body[data-route="settings"] #platform .settings-file {
+    width: auto;
+    max-width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--platform-muted);
+    font-size: 12.5px;
+}
+
+body[data-route="settings"] #platform .settings-file::file-selector-button {
+    min-height: 42px;
+    margin: 0 10px 0 0;
+    padding: 0 15px;
+    border: 1px solid var(--platform-border);
+    border-radius: 10px;
+    background: var(--tmw-white);
+    color: var(--tmw-navy);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+body[data-route="settings"] #platform .settings-file::file-selector-button:hover { background: #eef4fb; }
+
+/* Mobile keeps the collapsible groups; the group heading lives in the summary instead. */
+body.mobile-app[data-route="settings"] #platform .settings-group--head { display: none; }
+
+body.mobile-app[data-route="settings"] #platform .settings-group .mobile-details > summary {
+    margin: 0;
+    padding: 16px clamp(18px, 2.4vw, 26px);
+    color: var(--tmw-navy);
+    font-size: 16px;
+    font-weight: 780;
+}
+
+body.mobile-app[data-route="settings"] #platform .settings-group .mobile-details[open] > summary {
+    border-bottom: 1px solid var(--platform-border);
+}
+
+@media (max-width: 700px) {
+    body[data-route="settings"] #platform .settings-row { align-items: flex-start; }
+    body[data-route="settings"] #platform .settings-row--control { width: 100%; margin-left: 0; }
+    body[data-route="settings"] #platform .settings-stepper { width: 100%; justify-content: space-between; }
+    body[data-route="settings"] #platform .settings-stepper--value { flex: 1; justify-content: center; }
+    body[data-route="settings"] #platform .settings-stepper--input { width: 100%; max-width: 7rem; }
+    body[data-route="settings"] #platform .settings-stepper--btn { min-width: 46px; min-height: 46px; }
+    body[data-route="settings"] #platform .settings-chips { margin-inline: -14px; padding-inline: 14px; }
+    body[data-route="settings"] #platform .settings-foot > button { flex: 1 1 auto; }
+}

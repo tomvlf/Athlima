@@ -385,10 +385,31 @@ test('desktop shell wires every screen to real data, workout commands, accessibl
         expect(profile.elements.weight.value).toBe('74');
         expect(document.body.dataset.route).toBe('settings');
     }
+    /**
+     * The stepper buttons nudge the same fields the form saves and stop at the documented range.
+     * Values are restored afterwards so the submit assertion below still proves 270/74 is saved.
+     */
+    const ftpStep = root.querySelector('[data-settings-field="ftp"][data-settings-step="5"]');
+    ftpStep.click();
+    expect(profile.elements.ftp.value).toBe('275');
+    profile.elements.ftp.value = '1500';
+    ftpStep.click();
+    expect(profile.elements.ftp.value).toBe('1500');
+    root.querySelector('[data-settings-field="weight"][data-settings-step="-0.5"]').click();
+    expect(profile.elements.weight.value).toBe('73.5');
+    profile.elements.ftp.value = '270';
+    profile.elements.weight.value = '74';
     profile.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     await settle();
     expect(dispatch).toHaveBeenCalledWith('ui:ftp-set', 270);
     expect(dispatch).toHaveBeenCalledWith('ui:weight-set', 74);
+    // Section chips move between groups without rebuilding the forms they contain.
+    const backupChip = root.querySelector('[data-settings-jump="settings-backup"]');
+    backupChip.click();
+    expect(backupChip.getAttribute('aria-current')).toBe('true');
+    expect(root.querySelector('[data-settings-jump="settings-rider"]').getAttribute('aria-current')).toBe('false');
+    expect(root.querySelector('#settings-backup details').open).toBe(true);
+    expect(root.querySelector('#profile-form')).toBe(profile);
     const form = root.querySelector('#intervals-connect');
     form.elements.apiKey.value = 'local-only-key';
     form.elements.oldest.value = '2026-01-01';
